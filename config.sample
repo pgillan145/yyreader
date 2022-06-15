@@ -1,0 +1,16 @@
+# Edit this file and copy it to $HOME/yyreader.conf
+
+[default]
+# Location of the cache file
+cache_file = /tmp/yyreader.cache
+# Smallest file size to consider a comic, in MB
+minimum_file_size = 5
+# Location of the 'tar' utility
+tar = /usr/bin/tar
+# Location of the 'unzip' system utility.
+unzip = /usr/bin/unzip
+
+[comicvine]
+# https://comicvine.gamespot.com/api/
+api_key = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
