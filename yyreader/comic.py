@@ -1,6 +1,7 @@
 
 from fuzzywuzzy import fuzz
 import minorimpact
+import minorimpact.config
 import os
 import os.path
 import re
@@ -12,6 +13,7 @@ import tempfile
 from . import comicvine
 from . import parser
 
+config = minorimpact.config.getConfig(script_name = 'yyreader')
 
 class comic():
     data_dir = None
@@ -20,22 +22,24 @@ class comic():
     file = None
     config = None
 
-    def __init__(self, file, config):
+    #def __init__(self, file, config):
+    def __init__(self, file):
         self.file = file
-        self.config = config
+
+    def __repr__(self):
+        return self.file
 
     def box(self, target_dir, data = None, args = minorimpact.default_arg_flags):
         if (target_dir is None):
             raise Exception("No target directory specified.")
-
         elif (os.path.exists(target_dir) is False):
             raise Exception(f"{target_dir} doesn't exist")
 
         target_dir = re.sub('/$', '', target_dir)
 
         match_log = {}
-        if ('match_log_file' in self.config['default'] and os.path.exists(self.config['default']['match_log_file'])):
-            with open(self.config['default']['match_log_file'], 'r') as f:
+        if ('match_log_file' in config['default'] and os.path.exists(config['default']['match_log_file'])):
+            with open(config['default']['match_log_file'], 'r') as f:
                 line = f.readline()
                 while line:
                     (original,processed) = line.rstrip().split(' => ')
@@ -49,8 +53,8 @@ class comic():
             os.mkdir(target_dir + '/ByDate')
 
         minimum_file_size = 1
-        if ('minimum_file_size' in self.config['default']):
-            minimum_file_size = int(self.config['default']['minimum_file_size'])
+        if ('minimum_file_size' in config['default']):
+            minimum_file_size = int(config['default']['minimum_file_size'])
         minimum_file_size = minimum_file_size * 1024 * 1024
 
         parse_data = None
@@ -61,12 +65,11 @@ class comic():
                 raise Exception("No info parsed from filename")
             if (parse_data['size'] < minimum_file_size):
                 raise Exception("file too small")
-            comicvine_data = comicvine.search(parse_data, self.config['comicvine']['api_key'], cache_file = self.config['default']['cache_file'], args = args)
+            comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
 
             new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'])
             if (os.path.basename(self.file) != new_comic):
-                #ratio = fuzz.ratio(f"{data['parse_title']} {file_date}", f"{data['volume_name']} {data['date']}")
-                
+                # Figure out how 'close' the filename is to what we got back from comicvine.
                 ratio = 0
                 if (("The " + parse_data['title']) == comicvine_data['volume_name']):
                     ratio = 100
@@ -76,15 +79,20 @@ class comic():
                     ratio = fuzz.ratio(f"{parse_data['title']}", f"{comicvine_data['volume_name']}")
             
                 c = ''
-                if (args.yes and ( 'pub_date' in parse_data  and 'date' in comicvine_data and comicvine_data['date'] == parse_data['pub_date'] and ratio > 94 )):
-                    c = 'y'
-                elif (args.yes is False):
-                    if (ratio > 80):
-                        default_c = 'y'
-                        default_text = 'Y/n'
+                if ( 'pub_date' in parse_data and 'date' in comicvine_data and comicvine_data['date'] == parse_data['pub_date'] and ratio > 94):
+                    default_c = 'y'
+                    default_text = 'Y/n'
+                else:
+                    default_c = 'n'
+                    default_text = 'y/N'
+
+                if (args.yes is True):
+                    if (default_c == 'y'):
+                        c = 'y'
                     else:
-                        default_c = 'n'
-                        default_text = 'y/N'
+                        break
+
+                if (c == ''):
                     c = minorimpact.getChar(default=default_c, end='\n', prompt=f"move to {new_comic} (ratio:{ratio})? ({default_text}/?) ", echo=True).lower()
 
                 if (c == '?'):
@@ -133,9 +141,9 @@ class comic():
                     if (args.verbose): print(f"MOVE {self.file} => {name_dir}/{new_comic}")
                     if (args.dryrun is False):
                         shutil.move(self.file, name_dir + '/' + new_comic)
-                        if ('match_log_file' in self.config['default']):
+                        if ('match_log_file' in config['default']):
                             match_log[comic] = new_comic
-                            with open(self.config['default']['match_log_file'], 'a') as f:
+                            with open(config['default']['match_log_file'], 'a') as f:
                                 f.write(f"{self.file} => {match_log[comic]}\n")
                         self.file = name_dir + '/' + new_comic
                     if (comic_date is not None and os.path.exists(comic_date) is True):
@@ -192,9 +200,9 @@ class comic():
         os.chdir(temp_dir)
         command = None
         if (self.is_cbr()):
-            command = [self.config['default']['tar'], '-xf', self.file]
+            command = [config['default']['tar'], '-xf', self.file]
         elif (self.is_cbz()):
-            command = [self.config['default']['unzip'], '-q', self.file, '-d', temp_dir]
+            command = [config['default']['unzip'], '-q', self.file, '-d', temp_dir]
 
         if (command is None): raise Exception("can't unpack, unknown file type")
         result = subprocess.run(command)

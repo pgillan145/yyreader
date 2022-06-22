@@ -34,7 +34,7 @@ def main():
             sys.exit(f"{c_file} does not exist")
         
         try:
-            c = comic.comic(c_file, config)
+            c = comic.comic(c_file)
             c.box(args.target, args = args)
         except Exception as e:
             print(e)
@@ -48,7 +48,7 @@ def main():
             if ('ByName' in c_file or 'ByDate' in c_file):
                 continue
             try:
-                c = comic.comic(c_file, config)
+                c = comic.comic(c_file)
                 c.box(args.target, args = args)
             except Exception as e:
                 print(e)

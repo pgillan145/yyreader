@@ -35,7 +35,7 @@ class TestUtils(unittest.TestCase):
         self.assertIsInstance(config, configparser.ConfigParser)
 
     def test_comic(self):
-        c = yyreader.comic.comic(self.dir + '/test_data/test.cbz', config = self.config)
+        c = yyreader.comic.comic(self.dir + '/test_data/test.cbz')
         self.assertEqual(c.page_count(), 1)
         self.assertEqual(md5(c.page(1)).hexdigest(), 'd5ad9ac2b9d3cea48fc67d5cea893ea2')
 
