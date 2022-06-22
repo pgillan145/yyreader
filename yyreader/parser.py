@@ -13,6 +13,40 @@ date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)' ]
 
+cleanup_subs = [ { 'm':'\)\(', 's':') ('},
+                 { 'm':'([^ ])\(', 's':r'\1 (' },
+                 { 'm':'[. ]\.(cb[zr])$', 's':r'.\1' },
+                 { 'm':' \[[^]]*\]+', 's':''},
+                 { 'm':' \([^)]*[^)\d\-]+[^)]*\)', 's':'' },
+                 { 'm':' \d+ of \d+ covers', 's':'' },
+                 { 'm':' v\d+ (\d+)\.', 's':r' \1.' },
+                 { 'm':' #(\d+)', 's':r' \1' },
+                 { 'm':' (\d)\.', 's':r' 00\1.' },
+                 { 'm':' (\d\d)\.', 's':r' 0\1.' },
+                 { 'm':'^\d+ ?- ', 's':'' },
+                 { 'm':'__SLASH__', 's':'/' },
+                 { 'm':'^FCBD (\d\d\d\d) ', 's':r'Free Comic Book Day \1 ' },
+                 { 'm':' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', 's':r' - Marvel Legacy Primer Pages 001 (\1)' },
+                 { 'm':'^\d+ - House of M - ', 's':'' },
+               ]
+
+formats = [ '^(?P<year>\d\d\d\d)00 (?P<title>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<title>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            # Hulk - Grand Design 001 - Monster (2022).cbr
+            '^(?P<title>.+) (?P<issue>\d\d\d) - .+ \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) (?P<issue>\d+)\.(?P<extension>cb[rz])$',
+            '^(?P<year>\d\d\d\d)00 (?P<title>.+)\.(?P<extension>cb[rz])$',
+            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<title>.+)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<title>.+)\.(?P<extension>cb[rz])$',
+          ]
+
 def make_date(data, extension, directors_cut = False):
     if ('issue' not in data):
         raise Exception("'issue' not found in comic data")
@@ -120,24 +154,12 @@ def parse(comic_file, args = minorimpact.default_arg_flags):
         year = args.year
 
     (dirname, basename) = os.path.split(comic_file)
-    basename = re.sub('\)\(', ') (', basename)
-    basename = re.sub('([^ ])\(', r'\1 (', basename)
-    basename = re.sub('[. ]\.(cb[zr])$', r'.\1', basename)
     if (re.search('fc only', basename) is not None or re.search('cover ONLY', basename) is not None or re.search('cover only', basename) is not None):
         raise Exception("Front cover only")
 
-    basename = re.sub(' \[[^]]*\]+', '', basename)
-    basename = re.sub(' \([^)]*[^)\d\-]+[^)]*\)', '', basename)
-    basename = re.sub(' \d+ of \d+ covers', '', basename)
-    basename = re.sub(' v\d+ (\d+)\.', r' \1.', basename)
-    basename = re.sub(' #(\d+)', r' \1', basename)
-    basename = re.sub(' (\d)\.', r' 00\1.', basename)
-    basename = re.sub(' (\d\d)\.', r' 0\1.', basename)
-    basename = re.sub('^\d+ ?- ', '', basename)
-    basename = re.sub('__SLASH__', '/', basename)
-    basename = re.sub('^FCBD (\d\d\d\d) ', r'Free Comic Book Day \1 ', basename)
-    basename = re.sub(' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', r' - Marvel Legacy Primer Pages 001 (\1)', basename)
-    basename = re.sub('^\d+ - House of M - ', '', basename)
+    for c in cleanup_subs:
+        basename = re.sub(c['m'], c['s'], basename)
+
     print(f"basename:{basename}")
 
     if (re.search(r" - [dD]irector'?s? [Cc]ut", basename) is not None):
@@ -154,23 +176,9 @@ def parse(comic_file, args = minorimpact.default_arg_flags):
             if 'year' in g: year = g['year']
             break
 
-    formats = [ '^(?P<year>\d\d\d\d)00 (?P<title>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
-                '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<title>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) (?P<issue>\d+[^.]*)\.(?P<extension>cb[rz])$',
-                '^(?P<year>\d\d\d\d)00 (?P<title>.+)\.(?P<extension>cb[rz])$',
-                '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<title>.+)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-                '^(?P<title>.+)\.(?P<extension>cb[rz])$',
-              ]
 
     for f in formats:
-        #if (args.debug): print(f"testing '{f}'")
+        if (args.debug): print(f"testing '{f}'")
         m = re.search(f, basename)
         if (m is not None):
             if (args.debug): print(f"matched format '{f}'")
