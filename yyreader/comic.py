@@ -162,8 +162,16 @@ class comic():
         pass
 
     def _files(self):
+        files = []
         self._unpack()
-        return sorted(list(filter(lambda x:re.search(r'.jpg$', x), os.listdir(self.data_dir))))
+        for f in os.listdir(self.data_dir):
+            if (re.search(r'.jpg$', f) is None or f in parser.credit_pages):
+                continue
+            files.append(f)
+
+        return sorted(files)
+
+        #return sorted(list(filter(lambda x:re.search(r'.jpg$', x), os.listdir(self.data_dir))))
 
     def is_cbr(self):
         if (re.search('\.cbr$', self.file)):

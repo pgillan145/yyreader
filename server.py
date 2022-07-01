@@ -32,6 +32,12 @@ def main():
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
 
+            elif (re.search('favicon.ico', self.path)):
+                self.send_header('Content-type', 'image/jpeg')
+                self.end_headers()
+                with open('./favicon.ico', 'rb') as f:
+                    self.wfile.write(f.read())
+
             elif (re.search(r'^/read/(\d+)/?$', self.path.lower())):
                 m = re.search(r'^/read/(\d+)/?$', self.path.lower())
                 id = m.group(1)
@@ -60,6 +66,9 @@ def main():
                     comic_cache[id] = {}
                     comic_cache[id]['comic'] = c
                     comic_cache[id]['date'] = datetime.now()
+
+                if (page > c.page_count()):
+                    page = c.page_count()
 
                 output = "<!DOCTYPE HTML>\n<html><body>\n"
                 output = output + "<table>"
@@ -146,7 +155,7 @@ def main():
             # /bydate
             elif (re.search(r'/bydate/?$', self.path.lower())):
                 output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/'>Back</a><br />\n"
+                output = output + "<a href='/'>&lt;-- Back</a><br />\n"
                 output = output + "<table>\n"
                 for year in yyreader.yacreader.get_years():
                     output = output + "<tr>\n  <td>"
@@ -163,7 +172,7 @@ def main():
                 m = re.search(r'^/bytitle/([^/ ]+)/?$', self.path)
                 title = urllib.parse.unquote(m.group(1))
                 output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/bytitle'>Back</a><br />\n"
+                output = output + "<a href='/bytitle'>&lt;-- Back</a><br />\n"
                 output = output + "<table>\n"
                 for comic in yyreader.yacreader.get_comics_by_title(title):
                     output = output + "<tr>\n  <td>"
@@ -182,6 +191,7 @@ def main():
             # /bytitle
             elif (re.search(r'^/bytitle/?$', self.path.lower())):
                 output = "<!DOCTYPE HTML>\n<html><body>\n"
+                output = output + "<a href='/'>&lt;-- Back</a><br />\n"
                 for title in yyreader.yacreader.get_titles():
                     output = output + "<a href='/bytitle/{}'>{}</a><br />\n".format(urllib.parse.quote(title), title)
                 output = output + "</body></html>\n"
@@ -189,11 +199,6 @@ def main():
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
 
-            elif (self.path == '/favicon.ico'):
-                self.send_header('Content-type', 'image/jpeg')
-                self.end_headers()
-                with open('./favicon.ico', 'rb') as f:
-                    self.wfile.write(f.read())
             elif (self.path == '/test'):
                 self.send_header('Content-type', 'image/jpeg')
                 self.end_headers()
