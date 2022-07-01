@@ -60,5 +60,32 @@ class TestUtils(unittest.TestCase):
         new_filename = yyreader.parser.convert_name_to_date(filename)
         self.assertEqual(new_filename, '2019/12/2019-12-11 Yondu (2019) 003.cbr')
 
+    def test_patterns(self):
+        test_patterns_file = self.dir + '/test_data/test_patterns'
+        if (os.path.exists(test_patterns_file) is None):
+            self.skipTest("test_patterns file does not exist")
+
+        with open(test_patterns_file, 'r') as f:
+            args = minorimpact.default_arg_flags
+            args.yes = True
+            #args.verbose = True
+            #args.debug = True
+            line = f.readline()
+            while line:
+                if (line.rstrip() == ''):
+                    break
+                (original,processed) = line.rstrip().split(' => ')
+                parse_data = yyreader.parser.parse(original)
+                comicvine_data = yyreader.comicvine.search(parse_data, self.config['comicvine']['api_key'], cache_file = self.config['default']['cache_file'], args = args)
+
+                reprocessed = yyreader.parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
+                #if (reprocessed != processed):
+                #    print('   original:' + original)
+                #    print('  processed:' + processed)
+                #    print('reprocessed:' + reprocessed)
+                self.assertEqual(reprocessed, processed)
+                line = f.readline()
+
+
 if __name__ == '__main__':
     unittest.main()

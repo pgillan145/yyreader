@@ -32,7 +32,12 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
 
 formats = [ '^(?P<year>\d\d\d\d)00 (?P<title>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<title>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            # Damage Control (1989v2) 001 (1989-12-01).cbr
+            '^(?P<title>.+) \((?P<start_year>\d\d\d\d)-(?P<ver>\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            # Alien Legion (1984) 001 (1984-06-01).cbr
             '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            # Earth X (1999)/Earth X (1999) ½ (2000-01-01).cbz
+            '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>[^ ]+) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
             '^(?P<title>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             '^(?P<title>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
@@ -47,7 +52,12 @@ formats = [ '^(?P<year>\d\d\d\d)00 (?P<title>.+) (?P<issue>\d+[^ ]*)\.(?P<extens
             '^(?P<title>.+)\.(?P<extension>cb[rz])$',
           ]
 
-def make_date(data, extension, directors_cut = False):
+credit_pages = [ 'z.jpg',
+                 'zzoroboros.jpg',
+                 'zWater.jpg',
+               ]
+
+def make_date(data, extension, ver = None, directors_cut = False):
     if ('issue' not in data):
         raise Exception("'issue' not found in comic data")
 
@@ -59,9 +69,12 @@ def make_date(data, extension, directors_cut = False):
 
     issue = massage_issue(data['issue'], directors_cut = directors_cut)
     volume_name = massage_volume(data['volume_name'])
-    return f"{data['date']} {volume_name} ({data['start_year']}) {issue}.{extension}"
+    start_year = data['start_year']
+    if (ver is not None):
+        start_year = start_year + "-" + ver
+    return f"{data['date']} {volume_name} ({start_year}) {issue}.{extension}"
 
-def make_name(data, extension, directors_cut = False):
+def make_name(data, extension, ver = None, directors_cut = False):
     if ('issue' not in data):
         raise Exception("'issue' not found in comic data")
 
@@ -73,7 +86,10 @@ def make_name(data, extension, directors_cut = False):
 
     issue = massage_issue(data['issue'], directors_cut = directors_cut)
     volume_name = massage_volume(data['volume_name'])
-    return f"{volume_name} ({data['start_year']}) {issue} ({data['date']}).{extension}"
+    start_year = data['start_year']
+    if (ver is not None):
+        start_year = start_year + "-" + ver
+    return f"{volume_name} ({start_year}) {issue} ({data['date']}).{extension}"
 
 def massage_issue(issue, directors_cut = False):
     issue = re.sub('^0+','', issue)
@@ -128,14 +144,15 @@ def convert_name_to_date(comic):
     extension = m.group(7)
     return f'{year}/{month}/{year}-{month}-{day} {volume_name} ({start_year}) {issue}.{extension}'
 
-def parse(comic_file, args = minorimpact.default_arg_flags):
+def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     """Analyze the file name and pull as much information about it as possible."""
-    if (args.debug): print("-----")
     if (args.verbose): print("Parsing {}".format(comic_file))
 
     data = { 'directors_cut': False }
 
-    data['size'] = os.path.getsize(comic_file)
+    data['size'] = 0
+    if (os.path.exists(comic_file)):
+        data['size'] = os.path.getsize(comic_file)
 
     if (re.search('\.cb[rz]$', comic_file) is None):
         raise Exception("invalid file type")
@@ -147,11 +164,9 @@ def parse(comic_file, args = minorimpact.default_arg_flags):
     issue = None
     month = None
     start_year = None
-    pub_date = None
+    date = None
     title = None
-    year = None
-    if (args.year is not None):
-        year = args.year
+    ver = None
 
     (dirname, basename) = os.path.split(comic_file)
     if (re.search('fc only', basename) is not None or re.search('cover ONLY', basename) is not None or re.search('cover only', basename) is not None):
@@ -160,11 +175,10 @@ def parse(comic_file, args = minorimpact.default_arg_flags):
     for c in cleanup_subs:
         basename = re.sub(c['m'], c['s'], basename)
 
-    print(f"basename:{basename}")
-
     if (re.search(r" - [dD]irector'?s? [Cc]ut", basename) is not None):
         data['directors_cut'] = True
         basename = re.sub(" - [dD]irector'?s? [cC]ut", '', basename)
+    if (args.debug): print("basename:" + basename)
 
     # Scan the parent directories for something that looks like a date.
     for f in date_formats:
@@ -175,7 +189,6 @@ def parse(comic_file, args = minorimpact.default_arg_flags):
             if 'month' in g: month = g['month']
             if 'year' in g: year = g['year']
             break
-
 
     for f in formats:
         if (args.debug): print(f"testing '{f}'")
@@ -189,6 +202,7 @@ def parse(comic_file, args = minorimpact.default_arg_flags):
             if 'month' in g: month = g['month']
             if 'start_year' in g: start_year = g['start_year']
             if 'title' in g: title = g['title']
+            if 'ver' in g: ver = g['ver']
             if 'year' in g and year is None: year = g['year']
             break
 
@@ -205,12 +219,13 @@ def parse(comic_file, args = minorimpact.default_arg_flags):
     data['issue'] = issue
     data['start_year'] = start_year
     data['title'] = title
+    data['ver'] = ver
     data['year'] = year
 
     if (year is not None and month is not None and day is not None and day != '00'):
-        data['pub_date'] = f'{year}-{month}-{day}'
+        data['date'] = f'{year}-{month}-{day}'
     elif (year is not None and month is not None and month != '00'):
-        data['pub_date'] = f'{year}-{month}-01'
+        data['date'] = f'{year}-{month}-01'
 
     if (year is not None):
         if (re.search('^\d+$', year) and issue is not None and re.search('^\d+$', issue) and month is not None and month != '00' and re.search('^\d+$', month)):

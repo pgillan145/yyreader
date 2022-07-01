@@ -48,6 +48,12 @@ def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, c
             return i
     return None
 
+def get_issue_details(issue_id, api_key, args = minorimpact.default_arg_flags, cache_file = '/tmp/yyreader.cache'):
+    url = base_url + f'/issue/4000-' + str(issue_id) + '/?api_key=' + api_key + f'&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
+    if (args.debug is True): print(url)
+    results = get_results(url, cache_file = cache_file)
+    return results[0]
+
 last_result = datetime.now()
 def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cache_file = '/tmp/yyreader.cache'):
     global cache
@@ -98,7 +104,7 @@ def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cac
 
 def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/tmp/yyreader.cache'):
     global cache 
-    if (data['pub_date'] is None and args.yes is True):
+    if (('date' not in data or data['date'] is None) and args.yes is True):
         raise Exception("Can't auto confirm without file date. skipping.")
 
     if (cache_setup is False):
@@ -122,8 +128,8 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
         default = 0
         max_lev = 0
         issue_date = {}
-        if ('pub_date' in data and data['pub_date'] is not None):
-            if (args.verbose): print(f"looking for an issue #{data['issue']} released on {data['pub_date']}")
+        if ('date' in data and data['date'] is not None):
+            if (args.verbose): print(f"looking for an issue #{data['issue']} released on {data['date']}")
             for r in results:
                 i = get_issue(r['id'], data['issue'], api_key, args = args, cache_file = cache_file)
                 if (i is not None):
@@ -140,7 +146,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
                     if (date is not None):
                         if (args.verbose): print(f"found {r['name']} #{i['issue_number']} released on {date}")
                         issue_date[r['id']] = date
-                        if (date == data['pub_date']):
+                        if (date == data['date']):
                             result = r
                             match_issue = i
                             break
@@ -200,13 +206,16 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
             test_title = pick
 
     if (result is None):
-        raise VolumeException("can't find a volume")
+        raise Exception("can't find a volume")
 
     volume_id = result['id']
+    if (args.debug): print(result)
+
     comicvine_data = {}
     comicvine_data['volume_id'] = volume_id
     comicvine_data['volume_name'] = result['name']
     comicvine_data['start_year'] = result['start_year']
+    comicvine_data['publisher'] = result['publisher']['name']
 
     i = match_issue
     if i is None:
@@ -215,9 +224,12 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
     if (i is not None):
         comicvine_data['issue'] = i['issue_number']
         comicvine_data['issue_id'] = i['id']
-        comicvine_data['issue_name'] = i['name']
+        comicvine_data['issue_name'] = None
         comicvine_data['store_date'] = i['store_date']
         comicvine_data['cover_date'] = i['cover_date']
+
+        if ('name' in i and i['name'] is not None):
+            comicvine_data['issue_name'] = i['name']
 
         if ('store_date' in i and i['store_date'] is not None):
             comicvine_data['date'] = i['store_date']
@@ -256,7 +268,7 @@ def search_volumes(title, api_key, start_year = None, year = None, args = minori
               or results[i]['first_issue'] is None \
               or ( results[i]['first_issue']['name'] is not None and (re.search('TPB$', results[i]['first_issue']['name']) or re.search('^Volume \d+$', results[i]['first_issue']['name']))) \
               or results[i]['publisher'] is None  \
-              or (results[i]['publisher']['name'] not in ('Marvel', 'Epic', 'IDW', 'Star Comics', 'Max', 'Atlas', 'Curtis Magazine', 'Curtis Magazines')) \
+              or (results[i]['publisher']['name'] not in ('Marvel', 'Epic', 'IDW', 'Star Comics', 'Max', 'Max Comics', 'Atlas', 'Curtis Magazine', 'Curtis Magazines')) \
               or (title.lower() == 'the amazing spider-man' and int(year) < 2014 and results[i]['start_year'] != '1963') \
               or (year is not None and int(results[i]['start_year']) > int(year)+1):
               #or (start_year is not None and int(results[i]['start_year']) < (int(start_year) - 5))\

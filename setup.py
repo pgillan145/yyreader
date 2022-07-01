@@ -19,7 +19,7 @@ setup(
         "Topic :: Internet :: WWW/HTTP :: Dynamic Content"],
     description = "Yet another yet another comic reader.",
     #entry_points = { "console_scripts": [ "yyreader = yyreader:main" ] },
-    install_requires = ['dumper', 'fuzzywuzzy', 'IMDbPy', 'minorimpact', 'parse-torrent-title', 'plexapi', 'pyyaml', 'tvdb_v4_official', 'uravo', ],
+    install_requires = ['dumper', 'fuzzywuzzy', 'minorimpact', 'pyyaml', ],
     license = 'GPLv3',
     long_description = readme,
     long_description_content_type = 'text/markdown',

@@ -1,4 +1,4 @@
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 from os import listdir
 from os.path import isdir, isfile, join
