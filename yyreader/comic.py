@@ -81,7 +81,7 @@ class comic():
                 ratio = fuzz.ratio(f"{parse_data['title']}", f"{comicvine_data['volume_name']}")
         
             c = ''
-            if ( 'date' in parse_data and 'date' in comicvine_data and comicvine_data['date'] == parse_data['date'] and ratio > 94):
+            if ( 'date' in parse_data and 'date' in comicvine_data and comicvine_data['date'] == parse_data['date'] and ratio >= 93):
                 default_c = 'y'
                 default_text = 'Y/n'
             else:

@@ -22,17 +22,18 @@ PORT = int(config['server']['port'])
 def main():
     class ComicHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
         def do_GET(self):
-            self.send_response(200)
             if (self.path == '/'):
                 output = "<!DOCTYPE HTML>\n<html><body>\n"
                 output = output + "<a href='/bydate'>By Date</a><br />"
                 output = output + "<a href='/bytitle'>By Title</a><br />"
                 output = output + "</body></html>\n"
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
 
             elif (re.search('favicon.ico', self.path)):
+                self.send_response(200)
                 self.send_header('Content-type', 'image/jpeg')
                 self.end_headers()
                 with open('./favicon.ico', 'rb') as f:
@@ -47,6 +48,7 @@ def main():
                     current_page = comic['current_page']
 
                 output = "<!DOCTYPE HTML>\n<html><head><meta http-equiv='refresh' content='0; url=/read/{}/{}' /></head></html>\n".format(id, current_page)
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
@@ -95,6 +97,7 @@ def main():
                 output = output + "</table>\n"
                 output = output + "</body></html>\n"
 
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
@@ -113,6 +116,7 @@ def main():
                     comic_cache[id]['comic'] = c
                     comic_cache[id]['date'] = datetime.now()
 
+                self.send_response(200)
                 self.send_header('Content-type', 'image/jpeg')
                 self.end_headers()
                 self.wfile.write(c.page(page))
@@ -135,6 +139,7 @@ def main():
                     output = output + "</tr>\n"
                 output = output + "</table>\n"
                 output = output + "</body></html>\n"
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
@@ -148,6 +153,7 @@ def main():
                 for month in yyreader.yacreader.get_months(year):
                     output = output + "<a href='/bydate/{}/{}'>{}/{}</a><br />\n".format(year, month, year, month)
                 output = output + "</body></html>\n"
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
@@ -163,6 +169,7 @@ def main():
                     output = output + "</tr>\n"
                 output = output + "</table>\n"
                 output = output + "</body></html>\n"
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
@@ -184,6 +191,7 @@ def main():
                     output = output + "</tr>\n"
                 output = output + "</table>\n"
                 output = output + "</body></html>\n"
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
@@ -195,18 +203,23 @@ def main():
                 for title in yyreader.yacreader.get_titles():
                     output = output + "<a href='/bytitle/{}'>{}</a><br />\n".format(urllib.parse.quote(title), title)
                 output = output + "</body></html>\n"
+                self.send_response(200)
                 self.send_header('Content-type', 'text/html')
                 self.end_headers()
                 self.wfile.write(output.encode('utf-8'))
 
             elif (self.path == '/test'):
+                self.send_response(200)
                 self.send_header('Content-type', 'image/jpeg')
                 self.end_headers()
                 c = yyreader.comic.comic('/Users/pgillan/dev/yyreader/test_data/test.cbz')
                 self.wfile.write(c.page(1))
             else:
+                self.send_response(404)
                 self.send_header('Content-type', 'text/html')
-                self.wfile.write("Hello".encode('utf-8'))
+                self.wfile.write("File not found".encode('utf-8'))
+
+            self.close_connection = True
 
     #Handler = http.server.SimpleHTTPRequestHandler
     #Handler = ComicHTTPRequestHandler()

@@ -13,7 +13,8 @@ def main():
     parser.add_argument('--dir', metavar = 'DIR',  help = "Scan DIR")
     parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-y', '--yes', action='store_true')
-    parser.add_argument('-1', '--once', help = "Just process a single entry, for testing.  Also enabled --verbose and --debug.", action='store_true')
+    parser.add_argument('--comicvine',  help = "Pull external comicvine data, otherwise just update with can be parsed from the filename.", action='store_true')
+    parser.add_argument('-1', '--once', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
     parser.add_argument('--debug', action='store_true')
 
     args = parser.parse_args()
@@ -22,7 +23,7 @@ def main():
     if (os.path.exists(db) is None):
         raise Exception("{} does not exist".format(db))
 
-    comicvine = True
+    
     if (args.once is True):
         args.verbose = True
         args.debug = True
@@ -50,11 +51,11 @@ def main():
         if (re.search('^/ByDate', path) is not None):
             continue
 
-        if (comicvine is True):
-            #   comicVineID            date                   title 
-            if (row[6] is not None and row[3] is not None and row[7] is not None):
-                continue
-        elif (row[3] is not None):
+        #                               comicVineID            date                   title 
+        if (args.comicvine is True and (row[6] is not None and row[3] is not None and row[7] is not None)):
+            continue
+        #                                  date
+        elif (args.comicvine is False and (row[3] is not None)):
             continue
 
         if (args.debug): print("-----")
@@ -75,7 +76,7 @@ def main():
                 arcs = []
                 arc_name = None
                 publisher = None
-                if (comicvine is True):
+                if (args.comicvine is True):
                     comicvine_data = yyreader.comicvine.search(c.parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
                     if (comicvine_data is None):
                         continue
@@ -119,9 +120,6 @@ def main():
                     except Exception as e:
                         print(e)
                         break
-
-                if (len(arcs) > 1):
-                    break
 
         if (args.once is True):
             break

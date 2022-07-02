@@ -19,21 +19,17 @@ from . import parser
 base_url = 'https://comicvine.gamespot.com/api'
 cache = { 'results': {} }
 cache_setup = False
-date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)',
-                 '\((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)',
-                 '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
-                 '(?P<year>\d\d\d\d)(?P<month>\d\d)' ]
 headers = {'User-Agent': 'yyreader'}
 params = {}
 
 
 def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, cache_file = '/tmp/yyreader.cache'):
     url = base_url + f'/volume/4050-{volume_id}/?api_key=' + api_key + f'&format=json&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-    if (args.debug is True): print(url)
+    #if (args.debug is True): print(url)
     volume_name = parser.massage_volume(get_results(url, cache_file = cache_file)[0]['name'])
 
     url = base_url + '/issues/?api_key=' + api_key + f'&format=json&sort=name:asc&filter=volume:{volume_id}&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
-    if (args.debug is True): print(url)
+    #if (args.debug is True): print(url)
     results = get_results(url, max = None, cache_file = cache_file)
     i = len(results) - 1
     while i >= 0:
@@ -42,7 +38,7 @@ def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, c
         i = i - 1
 
     issue = parser.massage_issue(issue)
-    if (args.debug): print(f"searching for issue #{issue} for {volume_name}")
+    if (args.debug): print(f"  searching for issue #{issue} of {volume_name}")
     for i in results:
         if (parser.massage_issue(i['issue_number']) == issue):
             return i
@@ -50,7 +46,7 @@ def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, c
 
 def get_issue_details(issue_id, api_key, args = minorimpact.default_arg_flags, cache_file = '/tmp/yyreader.cache'):
     url = base_url + f'/issue/4000-' + str(issue_id) + '/?api_key=' + api_key + f'&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
-    if (args.debug is True): print(url)
+    #if (args.debug is True): print(url)
     results = get_results(url, cache_file = cache_file)
     return results[0]
 
@@ -75,8 +71,16 @@ def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cac
         data = json.loads(text)
         if (data['error'] == 'OK' and cache_results is True):
             cache['results'][offset_url] = { 'text': r.text, 'mod_date': datetime.now() }
-            with open(cache_file, 'wb') as f:
-                pickle.dump(cache, f)
+            pickle_data = pickle.dumps(cache)
+            done = False
+            while done is False:
+                try:
+                    with open(cache_file, 'wb') as f:
+                        f.write(pickle_data)
+                    done = True
+                except KeyboardInterrupt:
+                    print("cache dump interrupted - retrying")
+                    continue
     
     if (text is None):
         raise Exception(f"Unable to request '{offset_url}'")
@@ -121,35 +125,43 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
         elif ('est_start_year' in data):
             start_year = data['est_start_year']
 
+        # Get an initial list of volumes from the site that we can start to check.
         results = search_volumes(test_title, api_key, start_year = start_year, year = data['year'], args = args, cache_file = cache_file)
 
-        if (args.verbose): print(f"found {len(results)} result(s) for '{test_title}'")
+        if (args.verbose): print(f"  {len(results)} result(s) for '{test_title}'")
         item = 0
         default = 0
         max_lev = 0
         issue_date = {}
+        # If we have a date for the issue, then we can look through each volume for the given issue number to see if it has the
+        #   same date.  If so, then then this is *probably* the correct volume.
         if ('date' in data and data['date'] is not None):
-            if (args.verbose): print(f"looking for an issue #{data['issue']} released on {data['date']}")
+            if (args.verbose): print(f"  looking for an issue #{data['issue']} released on {data['date']}")
             for r in results:
-                i = get_issue(r['id'], data['issue'], api_key, args = args, cache_file = cache_file)
-                if (i is not None):
-                    #print(i)
-                    date = None
-                    if ('store_date' in i and i['store_date'] is not None):
-                        date = i['store_date']
-                    elif ('cover_date' in i and i['cover_date'] is not None):
-                        date = i['cover_date']
-                        # Sometimes the cover daye is the first of day of the month, sometimes it's the last, so
-                        #   for our generic 'date' comparison field, just force it to be the first, no one cares.
-                        date = re.sub('-\d\d$', '-01', date)
+                ratio = fuzz.ratio(test_title,r['name'])
+                if ("The " + test_title == r['name'] or "An " + test_title == r['name'] or "A " + test_title == r['name']):
+                    ratio = 100
 
-                    if (date is not None):
-                        if (args.verbose): print(f"found {r['name']} #{i['issue_number']} released on {date}")
-                        issue_date[r['id']] = date
-                        if (date == data['date']):
-                            result = r
-                            match_issue = i
-                            break
+                if (ratio >= 93):
+                    i = get_issue(r['id'], data['issue'], api_key, args = args, cache_file = cache_file)
+                    if (i is not None):
+                        #print(i)
+                        date = None
+                        if ('store_date' in i and i['store_date'] is not None):
+                            date = i['store_date']
+                        elif ('cover_date' in i and i['cover_date'] is not None):
+                            date = i['cover_date']
+                            # Sometimes the cover daye is the first of day of the month, sometimes it's the last, so
+                            #   for our generic 'date' comparison field, just force it to be the first, no one cares.
+                            date = re.sub('-\d\d$', '-01', date)
+
+                        if (date is not None):
+                            issue_date[r['id']] = date
+                            if (date == data['date']):
+                                if (args.verbose): print(f"  found {r['name']} #{i['issue_number']} released on {date}")
+                                result = r
+                                match_issue = i
+                                break
 
         if (result is not None or args.yes is True):
             break
@@ -157,10 +169,11 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
         # We didn't find a date match, and we're not in auto-mode, so ask a grown-up for help.
         for r in results:
             item = item + 1
-            if (fuzz.ratio(test_title,r['name']) > max_lev):
+            ratio = fuzz.ratio(test_title,r['name'])
+            if (ratio > max_lev):
                 default = item
-                max_lev = fuzz.ratio(test_title,r['name'])
-            menu_item = f"{item}: {r['name']} ({r['start_year']}) - {r['publisher']['name']}, {r['count_of_issues']} issue(s)"
+                max_lev = ratio
+            menu_item = f"{item}: {r['name']} ({r['start_year']}) - {r['publisher']['name']}, {r['count_of_issues']} issue(s) (ratio: {ratio})"
             if (r['id'] in issue_date):
                 menu_item = f"{menu_item} - {issue_date[r['id']]}"
             print(menu_item)
@@ -199,14 +212,14 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
             else:
                 volume_id = pick
             url = base_url + f'/volume/{volume_id}/?api_key=' + api_key + f'&format=json&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-            if (args.debug is True): print(url)
+            #if (args.debug is True): print(url)
             results = get_results(url, cache_file = cache_file)
             result = results[0]
         else:
             test_title = pick
 
     if (result is None):
-        raise Exception("can't find a volume")
+        raise Exception("can't find a volume for " + test_title)
 
     volume_id = result['id']
     if (args.debug): print(result)
@@ -221,25 +234,25 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
     if i is None:
         i = get_issue(volume_id, data['issue'], api_key, args = args, cache_file = cache_file)
 
-    if (i is not None):
-        comicvine_data['issue'] = i['issue_number']
-        comicvine_data['issue_id'] = i['id']
-        comicvine_data['issue_name'] = None
-        comicvine_data['store_date'] = i['store_date']
-        comicvine_data['cover_date'] = i['cover_date']
+    if (i is None):
+        raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['voume_name']}")
 
-        if ('name' in i and i['name'] is not None):
-            comicvine_data['issue_name'] = i['name']
+    comicvine_data['issue'] = i['issue_number']
+    comicvine_data['issue_id'] = i['id']
+    comicvine_data['issue_name'] = None
+    comicvine_data['store_date'] = i['store_date']
+    comicvine_data['cover_date'] = i['cover_date']
 
-        if ('store_date' in i and i['store_date'] is not None):
-            comicvine_data['date'] = i['store_date']
-        elif ('cover_date' in i):
-            # Cover date is always just a month (i think), so the day should always be
-            #   either the first or the last day of the month, but no one cares, so force it
-            #   to be the first -- way easier.
-            comicvine_data['date'] = re.sub('-\d\d$', '-01', i['cover_date'])
-    else:
-        if (args.debug): print(f"NO ISSUE RETURNED FROM get_issue({volume_id},{issue})")
+    if ('name' in i and i['name'] is not None):
+        comicvine_data['issue_name'] = i['name']
+
+    if ('store_date' in i and i['store_date'] is not None):
+        comicvine_data['date'] = i['store_date']
+    elif ('cover_date' in i):
+        # Cover date is always just a month (i think), so the day should always be
+        #   either the first or the last day of the month, but no one cares, so force it
+        #   to be the first -- way easier.
+        comicvine_data['date'] = re.sub('-\d\d$', '-01', i['cover_date'])
 
     return comicvine_data
 
