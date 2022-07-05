@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from datetime import datetime,timedelta
+from flask import current_app, Flask, g, render_template, redirect, Response
 import http.server
 import minorimpact.config
 import os
@@ -11,224 +12,119 @@ import urllib.parse
 import yyreader.comic
 import yyreader.yacreader
 
-comic_cache = {}
-
 config = minorimpact.config.getConfig(script_name = 'yyreader')
+app = Flask(__name__, template_folder='templates')
+app.config.from_mapping(
+        #EXPLAIN_TEMPLATE_LOADING=True,
+        #SECRET_KEY='dev',
+        #DATABASE=config['default']['db'],
+    )
+
+comic_cache = {}
 comic_dir = config['default']['comic_dir']
 comic_dir = re.sub(r'/$', '', comic_dir)
 
-PORT = int(config['server']['port'])
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-def main():
-    class ComicHTTPRequestHandler(http.server.BaseHTTPRequestHandler):
-        def do_GET(self):
-            if (self.path == '/'):
-                output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/bydate'>By Date</a><br />"
-                output = output + "<a href='/bytitle'>By Title</a><br />"
-                output = output + "</body></html>\n"
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
+@app.route('/bydate')
+@app.route('/bydate/<int:year>')
+@app.route('/bydate/<int:year>/<int:month>')
+def bydate(year = None, month = None):
+    items = []
+    back = '/'
+    if (year is None and month is None):
+        for year in yyreader.yacreader.get_years():
+            items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
+    elif (year is not None and month is None):
+        back = '/bydate'
+        for month in yyreader.yacreader.get_months(year):
+            items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(year, month) })
+    elif (year is not None and month is not None):
+        if (month < 10): month = '0{}'.format(month)
+        back = '/bydate/{}'.format(year)
+        for comic in yyreader.yacreader.get_comics_by_date(year, month):
+            status = ''
+            if (comic['read'] == 1):
+                status = "DONE"
+            elif (comic['current_page'] > 1):
+                status = '*'
+            items.append({ 'url':'/read/{}'.format(comic['id']), 'text':'({}) {} #{}'.format(comic['date'].strftime('%Y/%m/%d'), comic['volume'], comic['issue']) })
+    return render_template('bydate.html', back = back, items = items)
 
-            elif (re.search('favicon.ico', self.path)):
-                self.send_response(200)
-                self.send_header('Content-type', 'image/jpeg')
-                self.end_headers()
-                with open('./favicon.ico', 'rb') as f:
-                    self.wfile.write(f.read())
+@app.route('/byvolume')
+@app.route('/byvolume/<volume>')
+def byvolume(volume = None):
+    #yyreader.yacreader.connect()
+    items = []
+    back = '/'
+    if (volume is None):
+        for volume in yyreader.yacreader.get_volumes():
+            items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume } )
+    else:
+        back = '/byvolume'
+        volume = urllib.parse.unquote(volume)
+        for comic in yyreader.yacreader.get_comics_by_volume(volume):
+            status = ''
+            if (comic['read'] == 1):
+                status = 'DONE'
+            elif (comic['current_page'] > 1):
+                status = '*'
+            items.append({ 'url': '/read/{}'.format(comic['id']), 'text':"{} #{} ({})".format(comic['volume'], comic['issue'], comic['date'].strftime('%Y/%m/%d'))} )
 
-            elif (re.search(r'^/read/(\d+)/?$', self.path.lower())):
-                m = re.search(r'^/read/(\d+)/?$', self.path.lower())
-                id = m.group(1)
-                current_page = 1
-                comic = yyreader.yacreader.get_comic_by_id(id)
-                if ('current_page' in comic and comic['current_page'] is not None):
-                    current_page = comic['current_page']
+    return render_template('byvolume.html', back = back, items = items)
 
-                output = "<!DOCTYPE HTML>\n<html><head><meta http-equiv='refresh' content='0; url=/read/{}/{}' /></head></html>\n".format(id, current_page)
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
+@app.route('/read/<int:id>')
+@app.route('/read/<int:id>/<int:page>')
+def read(id, page = None):
+    comic = yyreader.yacreader.get_comic_by_id(id)
+    if (id in comic_cache):
+        c = comic_cache[id]['comic']
+    else:
+        c = yyreader.comic.comic(comic_dir + '/' + comic['path'])
+        comic_cache[id] = {}
+        comic_cache[id]['comic'] = c
+        comic_cache[id]['date'] = datetime.now()
 
-            # /read/8289/1
-            elif (re.search(r'^/read/(\d+)/(\d+)/?$', self.path.lower())):
-                m = re.search(r'^/read/(\d+)/(\d+)/?$', self.path.lower())
-                id = m.group(1)
-                page = int(m.group(2))
+    if (page is None):
+        page = 1
+        if ('current_page' in comic and comic['current_page'] is not None):
+            page = int(comic['current_page'])
+            if (page > c.page_count()): page = c.page_count()
+        return redirect('/read/{}/{}'.format(id, page))
 
-                comic = yyreader.yacreader.get_comic_by_id(id)
+    image_height = 1000
 
-                if (id in comic_cache):
-                    c = comic_cache[id]['comic']
-                else:
-                    c = yyreader.comic.comic(comic_dir + '/' + comic['path'])
-                    comic_cache[id] = {}
-                    comic_cache[id]['comic'] = c
-                    comic_cache[id]['date'] = datetime.now()
+    (w, h) = c.page_size(page)
+    image_width = int((w/h) * image_height)
 
-                if (page > c.page_count()):
-                    page = c.page_count()
+    if (page < 1): page = 1
+    if (page > c.page_count()): page = c.page_count()
 
-                output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<table>"
-                output = output + "<tr><td><a href=/bydate/{}>{}</a></td></tr>".format(comic['date'].strftime('%Y/%m'), comic['date'].strftime('%Y/%m'))
-                output = output + "<tr><td>"
-                if (page > 1):
-                    output = output + "<a href=/read/{}/{}>Previous Page</a>".format(id, (page-1))
-                output = output + "</td>"
-                output = output + "<td><a href='/bytitle/{}'>{}</a> #{} ({} of {})</td>".format(urllib.parse.quote(comic['title']), comic['title'], comic['issue'], page, c.page_count())
-                output = output + "<td>"
-                if (page < c.page_count()):
-                    output = output + "<a href=/read/{}/{}>Next Page</a>".format(id, (page+1))
-                output = output + "</td></tr>\n"
-                output = output + "<tr><td colspan = 3><img src='/page/{}/{}' height='750'></td></tr>\n".format(id, page)
-                output = output + "<tr><td>"
-                if (page > 1):
-                    output = output + "<a href=/read/{}/{}>Previous Page</a>".format(id, (page-1))
-                output = output + "</td>"
-                output = output + "<td>" + c.page_file(page) + "</td>\n"
-                output = output + "<td>"
-                if (page < c.page_count()):
-                    output = output + "<a href=/read/{}/{}>Next Page</a>".format(id, (page+1))
-                output = output + "</td></tr>\n"
-                output = output + "</table>\n"
-                output = output + "</body></html>\n"
+    previous_page_url = None
+    if (page > 1):
+        previous_page_url = '/read/{}/{}'.format(id, (page-1))
+    next_page_url = None
+    if (page < c.page_count()):
+        next_page_url = '/read/{}/{}'.format(id, (page+1))
 
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
-                yyreader.yacreader.update_read_log(id, page, page_count = c.page_count())
+    yyreader.yacreader.update_read_log(id, page, page_count = c.page_count())
+    return render_template('read.html', page = page, comic = comic, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), back = '/bydate/{}'.format(comic['date'].strftime('%Y/%m')))
 
-            elif (re.search(r'^/page/(\d+)/(\d+)?$', self.path.lower())):
-                m = re.search(r'^/page/(\d+)/(\d+)/?$', self.path.lower())
-                id = m.group(1)
-                page = int(m.group(2))
-                if (id in comic_cache):
-                    c = comic_cache[id]['comic']
-                else:
-                    comic = yyreader.yacreader.get_comic_by_id(id)
-                    c = yyreader.comic.comic('/Volumes/Media/Comics/' + comic['path'])
-                    comic_cache[id] = {}
-                    comic_cache[id]['comic'] = c
-                    comic_cache[id]['date'] = datetime.now()
+@app.route('/page/<int:id>/<int:page>')
+def page(id, page):
+    comic = yyreader.yacreader.get_comic_by_id(id)
+    if (id in comic_cache):
+        c = comic_cache[id]['comic']
+    else:
+        comic = yyreader.yacreader.get_comic_by_id(id)
+        c = yyreader.comic.comic('/Volumes/Media/Comics/' + comic['path'])
+        comic_cache[id] = {}
+        comic_cache[id]['comic'] = c
+        comic_cache[id]['date'] = datetime.now()
 
-                self.send_response(200)
-                self.send_header('Content-type', 'image/jpeg')
-                self.end_headers()
-                self.wfile.write(c.page(page))
-
-            # /bydate/1994/12
-            elif (re.search(r'^/bydate/(\d\d\d\d)/(\d\d)/?$', self.path.lower())):
-                m = re.search(r'^/bydate/(\d\d\d\d)/(\d\d)/?$', self.path.lower())
-                year = m.group(1)
-                month = m.group(2)
-                output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/bydate/{}'>&lt;-- {}</a><br />\n".format(year, year)
-                output = output + "<table>\n"
-                for comic in yyreader.yacreader.get_comics_by_date(year, month):
-                    output = output + "<tr>\n  <td>"
-                    if (comic['read'] == 1):
-                        output = output + "DONE"
-                    elif (comic['current_page'] > 1):
-                        output = output + "*"
-                    output = output + "</td>\n  <td><a href='/read/{}'>({}) {} #{}</a></td>\n".format(comic['id'], comic['date'].strftime('%Y/%m/%d'), comic['title'], comic['issue'])
-                    output = output + "</tr>\n"
-                output = output + "</table>\n"
-                output = output + "</body></html>\n"
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
-
-            # /bydate/1994
-            elif (re.search('^/bydate/([0-9][0-9][0-9][0-9])/?$', self.path.lower())):
-                m = re.search('^/bydate/([0-9][0-9][0-9][0-9])/?$', self.path.lower())
-                year = m.group(1)
-                output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/bydate'>&lt;--Back</a><br />"
-                for month in yyreader.yacreader.get_months(year):
-                    output = output + "<a href='/bydate/{}/{}'>{}/{}</a><br />\n".format(year, month, year, month)
-                output = output + "</body></html>\n"
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
-
-            # /bydate
-            elif (re.search(r'/bydate/?$', self.path.lower())):
-                output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/'>&lt;-- Back</a><br />\n"
-                output = output + "<table>\n"
-                for year in yyreader.yacreader.get_years():
-                    output = output + "<tr>\n  <td>"
-                    output = output + "</td>  <td><a href='/bydate/{}'>{}</a></td>\n".format(year, year)
-                    output = output + "</tr>\n"
-                output = output + "</table>\n"
-                output = output + "</body></html>\n"
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
-
-            # /bytitle/ALF (1998)
-            elif (re.search(r'^/bytitle/([^/]+)/?$', self.path.lower())):
-                m = re.search(r'^/bytitle/([^/ ]+)/?$', self.path)
-                title = urllib.parse.unquote(m.group(1))
-                output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/bytitle'>&lt;-- Back</a><br />\n"
-                output = output + "<table>\n"
-                for comic in yyreader.yacreader.get_comics_by_title(title):
-                    output = output + "<tr>\n  <td>"
-                    if (comic['read'] == 1):
-                        output = output + "DONE"
-                    elif (comic['current_page'] > 1):
-                        output = output + "*"
-                    output = output + "  </td>\n  <td>{}</td>\n  <td><a href='/read/{}'>#{}</a></td>\n  <td><a href='/bydate/{}/{}'>{}</a></td>\n".format(comic['title'], comic['id'], comic['issue'], comic['date'].year, comic['date'].strftime('%m'), comic['date'].strftime('%Y/%m/%d'))
-                    output = output + "</tr>\n"
-                output = output + "</table>\n"
-                output = output + "</body></html>\n"
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
-
-            # /bytitle
-            elif (re.search(r'^/bytitle/?$', self.path.lower())):
-                output = "<!DOCTYPE HTML>\n<html><body>\n"
-                output = output + "<a href='/'>&lt;-- Back</a><br />\n"
-                for title in yyreader.yacreader.get_titles():
-                    output = output + "<a href='/bytitle/{}'>{}</a><br />\n".format(urllib.parse.quote(title), title)
-                output = output + "</body></html>\n"
-                self.send_response(200)
-                self.send_header('Content-type', 'text/html')
-                self.end_headers()
-                self.wfile.write(output.encode('utf-8'))
-
-            elif (self.path == '/test'):
-                self.send_response(200)
-                self.send_header('Content-type', 'image/jpeg')
-                self.end_headers()
-                c = yyreader.comic.comic('/Users/pgillan/dev/yyreader/test_data/test.cbz')
-                self.wfile.write(c.page(1))
-            else:
-                self.send_response(404)
-                self.send_header('Content-type', 'text/html')
-                self.wfile.write("File not found".encode('utf-8'))
-
-            self.close_connection = True
-
-    #Handler = http.server.SimpleHTTPRequestHandler
-    #Handler = ComicHTTPRequestHandler()
-
-    yyreader.yacreader.connect()
-    with socketserver.TCPServer(("", PORT), ComicHTTPRequestHandler) as httpd:
-        print("serving at port ", PORT) 
-        httpd.serve_forever()
-
+    return Response(c.page(page), mimetype = 'image/jpeg')
 
 if __name__ == '__main__':
-    main()
+    app.run(port = config['server']['port'], host = '0.0.0.0', debug = True)

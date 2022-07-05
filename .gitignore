@@ -1,8 +1,9 @@
 .DS_Store
 cache/*
+dist/*
+instance/*
 log/*
 test/*
-dist/*
 *.egg-info
 *.log
 *.pyc

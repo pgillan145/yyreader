@@ -4,6 +4,7 @@ import minorimpact
 import minorimpact.config
 import os
 import os.path
+from PIL import Image
 import re
 import shutil
 import subprocess
@@ -19,14 +20,14 @@ class comic():
     data_dir = None
     file = None
     issue = None
-    title = None
+    volume = None
     temp_dir = None
 
     def __init__(self, file, args = minorimpact.default_arg_flags):
         self.file = file
         self.parse_data = parser.parse(self.file, args = args)
-        if ('title' in self.parse_data):
-            self.title = self.parse_data['title']
+        if ('volume' in self.parse_data):
+            self.volume = self.parse_data['volume']
         if ('issue' in self.parse_data):
             self.issue = self.parse_data['issue']
 
@@ -70,15 +71,18 @@ class comic():
         comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
 
         new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
-        if (os.path.basename(self.file) != new_comic):
+        volume_name = parser.massage_volume(comicvine_data['volume_name'])
+        name_dir = f'{target_dir}/ByName/{volume_name} ({comicvine_data["start_year"]})'
+        #if (os.path.basename(self.file) != new_comic):
+        if (self.file != name_dir + '/' + new_comic):
             # Figure out how 'close' the filename is to what we got back from comicvine.
             ratio = 0
-            if (("The " + parse_data['title']) == comicvine_data['volume_name']):
+            if (("The " + parse_data['volume']) == comicvine_data['volume_name']):
                 ratio = 100
-            elif (("A " + parse_data['title']) == comicvine_data['volume_name']):
+            elif (("A " + parse_data['volume']) == comicvine_data['volume_name']):
                 ratio = 100
             else:
-                ratio = fuzz.ratio(f"{parse_data['title']}", f"{comicvine_data['volume_name']}")
+                ratio = fuzz.ratio(f"{parse_data['volume']}", f"{comicvine_data['volume_name']}")
         
             c = ''
             if ( 'date' in parse_data and 'date' in comicvine_data and comicvine_data['date'] == parse_data['date'] and ratio >= 93):
@@ -118,12 +122,10 @@ class comic():
                     if (args.debug): print(comic_date)
                     comic_date = target_dir + '/ByDate/' + comic_date
 
-                volume_name = parser.massage_volume(comicvine_data['volume_name'])
-                self.title = volume_name
+                self.volume = volume_name
                 issue = parser.massage_issue(comicvine_data['issue'])
                 self.issue = issue
                 extension = parse_data['extension']
-                name_dir = f'{target_dir}/ByName/{volume_name} ({comicvine_data["start_year"]})'
                 if (os.path.exists(name_dir) is False):
                     if (args.dryrun is False): os.mkdir(name_dir)
                 if (os.path.exists(f'{name_dir}/{new_comic}') is True):
@@ -198,6 +200,10 @@ class comic():
         f.close()
         return data
 
+    def page_size(self, number = 1):
+        img = Image.open(self.page_file(number))
+        return img.size
+        
     def page_file(self, number):
         if (number < 1 or number > self.page_count()):
             raise Exception("Invalid page number")

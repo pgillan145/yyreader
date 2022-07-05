@@ -45,9 +45,10 @@ def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, c
     return None
 
 def get_issue_details(issue_id, api_key, args = minorimpact.default_arg_flags, cache_file = '/tmp/yyreader.cache'):
-    url = base_url + f'/issue/4000-' + str(issue_id) + '/?api_key=' + api_key + f'&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
+    url = base_url + f'/issue/4000-' + str(issue_id) + '/?api_key=' + api_key + f'&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits'
     #if (args.debug is True): print(url)
     results = get_results(url, cache_file = cache_file)
+    #if (args.debug): print(results[0])
     return results[0]
 
 last_result = datetime.now()
@@ -114,7 +115,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
     if (cache_setup is False):
         setup_cache(cache_file)
 
-    test_title = data['title']
+    test_volume = parser.massage_volume(data['volume'], reverse = True)
 
     result = None
     match_issue = None
@@ -126,9 +127,9 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
             start_year = data['est_start_year']
 
         # Get an initial list of volumes from the site that we can start to check.
-        results = search_volumes(test_title, api_key, start_year = start_year, year = data['year'], args = args, cache_file = cache_file)
+        results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], args = args, cache_file = cache_file)
 
-        if (args.verbose): print(f"  {len(results)} result(s) for '{test_title}'")
+        if (args.verbose): print(f"  {len(results)} result(s) for '{test_volume}'")
         item = 0
         default = 0
         max_lev = 0
@@ -138,11 +139,11 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
         if ('date' in data and data['date'] is not None):
             if (args.verbose): print(f"  looking for an issue #{data['issue']} released on {data['date']}")
             for r in results:
-                ratio = fuzz.ratio(test_title,r['name'])
-                if ("The " + test_title == r['name'] or "An " + test_title == r['name'] or "A " + test_title == r['name']):
+                ratio = fuzz.ratio(test_volume,r['name'])
+                if ("The " + test_volume == r['name'] or "An " + test_volume == r['name'] or "A " + test_volume == r['name']):
                     ratio = 100
 
-                if (ratio >= 93):
+                if (ratio >= 80):
                     i = get_issue(r['id'], data['issue'], api_key, args = args, cache_file = cache_file)
                     if (i is not None):
                         #print(i)
@@ -157,7 +158,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
 
                         if (date is not None):
                             issue_date[r['id']] = date
-                            if (date == data['date']):
+                            if (date == data['date'] and ratio >= 93):
                                 if (args.verbose): print(f"  found {r['name']} #{i['issue_number']} released on {date}")
                                 result = r
                                 match_issue = i
@@ -169,7 +170,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
         # We didn't find a date match, and we're not in auto-mode, so ask a grown-up for help.
         for r in results:
             item = item + 1
-            ratio = fuzz.ratio(test_title,r['name'])
+            ratio = fuzz.ratio(test_volume,r['name'])
             if (ratio > max_lev):
                 default = item
                 max_lev = ratio
@@ -216,10 +217,10 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
             results = get_results(url, cache_file = cache_file)
             result = results[0]
         else:
-            test_title = pick
+            test_volume = pick
 
     if (result is None):
-        raise Exception("can't find a volume for " + test_title)
+        raise Exception("can't find a volume for " + test_volume)
 
     volume_id = result['id']
     if (args.debug): print(result)
@@ -235,7 +236,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
         i = get_issue(volume_id, data['issue'], api_key, args = args, cache_file = cache_file)
 
     if (i is None):
-        raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['voume_name']}")
+        raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['volume_name']}")
 
     comicvine_data['issue'] = i['issue_number']
     comicvine_data['issue_id'] = i['id']
@@ -256,21 +257,21 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
 
     return comicvine_data
 
-def search_volumes(title, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
-    title = parser.massage_volume(title, reverse = True)
-    title = re.sub('^Amazing Spider-Man$', 'The Amazing Spider-Man', title)
-    title = re.sub('^Immortal Hulk$', 'The Immortal Hulk', title)
-    if (args.debug): print(f"search title:'{title}',start_year:'{start_year}',year:'{year}'")
+def search_volumes(volume, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
+    volume = parser.massage_volume(volume, reverse = True)
+    volume = re.sub('^Amazing Spider-Man$', 'The Amazing Spider-Man', volume)
+    volume = re.sub('^Immortal Hulk$', 'The Immortal Hulk', volume)
+    if (args.debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
     results = []
-    url = base_url + '/search/?api_key=' + api_key + f'&format=json&query={title}&resources=volume&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
+    url = base_url + '/search/?api_key=' + api_key + f'&format=json&query={volume}&resources=volume&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
     #if (args.debug): print(url)
     try:
         results = get_results(url, max = 100, cache_results = cache_results, cache_file = cache_file)
     except Exception as e:
         pass
     
-    title_year = {}
+    volume_year = {}
     if (len(results) > 0):
         i = len(results) - 1
         while i >= 0:
@@ -282,24 +283,24 @@ def search_volumes(title, api_key, start_year = None, year = None, args = minori
               or ( results[i]['first_issue']['name'] is not None and (re.search('TPB$', results[i]['first_issue']['name']) or re.search('^Volume \d+$', results[i]['first_issue']['name']))) \
               or results[i]['publisher'] is None  \
               or (results[i]['publisher']['name'] not in ('Marvel', 'Epic', 'IDW', 'Star Comics', 'Max', 'Max Comics', 'Atlas', 'Curtis Magazine', 'Curtis Magazines')) \
-              or (title.lower() == 'the amazing spider-man' and int(year) < 2014 and results[i]['start_year'] != '1963') \
+              or (volume.lower() == 'the amazing spider-man' and int(year) < 2014 and results[i]['start_year'] != '1963') \
               or (year is not None and int(results[i]['start_year']) > int(year)+1):
               #or (start_year is not None and int(results[i]['start_year']) < (int(start_year) - 5))\
               #or (start_year is not None and int(results[i]['start_year']) > (int(start_year) + 5))\
-              #or (fuzz.ratio(title,results[i]['name']) < 60) \
+              #or (fuzz.ratio(volume,results[i]['name']) < 60) \
                 del results[i]
                 pass
             i = i - 1
 
-        # If there are multiple volumes with identical titles, only keep the 'latest' one.
+        # If there are multiple volumes with identical volumes, only keep the 'latest' one.
         results = sorted(results, key = lambda x:int(x['start_year']), reverse = True)
         i = len(results) - 1
         while i >= 0:
-            if (results[i]['name'] in title_year):
+            if (results[i]['name'] in volume_year):
                 #del results[i]
                 pass
             else:
-                title_year[results[i]['name']] = results[i]['start_year']
+                volume_year[results[i]['name']] = results[i]['start_year']
             i = i - 1
 
         #results = sorted(results, key = lambda x:int(x['start_year']))

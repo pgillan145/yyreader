@@ -1,0 +1,11 @@
+<!DOCTYPE HTML>
+<html>
+    <head>
+        <meta name='viewport' content='width=device-width, initial-scale=1'/>
+        <title>{% block title %}{% endblock %}</title>
+    </head>
+    <body>
+        {% block header %}<a href='{% if back %}{{ back }}{% else %}/{% endif %}'>&lt;-- Back</a><br />{% endblock %}
+        {% block content %}{% endblock %}
+    </body>
+</html>
