@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block content %}
+<table>
+    {% for item in items %}
+    <tr>
+        <td>{{item.status}}</td>
+        <td>{{item.date}} <a href='/read/{{item.comic.id}}'>{{item.comic.volume}} #{{item.comic.issue}}</a></td>
+    </tr>
+    {% endfor %}
+</table>
+{% endblock %}

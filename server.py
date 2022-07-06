@@ -37,10 +37,12 @@ def bydate(year = None, month = None):
     if (year is None and month is None):
         for year in yyreader.yacreader.get_years():
             items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
+        return render_template('bydate.html', back = back, items = items)
     elif (year is not None and month is None):
         back = '/bydate'
         for month in yyreader.yacreader.get_months(year):
             items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(year, month) })
+        return render_template('bydate.html', back = back, items = items)
     elif (year is not None and month is not None):
         if (month < 10): month = '0{}'.format(month)
         back = '/bydate/{}'.format(year)
@@ -50,8 +52,9 @@ def bydate(year = None, month = None):
                 status = "DONE"
             elif (comic['current_page'] > 1):
                 status = '*'
-            items.append({ 'url':'/read/{}'.format(comic['id']), 'text':'({}) {} #{}'.format(comic['date'].strftime('%Y/%m/%d'), comic['volume'], comic['issue']) })
-    return render_template('bydate.html', back = back, items = items)
+            #items.append({ 'url':'/read/{}'.format(comic['id']), 'text':'({}) {} #{}'.format(comic['date'].strftime('%Y/%m/%d'), comic['volume'], comic['issue']) })
+            items.append({ 'status': status, 'comic': comic, 'date':comic['date'].strftime('%Y/%m/%d') }) 
+        return render_template('comics_bydate.html', back = back, items = items)
 
 @app.route('/byvolume')
 @app.route('/byvolume/<volume>')
@@ -62,6 +65,7 @@ def byvolume(volume = None):
     if (volume is None):
         for volume in yyreader.yacreader.get_volumes():
             items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume } )
+        return render_template('byvolume.html', back = back, items = items)
     else:
         back = '/byvolume'
         volume = urllib.parse.unquote(volume)
@@ -71,9 +75,9 @@ def byvolume(volume = None):
                 status = 'DONE'
             elif (comic['current_page'] > 1):
                 status = '*'
-            items.append({ 'url': '/read/{}'.format(comic['id']), 'text':"{} #{} ({})".format(comic['volume'], comic['issue'], comic['date'].strftime('%Y/%m/%d'))} )
+            items.append({ 'status': status, 'comic': comic, 'date':comic['date'].strftime('%Y/%m/%d') }) 
 
-    return render_template('byvolume.html', back = back, items = items)
+        return render_template('comics.html', back = back, items = items)
 
 @app.route('/read/<int:id>')
 @app.route('/read/<int:id>/<int:page>')
