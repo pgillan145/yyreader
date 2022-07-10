@@ -1,0 +1,8 @@
+<div class='w3-row w3-margin'>
+    <div class='w3-cell m3 w3-leftbar {% if item.status == "DONE" %}w3-border-red{% elif item.status == "*" %}w3-border-yellow{% else %}w3-border-white{% endif %}'>
+        <a href='/read/{{item.yacreader.id}}'><img class='w3-round w3-card' src='/cover/{{item.yacreader.id}}' height=200></a>
+    </div>
+    <div class='w3-cell m3'>
+        <a class='w3-margin' href='/read/{{item.yacreader.id}}'>{{item.yacreader.volume}} #{{item.yacreader.issue}}<br />{{item.date}}</a>
+    </div>
+</div>

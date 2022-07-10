@@ -225,7 +225,6 @@ class comic():
         files = self._files()
         page_file = files[page - 1]
         return self.data_dir + '/' + page_file
-        
 
     def page_count(self):
         self._unpack()

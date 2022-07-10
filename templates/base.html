@@ -5,10 +5,44 @@
         <meta name="apple-mobile-web-app-capable" content="yes">
         <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
         <title>{% block title %}{% endblock %}</title>
+        <style>
+            .rel {
+                position: relative;
+            }
+            .comic {
+                height: 200px;
+                #background: yellow;
+                position: relative;
+            }
+            .comic-img {
+                top: 0;
+                left: 25%;
+                position: absolute;
+                #background: blue;
+            }
+            .status {
+                z-index: 9;
+                top: 0;
+                left: 27%;
+                height: 45px;
+                width: 30px;
+                opacity: .8;
+            }
+            .done {
+                background: red;
+            }
+            .inprogress {
+                background: yellow;
+            }
+            .title {
+                position: relative;
+            }
+
+        </style>
     </head>
     <body>
         {% block header %}<a href='{% if back %}{{ back }}{% else %}/{% endif %}'>&lt;-- Back</a><br />{% endblock %}
-        <div class='w3-center'>
+        <div class='w3-container w3-center'>
         {% block content %}{% endblock %}
         </div>
     </body>

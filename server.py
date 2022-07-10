@@ -46,55 +46,78 @@ def bydate(year = None, month = None):
     elif (year is not None and month is not None):
         if (month < 10): month = '0{}'.format(month)
         back = '/bydate/{}'.format(year)
-        for comic in yyreader.yacreader.get_comics_by_date(year, month):
+        for yacreader in yyreader.yacreader.get_comics_by_date(year, month):
             status = ''
-            if (comic['read'] == 1):
+            if (yacreader['read'] == 1):
                 status = "DONE"
-            elif (comic['current_page'] > 1):
+            elif (yacreader['current_page'] > 1):
                 status = '*'
-            #items.append({ 'url':'/read/{}'.format(comic['id']), 'text':'({}) {} #{}'.format(comic['date'].strftime('%Y/%m/%d'), comic['volume'], comic['issue']) })
-            items.append({ 'status': status, 'comic': comic, 'date':comic['date'].strftime('%Y/%m/%d') }) 
+            items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%Y/%m/%d'), 'short_volume':yacreader['volume'][0:25] }) 
         return render_template('comics_bydate.html', back = back, items = items)
 
 @app.route('/byvolume')
 @app.route('/byvolume/<volume>')
 def byvolume(volume = None):
-    #yyreader.yacreader.connect()
     items = []
     back = '/'
     if (volume is None):
         for volume in yyreader.yacreader.get_volumes():
-            items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume } )
+            items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume , 'short_text': volume[0:25]} )
         return render_template('byvolume.html', back = back, items = items)
     else:
         back = '/byvolume'
         volume = urllib.parse.unquote(volume)
-        for comic in yyreader.yacreader.get_comics_by_volume(volume):
+        for yacreader in yyreader.yacreader.get_comics_by_volume(volume):
             status = ''
-            if (comic['read'] == 1):
+            if (yacreader['read'] == 1):
                 status = 'DONE'
-            elif (comic['current_page'] > 1):
+            elif (yacreader['current_page'] > 1):
                 status = '*'
-            items.append({ 'status': status, 'comic': comic, 'date':comic['date'].strftime('%Y/%m/%d') }) 
+            items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%Y/%m/%d') }) 
 
         return render_template('comics.html', back = back, items = items)
+
+@app.route('/cover/<int:id>')
+def cover(id):
+    cover_file = None
+    if (id in comic_cache):
+        cover_file = comic_cache[id]['cover']
+    else:
+        yacreader = yyreader.yacreader.get_comic_by_id(id)
+        comic_cache[id] = {}
+        comic_cache[id]['yacreader'] = yacreader
+        comic_cache[id]['comic'] = yyreader.comic.comic(comic_dir + '/' + yacreader['path'])
+        cover_file = yyreader.yacreader.get_cover_file(id, hash = yacreader['hash'])
+        comic_cache[id]['cover'] = cover_file
+        comic_cache[id]['date'] = datetime.now()
+    
+    cover_data = None
+    with (open(cover_file, 'rb') as f):
+        cover_data = f.read()
+
+    if (cover_data is not None):
+        return Response(cover_data, mimetype = 'image/jpeg')
 
 @app.route('/read/<int:id>')
 @app.route('/read/<int:id>/<int:page>')
 def read(id, page = None):
-    comic = yyreader.yacreader.get_comic_by_id(id)
+    yacreader = None
     if (id in comic_cache):
+        yacreader = comic_cache[id]['yacreader']
         c = comic_cache[id]['comic']
     else:
-        c = yyreader.comic.comic(comic_dir + '/' + comic['path'])
+        yacreader = yyreader.yacreader.get_comic_by_id(id)
+        c = yyreader.comic.comic(comic_dir + '/' + yacreader['path'])
         comic_cache[id] = {}
+        comic_cache[id]['yacreader'] = yacreader
+        comic_cache[id]['cover'] = yyreader.yacreader.get_cover(id, hash = yacreader['hash'])
         comic_cache[id]['comic'] = c
         comic_cache[id]['date'] = datetime.now()
 
     if (page is None):
         page = 1
-        if ('current_page' in comic and comic['current_page'] is not None):
-            page = int(comic['current_page'])
+        if ('current_page' in yacreader and yacreader['current_page'] is not None):
+            page = int(yacreader['current_page'])
         if (page < 1): page = 1
         if (page > c.page_count()): page = c.page_count()
         return redirect('/read/{}/{}'.format(id, page))
@@ -115,18 +138,21 @@ def read(id, page = None):
         next_page_url = '/read/{}/{}'.format(id, (page+1))
 
     yyreader.yacreader.update_read_log(id, page, page_count = c.page_count())
-    return render_template('read.html', page = page, comic = comic, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), back = '/bydate/{}'.format(comic['date'].strftime('%Y/%m')), data_dir = c.data_dir)
+    return render_template('read.html', page = page, yacreader = yacreader, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), back = '/bydate/{}'.format(yacreader['date'].strftime('%Y/%m')), data_dir = c.data_dir)
 
 @app.route('/page/<int:id>/<int:page>')
 def page(id, page):
-    comic = yyreader.yacreader.get_comic_by_id(id)
+    yacreader = None
     if (id in comic_cache):
+        yacreader = comic_cache[id]['yacreader']
         c = comic_cache[id]['comic']
     else:
-        comic = yyreader.yacreader.get_comic_by_id(id)
-        c = yyreader.comic.comic('/Volumes/Media/Comics/' + comic['path'])
+        yacreader = yyreader.yacreader.get_comic_by_id(id)
+        c = yyreader.comic.comic('/Volumes/Media/Comics/' + yacreader['path'])
         comic_cache[id] = {}
+        comic_cache[id]['yacreader'] = yacreader
         comic_cache[id]['comic'] = c
+        comic_cache[id]['cover'] = yyreader.yacreader.get_cover(id, hash = yacreader['hash'])
         comic_cache[id]['date'] = datetime.now()
 
     if (page < 0): page = 1

@@ -10,15 +10,11 @@
     <area shape='rect' coords='{{img.half_width}},0,{{img.width}},{{img.height}}' href='{{next_page_url}}'>
 {% endif %}
 </map>
-<table>
-<tr>
-   <td colspan=3><a href='/byvolume/{{comic.volume}}'>{{comic.volume}}</a> #{{comic.issue}} (page {{page}} of {{page_count}})</td>
-</tr>
-<tr>  
-    <td colspan=3><img src='/page/{{comic.id}}/{{page}}' height='{{img.height}}' width='{{img.width}}' usemap=#pageturner></td>
-</tr>
+<div class=w3-panel>
+    <a href='/byvolume/{{yacreader.volume}}'>{{yacreader.volume}}</a> #{{yacreader.issue}} (page {{page}} of {{page_count}})
+</div>
+<img src='/page/{{yacreader.id}}/{{page}}' height='{{img.height}}' width='{{img.width}}' usemap=#pageturner>
 {#}<tr>
     <td colspan=3>{{data_dir}}</td>
 </tr>{#}
-</table>
 {% endblock %}

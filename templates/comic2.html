@@ -1,0 +1,13 @@
+<a href='/read/{{item.yacreader.id}}' class='w3-button'>
+    <div class=comic>
+        <div class='comic-img'><img class='w3-round w3-card' src='/cover/{{item.yacreader.id}}' height=200></div>
+        {% if item.status == "DONE" %}
+        <div class='comic-img status done'></div>
+        {% elif item.status == "*" %}
+        <div class='comic-img status inprogress'></div>
+        {% endif %}
+    </div>
+    <div>
+        {{item.yacreader.volume}} #{{item.yacreader.issue}}<br />{{item.date}}
+    </div>
+</a>

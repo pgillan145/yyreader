@@ -12,50 +12,41 @@ import re
 #import yyreader.comic
 
 config = None
-db = None
-cursor = None
 
 def connect():
-    global config, db, cursor
+    global config
 
-    #if (db is not None and cursor is not None):
-    #    return
-
-    config = minorimpact.config.getConfig(script_name = 'yyreader')
+    if (config is None):
+        config = minorimpact.config.getConfig(script_name = 'yyreader')
     
     db_file = config['default']['db']
     if (os.path.exists(db_file) is None):
         raise Exception("{} does not exist".format(db_file))
 
+
     db = sqlite3.connect(db_file)
-    cursor = db.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
-    db.commit()
-    try:
-        cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
-        db.commit()
-    except Exception as e:
-        if (str(e) != 'index comic_info_arc_idx already exists'):
-            raise e
-
     return db
+    
+    #cursor = db.cursor()
+    #cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
+    #db.commit()
+    #try:
+    #    cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
+    #    db.commit()
+    #except Exception as e:
+    #    if (str(e) != 'index comic_info_arc_idx already exists'):
+    #        raise e
 
-def disconnect():
-    global cursor, db
-
-    if db is not None:
-        db.close()
-
-    db = None
-    cursor = None
+    #return db
 
 def convert_yacreader_date(yacreader_date):
     date = datetime.datetime.strptime(yacreader_date, '%d/%m/%Y')
     return date
     
 def get_comic_by_id(id):
-    connect()
-    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
+    db = connect()
+    cursor = db.cursor()
+    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
     rows = cursor.fetchall()
     comic_data = None
     for row in rows:
@@ -66,15 +57,16 @@ def get_comic_by_id(id):
         path = row[4]
         read = row[5]
         current_page = row[6]
+        hash = row[7]
 
         if (re.search(r'^/ByDate', path)):
             continue
 
         if (current_page is None or current_page == 0):
             current_page = 1
-        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page }
+        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash }
 
-    disconnect()
+    db.close()
     if (comic_data is None):
         raise Exception("invalid comic_info id: '{}'".format(id))
 
@@ -82,7 +74,8 @@ def get_comic_by_id(id):
 
 # TODO: Turn these two "get_comics_by_*" into a single function, they do the same thing but with a slightly different SELECT.
 def get_comics_by_date(year, month):
-    connect()
+    db = connect()
+    cursor = db.cursor()
     comics = []
     sql = 'select volume, number, date, id, read, currentPage from comic_info where date like "%/{}/{}"'
     #print(sql.format(month, year))
@@ -100,11 +93,27 @@ def get_comics_by_date(year, month):
             current_page = 1
 
         comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
-    disconnect()
+    db.close()
     return sorted(comics, key=lambda x:(x['date'], x['volume']) )
 
+def get_cover(id, hash = None):
+    cover_data = None
+    cover_file = get_cover_file(id, hash = hash)
+    with (open(cover_file, 'rb') as f):
+        cover_data = f.read()
+    return cover_data
+
+def get_cover_file(id, hash = None):
+    if (hash is None):
+        comic = get_comic_by_id(id)
+        hash = comic['hash']
+    cover_file = config['default']['comic_dir'] + '/' + '.yacreaderlibrary/covers/' + hash + '.jpg'
+
+    return cover_file
+
 def get_comics_by_volume(volume):
-    connect()
+    db = connect()
+    cursor = db.cursor()
     comics = []
     cursor.execute('select volume, number, date, id, read, currentPage from comic_info where volume = "{}"'.format(volume))
     rows = cursor.fetchall()
@@ -121,11 +130,12 @@ def get_comics_by_volume(volume):
 
         comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
 
-    disconnect()
+    db.close()
     return sorted(comics, key=lambda x:(x['date'], x['volume']) )
 
 def get_months(year):
-    connect()
+    db = connect()
+    cursor = db.cursor()
     months = []
     cursor.execute('select distinct(date) from comic_info')
     rows = cursor.fetchall()
@@ -138,11 +148,12 @@ def get_months(year):
         month = date.strftime('%m')
         if (month not in months):
             months.append(month)
-    disconnect()
+    db.close()
     return sorted(months, key=lambda x:x)
 
 def get_volumes():
-    connect()
+    db = connect()
+    cursor = db.cursor()
     volumes = []
     cursor.execute('select distinct(volume) from comic_info')
     rows = cursor.fetchall()
@@ -150,11 +161,12 @@ def get_volumes():
         if (row[0] is None):
             continue
         volumes.append(row[0])
-    disconnect()
+    db.close()
     return sorted(volumes, key=lambda x: x)
 
 def get_years():
-    connect()
+    db = connect()
+    cursor = db.cursor()
     years = []
     cursor.execute('select distinct(date) from comic_info')
     rows = cursor.fetchall()
@@ -165,11 +177,12 @@ def get_years():
         year = date.year
         if (year not in years):
             years.append(year)
-    disconnect()
+    db.close()
     return sorted(years, key=lambda x: x)
 
 def update_read_log(id, page, page_count = None):
-    connect()
+    db = connect()
+    cursor = db.cursor()
     cursor.execute('update comic_info set hasBeenOpened = TRUE, currentPage = ? where comic_info.id = ?', (page, id))
     if (page_count is not None and page == page_count):
         cursor.execute('update comic_info set read = TRUE where comic_info.id = ?', (id,))
