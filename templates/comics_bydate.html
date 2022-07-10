@@ -2,10 +2,8 @@
 {% block content %}
 <table>
     {% for item in items %}
-    <tr>
-        <td>{{item.status}}</td>
-        <td>{{item.date}} <a href='/read/{{item.comic.id}}'>{{item.comic.volume}} #{{item.comic.issue}}</a></td>
-    </tr>
+        {#}<td>{{item.date}} <a href='/read/{{item.comic.id}}'>{{item.comic.volume}} #{{item.comic.issue}}</a></td>{#}
+        <a class='w3-button w3-blue w3-margin' href='/read/{{item.comic.id}}'>{{item.comic.volume}} #{{item.comic.issue}}<br />{{item.date}}</a>
     {% endfor %}
 </table>
 {% endblock %}

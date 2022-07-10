@@ -17,7 +17,7 @@ import xml.etree.ElementTree as ET
 from . import parser
 
 base_url = 'https://comicvine.gamespot.com/api'
-cache = { 'results': {} }
+cache = { 'results': {}, 'volumes': {} }
 cache_setup = False
 headers = {'User-Agent': 'yyreader'}
 params = {}
@@ -255,6 +255,8 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_file = '/t
         #   to be the first -- way easier.
         comicvine_data['date'] = re.sub('-\d\d$', '-01', i['cover_date'])
 
+    cache['volumes'][test_volume] = { 'volume': comicvine_data['volume_name'], 'mod_date': datetime.now() }
+
     return comicvine_data
 
 def search_volumes(volume, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
@@ -315,10 +317,17 @@ def setup_cache(cache_file):
             cache = pickle.load(f)
         if ('results' not in cache):
             cache['results'] = {}
+        if ('volumes' not in cache):
+            cache['volumes'] = {}
 
     urls = [key for key in cache['results']]
     for url in urls:
         if cache['results'][url]['mod_date'] < (datetime.now() - timedelta(weeks = 4)):
             del cache['results'][url]
+
+    volumes = [key for key in cache['volumes']]
+    for volume in volumes:
+        if cache['volumes'][volume]['mod_date'] < (datetime.now() - timedelta(weeks = 4)):
+            del cache['volumes'][volume]
 
     cache_setup = True

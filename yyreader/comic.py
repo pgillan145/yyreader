@@ -16,6 +16,18 @@ from . import parser
 
 config = minorimpact.config.getConfig(script_name = 'yyreader')
 
+def dive(dir, ext = 'jpg'):
+    for f in os.listdir(dir):
+        if (re.search(r'^\.', f)): continue
+        if (re.search('\.' + ext + '$', f)):
+            return dir
+    for f in os.listdir(dir):
+        if (re.search(r'^\.', f)): continue
+        if (os.path.isdir(dir + '/' + f)):
+            bottom = dive(dir + '/' + f)
+            if (bottom is not None):
+                return bottom
+
 class comic():
     data_dir = None
     file = None
@@ -200,17 +212,19 @@ class comic():
         f.close()
         return data
 
-    def page_size(self, number = 1):
-        img = Image.open(self.page_file(number))
+    def page_size(self, page = 1):
+        if (page < 0): page = 1
+        if (page > self.page_count()): page = self.page_count()
+        img = Image.open(self.page_file(page))
         return img.size
         
-    def page_file(self, number):
-        if (number < 1 or number > self.page_count()):
-            raise Exception("Invalid page number")
+    def page_file(self, page):
+        if (page < 1): page = 1
+        if (page > self.page_count()): page = self.page_count()
 
         files = self._files()
-        page = files[number - 1]
-        return self.data_dir + '/' + page
+        page_file = files[page - 1]
+        return self.data_dir + '/' + page_file
         
 
     def page_count(self):
@@ -233,12 +247,7 @@ class comic():
 
         if (command is None): raise Exception("can't unpack, unknown file type")
         result = subprocess.run(command)
-        self.data_dir = temp_dir
-        for f in os.listdir(temp_dir):
-            if (re.search('^\.', f)): continue
-            if (os.path.isdir(temp_dir + '/' + f)):
-                self.data_dir = temp_dir + '/' + f
-                break
+        self.data_dir = dive(temp_dir, ext = 'jpg')
         os.chdir(cwd)
 
     def __del__(self):

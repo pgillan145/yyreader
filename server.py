@@ -37,12 +37,12 @@ def bydate(year = None, month = None):
     if (year is None and month is None):
         for year in yyreader.yacreader.get_years():
             items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
-        return render_template('bydate.html', back = back, items = items)
+        return render_template('byyear.html', back = back, items = items)
     elif (year is not None and month is None):
         back = '/bydate'
         for month in yyreader.yacreader.get_months(year):
             items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(year, month) })
-        return render_template('bydate.html', back = back, items = items)
+        return render_template('bymonth.html', back = back, items = items)
     elif (year is not None and month is not None):
         if (month < 10): month = '0{}'.format(month)
         back = '/bydate/{}'.format(year)
@@ -95,7 +95,8 @@ def read(id, page = None):
         page = 1
         if ('current_page' in comic and comic['current_page'] is not None):
             page = int(comic['current_page'])
-            if (page > c.page_count()): page = c.page_count()
+        if (page < 1): page = 1
+        if (page > c.page_count()): page = c.page_count()
         return redirect('/read/{}/{}'.format(id, page))
 
     image_height = 1000
@@ -114,7 +115,7 @@ def read(id, page = None):
         next_page_url = '/read/{}/{}'.format(id, (page+1))
 
     yyreader.yacreader.update_read_log(id, page, page_count = c.page_count())
-    return render_template('read.html', page = page, comic = comic, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), back = '/bydate/{}'.format(comic['date'].strftime('%Y/%m')))
+    return render_template('read.html', page = page, comic = comic, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), back = '/bydate/{}'.format(comic['date'].strftime('%Y/%m')), data_dir = c.data_dir)
 
 @app.route('/page/<int:id>/<int:page>')
 def page(id, page):
@@ -127,6 +128,9 @@ def page(id, page):
         comic_cache[id] = {}
         comic_cache[id]['comic'] = c
         comic_cache[id]['date'] = datetime.now()
+
+    if (page < 0): page = 1
+    if (page > c.page_count()): page = c.page_count()
 
     return Response(c.page(page), mimetype = 'image/jpeg')
 

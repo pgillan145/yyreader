@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% for item in items %}
+        <a class='w3-button w3-blue w3-margin' href='{{ item.url }}'>{{ item.text }}</a>
+    {% endfor %}
+{% endblock %}

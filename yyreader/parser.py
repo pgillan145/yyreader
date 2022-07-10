@@ -13,25 +13,6 @@ date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)' ]
 
-cleanup_subs = [ { 'm':'\)\(', 's':') ('},
-                 { 'm':'([^ ])\(', 's':r'\1 (' },
-                 { 'm':'[. ]\.(cb[zr])$', 's':r'.\1' },
-                 { 'm':' \[[^]]*\]+', 's':''},
-                 { 'm':' \([^)]*[^)\d\-]+[^)]*\)', 's':'' },
-                 { 'm':' \d+ of \d+ covers', 's':'' },
-                 { 'm':' v\d+ (\d+)\.', 's':r' \1.' },
-                 { 'm':' vII ', 's':r' ' },
-                 { 'm':' #(\d+)', 's':r' \1' },
-                 { 'm':' (\d)\.', 's':r' 00\1.' },
-                 { 'm':' (\d\d)\.', 's':r' 0\1.' },
-                 { 'm':'^\d+ ?- ', 's':'' },
-                 { 'm':'__SLASH__', 's':'/' },
-                 { 'm':'^FCBD (\d\d\d\d) ', 's':r'Free Comic Book Day \1 ' },
-                 { 'm':' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', 's':r' - Marvel Legacy Primer Pages 001 (\1)' },
-                 { 'm':'^\d+ - House of M - ', 's':'' },
-                 { 'm':' - ', 's':': ', 'c':1 },
-               ]
-
 formats = [ '^(?P<year>\d\d\d\d)00 (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # Damage Control (1989v2) 001 (1989-12-01).cbr
@@ -59,6 +40,38 @@ credit_pages = [ 'z.jpg',
                  'zzGGtag.jpg',
                  'zWater.jpg',
                ]
+
+cleanup_subs = [ { 'm':'\)\(', 's':') ('},
+                 { 'm':'([^ ])\(', 's':r'\1 (' },
+                 { 'm':'[. ]\.(cb[zr])$', 's':r'.\1' },
+                 { 'm':' \[[^]]*\]+', 's':''},
+                 { 'm':' \([^)]*[^)\d\-]+[^)]*\)', 's':'' },
+                 { 'm':' \d+ of \d+ covers', 's':'' },
+                 { 'm':' v\d+ (\d+)\.', 's':r' \1.' },
+                 { 'm':' vII ', 's':r' ' },
+                 { 'm':' #(\d+)', 's':r' \1' },
+                 { 'm':' (\d)\.', 's':r' 00\1.' },
+                 { 'm':' (\d\d)\.', 's':r' 0\1.' },
+                 { 'm':'^\d+ ?- ', 's':'' },
+                 { 'm':'__SLASH__', 's':'/' },
+                 { 'm':'^FCBD (\d\d\d\d) ', 's':r'Free Comic Book Day \1 ' },
+                 { 'm':' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', 's':r' - Marvel Legacy Primer Pages 001 (\1)' },
+                 { 'm':'^\d+ - House of M - ', 's':'' },
+                 { 'm':' - ', 's':': ', 'c':1 },
+               ]
+
+volume_subs = [ 
+                { 'm': '(.+) starring .*', 's': r'\1' },
+                { 'm': '(.+) featuring .*', 's': r'\1' },
+                { 'm': 'Astonishing Tales and .*', 's': 'Astonishing Tales' },
+                { 'm': 'Marvel Premiere and .*', 's': 'Marvel Premiere' },
+                { 'm': 'Jungle Action & Black Panther', 's': 'Jungle Action' },
+                { 'm': 'Marvel Spotlight and .*', 's': 'Marvel Spotlight' },
+                { 'm': 'Marvel Team-Up: .*', 's': 'Marvel Team-Up' },
+                { 'm': 'Marvel Two In One: .*', 's': 'Marvel Two-in-One' },
+                { 'm': 'Marvel Two-in-One: .*', 's': 'Marvel Two-in-One' },
+                { 'm': 'Supernatural Thrillers and .*', 's': 'Supernatural Thrillers' },
+             ]
 
 def make_date(data, extension, ver = None, directors_cut = False):
     if ('issue' not in data):
@@ -219,6 +232,12 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     if (re.search('amazing spider-man', volume) and year is not None):
         if (int(year) >= 1999 and int(year) < 2014 and (int(issue) <= 58)):
             issue = int(issue) + 441
+
+    for c in volume_subs:
+        count = 0
+        if 'c' in c:
+            count = c['c']
+        volume = re.sub(c['m'], c['s'], volume, count = count)
 
     if (args.debug): print(f"parsed volume:{volume},issue:{issue},year:{year},month:{month},day:{day}")
     data['extension'] = extension
