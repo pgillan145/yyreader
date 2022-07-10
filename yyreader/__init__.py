@@ -28,18 +28,12 @@ def main():
     args = parser.parse_args()
     if (args.debug): args.verbose = True
 
-
     if (args.file is not None):
         c_file = re.sub('/$','', args.file)
-        if (os.path.exists(c_file) is False):
-            sys.exit(f"{c_file} does not exist")
-        
-        try:
-            c = comic.comic(c_file)
-            c.box(args.target, args = args)
-        except Exception as e:
-            print(e)
-    elif (args.dir is not None):
+        if (os.path.exists(c_file) and os.path.isdir(c_file) and args.dir is None):
+            args.dir = c_file
+
+    if (args.dir is not None):
         comic_dir = args.dir
         if (os.path.exists(comic_dir) is False):
             raise Exception(f"{comic_dir} does not exist")
@@ -55,4 +49,13 @@ def main():
             except Exception as e:
                 print(e)
         pass
+    elif (args.file is not None):
+        c_file = re.sub('/$','', args.file)
+        if (os.path.exists(c_file) is False):
+            sys.exit(f"{c_file} does not exist")
+        try:
+            c = comic.comic(c_file)
+            c.box(args.target, args = args)
+        except Exception as e:
+            print(e)
 

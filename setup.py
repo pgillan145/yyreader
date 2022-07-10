@@ -19,7 +19,7 @@ setup(
         "Topic :: Internet :: WWW/HTTP :: Dynamic Content"],
     description = "Yet another yet another comic reader.",
     #entry_points = { "console_scripts": [ "yyreader = yyreader:main" ] },
-    install_requires = ['dumper', 'flask', 'fuzzywuzzy', 'minorimpact', 'Pillow ],
+    install_requires = ['dumper', 'flask', 'fuzzywuzzy', 'minorimpact', 'Pillow', 'python-magic' ],
     license = 'GPLv3',
     long_description = readme,
     long_description_content_type = 'text/markdown',

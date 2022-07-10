@@ -1,5 +1,6 @@
 
 from fuzzywuzzy import fuzz
+import magic
 import minorimpact
 import minorimpact.config
 import os
@@ -19,7 +20,7 @@ config = minorimpact.config.getConfig(script_name = 'yyreader')
 def dive(dir, ext = 'jpg'):
     for f in os.listdir(dir):
         if (re.search(r'^\.', f)): continue
-        if (re.search('\.' + ext + '$', f)):
+        if (re.search('\.' + ext + '$', f, re.I)):
             return dir
     for f in os.listdir(dir):
         if (re.search(r'^\.', f)): continue
@@ -79,14 +80,13 @@ class comic():
             raise Exception("No info parsed from filename")
         if (parse_data['size'] < minimum_file_size):
             raise Exception("file too small")
-    
-        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
 
+        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
         new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
         volume_name = parser.massage_volume(comicvine_data['volume_name'])
         name_dir = f'{target_dir}/ByName/{volume_name} ({comicvine_data["start_year"]})'
-        #if (os.path.basename(self.file) != new_comic):
-        if (self.file != name_dir + '/' + new_comic):
+
+        while (self.file != name_dir + '/' + new_comic):
             # Figure out how 'close' the filename is to what we got back from comicvine.
             ratio = 0
             if (("The " + parse_data['volume']) == comicvine_data['volume_name']):
@@ -114,17 +114,21 @@ class comic():
                 c = minorimpact.getChar(default=default_c, end='\n', prompt=f"move to {new_comic} (ratio:{ratio})? ({default_text}/?) ", echo=True).lower()
 
             if (c == '?'):
+                print("  'c': Search comicvine again")
                 print("  'd': Dump the data for this issue")
                 print("  'n': Don't move the file")
                 print("  'q': Quit")
                 print("  'y': Move the file")
-                parse_data = None
+            elif (c == 'c'):
+                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
+                new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
+                volume_name = parser.massage_volume(comicvine_data['volume_name'])
+                name_dir = f'{target_dir}/ByName/{volume_name} ({comicvine_data["start_year"]})'
             elif (c == 'd'):
                 print("Data parsed from filename:")
                 print(parse_data)
                 print("Data collected online:")
                 print(comicvine_data)
-                parse_data = None
             elif (c == 'q'):
                 sys.exit()
             elif (c == 'y'):
@@ -179,25 +183,23 @@ class comic():
         files = []
         self._unpack()
         for f in os.listdir(self.data_dir):
-            if (re.search(r'.jpg$', f) is None or f in parser.credit_pages):
-                continue
             files.append(f)
 
-        return sorted(files)
-
-        #return sorted(list(filter(lambda x:re.search(r'.jpg$', x), os.listdir(self.data_dir))))
+        return files
 
     def is_cbr(self):
-        if (re.search('\.cbr$', self.file)):
-            return True
-        elif (re.search('\.tar$', self.file)):
+        if (re.search('\.cbr$', self.file) or (re.search('\.rar$', self.file))):
+            magic_str = magic.from_file(self.file)
+            if (re.search('^RAR archive data', magic_str) is None):
+                raise Exception("extension is rar, but filetype is '{}'".format(magic_str))
             return True
         return False
 
     def is_cbz(self):
-        if (re.search('\.cbz$', self.file)):
-            return True
-        elif (re.search('\.zip$', self.file)):
+        if (re.search('\.cbz$', self.file)) or (re.search('\.zip$', self.file))):
+            magic_str = magic.from_file(self.file)
+            if (re.search('^Zip archive data', magic_str) is None):
+                raise Exception("extension is zip, but filetype is '{}'".format(magic_str))
             return True
         return False
 
@@ -212,24 +214,33 @@ class comic():
         f.close()
         return data
 
-    def page_size(self, page = 1):
-        if (page < 0): page = 1
-        if (page > self.page_count()): page = self.page_count()
-        img = Image.open(self.page_file(page))
-        return img.size
-        
+    def page_count(self):
+        return len(self._page_files())
+
     def page_file(self, page):
         if (page < 1): page = 1
         if (page > self.page_count()): page = self.page_count()
 
-        files = self._files()
+        files = self._page_files()
         page_file = files[page - 1]
         return self.data_dir + '/' + page_file
 
-    def page_count(self):
-        self._unpack()
+    def _page_files(self):
+        page_files = []
+        files = self._files()
+        for f in files:
+            if (re.search(r'.jpg$', f, re.I) is None or f in parser.credit_pages):
+                continue
+            page_files.append(f)
 
-        return len(self._files())
+        #return sorted(list(filter(lambda x:re.search(r'.jpg$', x), os.listdir(self.data_dir))))
+        return sorted(page_files)
+
+    def page_size(self, page = 1):
+        if (page < 1): page = 1
+        if (page > self.page_count()): page = self.page_count()
+        img = Image.open(self.page_file(page))
+        return img.size
 
     def _unpack(self):
         if (self.data_dir is not None):
@@ -238,6 +249,7 @@ class comic():
         temp_dir = self.make_temp_dir()
         cwd = os.getcwd()
         os.chdir(temp_dir)
+        #print(temp_dir)
         command = None
         if (self.is_cbr()):
             command = [config['default']['unrar'], 'x', '-inul', self.file]
@@ -245,6 +257,7 @@ class comic():
             command = [config['default']['unzip'], '-q', self.file, '-d', temp_dir]
 
         if (command is None): raise Exception("can't unpack, unknown file type")
+        #print(command)
         result = subprocess.run(command)
         self.data_dir = dive(temp_dir, ext = 'jpg')
         os.chdir(cwd)

@@ -2,3 +2,4 @@ flask
 fuzzywuzzy
 minorimpact
 Pillow
+python-magic

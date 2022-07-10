@@ -24,6 +24,12 @@ comic_cache = {}
 comic_dir = config['default']['comic_dir']
 comic_dir = re.sub(r'/$', '', comic_dir)
 
+def clean_cache():
+    ids = [key for key in comic_cache]
+    for id in ids:
+        if (('date' in comic_cache[id] and datetime.now() > comic_cache[id]['date'] + timedelta(hours=2)) or ('date' not in comic_cache[id])):
+           del comic_cache[id]
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -34,6 +40,7 @@ def index():
 def bydate(year = None, month = None):
     items = []
     back = '/'
+    clean_cache()
     if (year is None and month is None):
         for year in yyreader.yacreader.get_years():
             items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
@@ -60,6 +67,7 @@ def bydate(year = None, month = None):
 def byvolume(volume = None):
     items = []
     back = '/'
+    clean_cache()
     if (volume is None):
         for volume in yyreader.yacreader.get_volumes():
             items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume , 'short_text': volume[0:25]} )
