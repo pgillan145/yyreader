@@ -27,17 +27,18 @@ def connect():
     db = sqlite3.connect(db_file)
     return db
     
-    #cursor = db.cursor()
-    #cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
-    #db.commit()
-    #try:
-    #    cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
-    #    db.commit()
-    #except Exception as e:
-    #    if (str(e) != 'index comic_info_arc_idx already exists'):
-    #        raise e
-
-    #return db
+def init():
+    db = connect()
+    cursor = db.cursor()
+    cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
+    db.commit()
+    try:
+        cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
+        db.commit()
+    except Exception as e:
+        if (str(e) != 'index comic_info_arc_idx already exists'):
+            raise e
+    db.close()
 
 def convert_yacreader_date(yacreader_date):
     date = datetime.datetime.strptime(yacreader_date, '%d/%m/%Y')
@@ -186,8 +187,8 @@ def update_read_log(id, page, page_count = None):
     cursor.execute('update comic_info set hasBeenOpened = TRUE, currentPage = ? where comic_info.id = ?', (page, id))
     if (page_count is not None and page == page_count):
         cursor.execute('update comic_info set read = TRUE where comic_info.id = ?', (id,))
-
     db.commit()
+    db.close()
     
     
 

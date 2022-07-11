@@ -5,7 +5,7 @@ import minorimpact
 import minorimpact.config
 import os
 import os.path
-from PIL import Image
+from PIL import Image, ImageDraw
 import re
 import shutil
 import subprocess
@@ -196,7 +196,7 @@ class comic():
         return False
 
     def is_cbz(self):
-        if (re.search('\.cbz$', self.file)) or (re.search('\.zip$', self.file))):
+        if (re.search('\.cbz$', self.file) or (re.search('\.zip$', self.file))):
             magic_str = magic.from_file(self.file)
             if (re.search('^Zip archive data', magic_str) is None):
                 raise Exception("extension is zip, but filetype is '{}'".format(magic_str))
@@ -213,6 +213,64 @@ class comic():
         data = f.read()
         f.close()
         return data
+
+    def page_color(self, page = 1):
+        """Returns the hex code for the color that appears most often on the page."""
+
+        img = Image.open(self.page_file(page))
+        #(w, h) = img.size
+        #d = ImageDraw.Draw(img)
+        #d.rectangle([(50,50), (w-50, h-50)], fill=(0,0,0,255))
+        colors = sorted(img.getcolors(maxcolors=1024*1024), key=lambda x:x[0], reverse = True)
+        #img.save(self.data_dir + "/fuck.png")
+        #print(self.data_dir + "/fuck.png")
+        return '#{:02x}{:02x}{:02x}'.format(colors[0][1][0], colors[0][1][1], colors[0][1][2])
+
+    def page_color1(self, page = 1):
+        img = Image.open(self.page_file(page))
+        (w, h) = img.size
+        mask = Image.new('1', img.size, 1)
+        d = ImageDraw.Draw(mask)
+        d.rectangle([(50,50), (w-50, h-50)], fill=0)
+        #mask.save(self.data_dir + "/fuck.png")
+        #print(self.data_dir + "/fuck.png")
+
+        r,g,b = img.split()
+        big_r = 0
+        tr = 0
+        h =  r.histogram() #mask=mask)
+        i = 0
+        while (i < len(h)):
+            if (h[i] > big_r):
+                big_r = h[i]
+                tr = i
+            #print("{}:{}".format(i, h[i]))
+            i = i + 1
+
+        big_g = 0
+        tg = 0
+        h =  g.histogram() #mask=mask)
+        i = 0
+        while (i < len(h)):
+            if (h[i] > big_g):
+                big_g = h[i]
+                tg = i
+            #print("{}:{}".format(i, h[i]))
+            i = i + 1
+
+        big_b = 0
+        tb = 0
+        h =  b.histogram() #mask=mask)
+        i = 0
+        while (i < len(h)):
+            if (h[i] > big_b):
+                big_b = h[i]
+                tb = i
+            #print("{}:{}".format(i, h[i]))
+            i = i + 1
+        h = re.sub('0x', '', "#" + str(hex((tr*256*256) + (tg*256) + tb)))
+        #print(h)
+        return h
 
     def page_count(self):
         return len(self._page_files())
@@ -237,8 +295,6 @@ class comic():
         return sorted(page_files)
 
     def page_size(self, page = 1):
-        if (page < 1): page = 1
-        if (page > self.page_count()): page = self.page_count()
         img = Image.open(self.page_file(page))
         return img.size
 

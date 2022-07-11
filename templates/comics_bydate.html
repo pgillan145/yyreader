@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
+    <a href='{{back}}'>&lt;--Back</a>
     {% for item in items %}
         {% include 'comic.html' %}
     {% endfor %}

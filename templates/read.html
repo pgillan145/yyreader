@@ -11,10 +11,14 @@
 {% endif %}
 </map>
 <div class=w3-panel>
-    <a href='/byvolume/{{yacreader.volume}}'>{{yacreader.volume}}</a> #{{yacreader.issue}} (page {{page}} of {{page_count}})
-</div>
+    <a href='{% if back %}{{ back }}{% else %}/{% endif %}'>&lt;--Back</a>&nbsp;&nbsp;
+    <a href='/byvolume/{{yacreader.volume}}#{yacreader.id}'>{{yacreader.volume}}</a> #{{yacreader.issue}} (page {{page}} of {{page_count}})
+    {% if datelink != back %}
+        <a href='{{datelink}}#{{yacreader.id}}'>{{yacreader.date.strftime("%m/%d/%Y")}}</a>
+    {% else %}
+        {{yacreader.date.strftime("%m/%d/%Y")}}
+    {% endif %}
+<div>
 <img src='/page/{{yacreader.id}}/{{page}}' height='{{img.height}}' width='{{img.width}}' usemap=#pageturner>
-{#}<tr>
-    <td colspan=3>{{data_dir}}</td>
-</tr>{#}
+{#}<br />{{data_dir}}{#}
 {% endblock %}

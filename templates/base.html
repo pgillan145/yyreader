@@ -34,16 +34,17 @@
             .inprogress {
                 background: yellow;
             }
-            .title {
-                position: relative;
+            .read {
+                background: {{background_color}};
+                color: {{text_color}};
             }
 
         </style>
     </head>
     <body>
-        {% block header %}<a href='{% if back %}{{ back }}{% else %}/{% endif %}'>&lt;-- Back</a><br />{% endblock %}
-        <div class='w3-container w3-center'>
-        {% block content %}{% endblock %}
+        <div class='w3-container w3-center read'>
+            {#}{% block header %}<a href='{% if back %}{{ back }}{% else %}/{% endif %}'>&lt;-- Back</a>{% endblock %}{#}
+            {% block content %}{% endblock %}
         </div>
     </body>
 </html>
