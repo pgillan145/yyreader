@@ -36,9 +36,11 @@ formats = [ '^(?P<year>\d\d\d\d)00 (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<exten
           ]
 
 credit_pages = [ 'z.jpg',
-                 'zzoroboros.jpg',
-                 'zzGGtag.jpg',
                  'zWater.jpg',
+                 'zzGGtag.jpg',
+                 'zzoroboros.jpg',
+                 'zzoronewtag10.jpg',
+                 'zzzGlorithSolo.jpg',
                ]
 
 cleanup_subs = [ { 'm':'\)\(', 's':') ('},
