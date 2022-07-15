@@ -25,6 +25,12 @@ comic_cache = {}
 comic_dir = config['default']['comic_dir']
 comic_dir = re.sub(r'/$', '', comic_dir)
 
+debug = False
+if ('debug' in config['server']):
+    config_debug = eval(config['server']['debug'])
+    if (config_debug is True):
+        debug = True
+
 def clean_cache():
     ids = [key for key in comic_cache]
     for id in ids:
@@ -210,4 +216,4 @@ def page(id, page):
 
 if __name__ == '__main__':
     yyreader.yacreader.init()
-    app.run(port = config['server']['port'], host = '0.0.0.0', debug = True)
+    app.run(port = config['server']['port'], host = '0.0.0.0', debug = debug)
