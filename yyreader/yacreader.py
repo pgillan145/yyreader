@@ -77,6 +77,7 @@ def get_comic_by_id(id):
 def get_comics_by_date(year, month):
     db = connect()
     cursor = db.cursor()
+    if (month < 10): month = '0{}'.format(month)
     comics = []
     sql = 'select volume, number, date, id, read, currentPage from comic_info where date like "%/{}/{}"'
     #print(sql.format(month, year))

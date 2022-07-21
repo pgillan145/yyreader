@@ -1,24 +1,28 @@
 {% extends 'base.html' %}
 {% block content %}
-<map name='pageturner'>
-{% if previous_page_url is none %}
-{% else %}
-    <area shape='rect' coords='0,0,{{img.half_width}},{{img.height}}' href='{{previous_page_url}}'>
-{% endif %}
-{% if next_page_url is none %}
-{% else %}
-    <area shape='rect' coords='{{img.half_width}},0,{{img.width}},{{img.height}}' href='{{next_page_url}}'>
-{% endif %}
-</map>
 <div class=w3-panel>
-    <a href='{% if back %}{{ back }}{% else %}/{% endif %}'>&lt;--Back</a>&nbsp;&nbsp;
-    <a href='/byvolume/{{yacreader.volume}}#{yacreader.id}'>{{yacreader.volume}}</a> #{{yacreader.issue}} (page {{page}} of {{page_count}})
-    {% if datelink != back %}
-        <a href='{{datelink}}#{{yacreader.id}}'>{{yacreader.date.strftime("%m/%d/%Y")}}</a>
+    <a href='{{back.url}}'>&lt;--{{back.text}}</a>
+    <a href='/byvolume/{{yacreader.volume}}#{{yacreader.id}}'>{{yacreader.volume}}</a> #{{yacreader.issue}} (page {{page}} of {{page_count}})
+    {% if datelink != back.url %}
+        <a href='{{datelink}}'>{{yacreader.date.strftime("%m/%d/%Y")}}</a>
     {% else %}
         {{yacreader.date.strftime("%m/%d/%Y")}}
     {% endif %}
-<div>
-<img src='/page/{{yacreader.id}}/{{page}}' height='{{img.height}}' width='{{img.width}}' usemap=#pageturner>
+</div>
+<div class='page'>
+    {% if half == 2 %}
+        <img class='page page2' src='/page/{{yacreader.id}}/{{page}}'>
+    {% else %}
+        <img class='page page1' src='/page/{{yacreader.id}}/{{page}}'>
+    {% endif %}
+    {% if previous_page_url is none %}
+    {% else %}
+        <a href='{{previous_page_url}}'><div class='page back'></div></a>
+    {% endif %}
+    {% if next_page_url is none %}
+    {% else %}
+        <a href='{{next_page_url}}'><div class='page next'></div></a>
+    {% endif %}
+</div>
 {#}<br />{{data_dir}}{#}
 {% endblock %}

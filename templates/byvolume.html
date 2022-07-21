@@ -1,11 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
-<a href='{{back}}'>&lt;--Back</a>
-<table>
-    {% for item in items %}
-    <tr>
-        <td><a href='{{ item.url }}'>{{ item.text }}</a></td>
-    </tr>
+    {% include 'nav.html' %}
+    {% for item in index %}
+        <a class='w3-button w3-blue' href='{{ item.url }}'>{{ item.text }}</a>
     {% endfor %}
-</table>
+    {% for item in items %}
+        {% if item.name is none %}
+            <div>
+                <a href='{{ item.url }}'>{{ item.text }}</a>
+            </div>
+        {% else %}
+            <a name='{{item.name}}'>
+        {% endif %}
+    {% endfor %}
 {% endblock %}

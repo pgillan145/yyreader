@@ -36,10 +36,12 @@ formats = [ '^(?P<year>\d\d\d\d)00 (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<exten
           ]
 
 credit_pages = [ 'z.jpg',
+                 'zSoU-Nerd.jpg',
                  'zWater.jpg',
                  'zzGGtag.jpg',
                  'zzoroboros.jpg',
                  'zzoronewtag10.jpg',
+                 'zzorostnick11.jpg',
                  'zzzGlorithSolo.jpg',
                ]
 
@@ -246,15 +248,21 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     data['issue'] = issue
     data['start_year'] = start_year
     data['volume'] = volume
+    data['volume_name'] = volume
     data['ver'] = ver
-    data['year'] = year
+    
 
     if (year is not None and month is not None and day is not None and day != '00'):
         data['date'] = f'{year}-{month}-{day}'
+        data['day'] = day
+        data['month'] = month
     elif (year is not None and month is not None and month != '00'):
         data['date'] = f'{year}-{month}-01'
+        data['day'] = '01'
+        data['month'] = month
 
     if (year is not None):
+        data['year'] = year
         if (re.search('^\d+$', year) and issue is not None and re.search('^\d+$', issue) and month is not None and month != '00' and re.search('^\d+$', month)):
             months = int(issue) - 1
             if (re.search(' annual',volume.lower())):

@@ -60,20 +60,41 @@ def index():
 @app.route('/bydate/<int:year>/<int:month>')
 def bydate(year = None, month = None):
     items = []
-    back = '/'
+    up = { 'url':'/', 'text':'Index' }
+    back = None
+    forth = None
     clean_cache()
     if (year is None and month is None):
         for year in yyreader.yacreader.get_years():
             items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
-        return render_template('byyear.html', back = back, items = items)
+        return render_template('byyear.html', back = back, items = items, nav = { 'back':back, 'forth':forth, 'up': up })
     elif (year is not None and month is None):
-        back = '/bydate'
+        years = yyreader.yacreader.get_years()
+        i = 0
+        while i < len(years):
+            if (years[i] == year):
+                if (i > 0): back = { 'url': '/bydate/{}'.format(years[i-1]), 'text':'{}'.format(years[i-1]) } 
+                if (i < len(years)-1): forth = { 'url': '/bydate/{}'.format(years[i+1]), 'text':'{}'.format(years[i+1]) } 
+                break
+            i = i + 1
+        up = { 'url':'/bydate', 'text':'ByDate' }
         for month in yyreader.yacreader.get_months(year):
-            items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(year, month) })
-        return render_template('bymonth.html', back = back, items = items)
+            items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(month, year) })
+        return render_template('bymonth.html', back = back, items = items, nav = { 'back':back, 'forth':forth, 'up': up })
     elif (year is not None and month is not None):
-        if (month < 10): month = '0{}'.format(month)
-        back = '/bydate/{}'.format(year)
+        up = { 'url':'/bydate/{}'.format(year), 'text':str(year) }
+        if (month > 1):
+            back = { 'url':'/bydate/{}/{}'.format(year, month-1), 'text':'{}/{}'.format(month-1, year) }
+        elif (month == 1):
+            #TODO: Figure out what the previous month and year actually are
+            back = { 'url':'/bydate/{}/{}'.format(year-1, 12), 'text':'{}/{}'.format(12, year-1) }
+
+        if (month < 12):
+            forth = { 'url':'/bydate/{}/{}'.format(year, month+1), 'text':'{}/{}'.format(month+1, year) }
+        elif (month == 12):
+            #TODO: Figure out what the next month and year actually are
+            forth = { 'url':'/bydate/{}/{}'.format(year+1, 1), 'text':'{}/{}'.format(1, year+1) }
+            
         for yacreader in yyreader.yacreader.get_comics_by_date(year, month):
             status = ''
             if (yacreader['read'] == 1):
@@ -81,7 +102,7 @@ def bydate(year = None, month = None):
             elif (yacreader['current_page'] > 1):
                 status = '*'
             items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'short_volume':yacreader['volume'][0:25], 'datelink':'/bydate/{}'.format(yacreader['date'].strftime('%Y/%m')) }) 
-        response = Response(render_template('comics_bydate.html', back = back, items = items))
+        response = Response(render_template('comics_bydate.html', back = back, forth = forth, items = items, nav = {'back':back, 'forth':forth, 'up':up }))
         response.set_cookie('traversal_method', 'bydate', max_age=60*60*24*365)
         response.set_cookie('current_time', '{}/{}'.format(year, month), max_age=60*60*24*365)
         return response
@@ -90,16 +111,23 @@ def bydate(year = None, month = None):
 @app.route('/byvolume/<volume>')
 def byvolume(volume = None):
     items = []
-    back = '/'
+    back = { 'url':'/bydate/{}'.format(request.cookies.get('current_time')), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
+    up = { 'url':'/', 'text':'Index' }
+    forth = None
     clean_cache()
     if (volume is None):
+        last = None
+        index = []
         for volume in yyreader.yacreader.get_volumes():
-            items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume , 'short_text': volume[0:25] })
-        return render_template('byvolume.html', back = back, items = items)
+            if (volume[0:1] != last):
+                last = volume[0:1]
+                items.append({ 'name':last })
+                index.append({ 'url':'#{}'.format(last), 'text':last })
+
+            items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume, 'name':None })
+        return render_template('byvolume.html', items = items, nav = {'back':back, 'forth':forth, 'up':up }, index = index)
     else:
-        back = '/byvolume'
-        if (request.cookies.get('current_time')):
-            back = '/bydate/' + request.cookies.get('current_time')
+        up = { 'url':'/byvolume', 'text':'By Volume' }
         volume = urllib.parse.unquote(volume)
         for yacreader in yyreader.yacreader.get_comics_by_volume(volume):
             status = ''
@@ -109,7 +137,7 @@ def byvolume(volume = None):
                 status = '*'
             items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'short_volume':yacreader['volume'][0:25], 'datelink':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), yacreader['id']) }) 
 
-        response = Response(render_template('comics.html', back = back, items = items))
+        response = Response(render_template('comics.html', back = back, items = items, nav = {'back':back, 'forth':forth, 'up':up }))
         response.set_cookie('traversal_method', 'byvolume', max_age=60*60*24*365)
         return response
 
@@ -136,13 +164,14 @@ def cover(id):
 
 @app.route('/read/<int:id>')
 @app.route('/read/<int:id>/<int:page>')
-def read(id, page = None):
+@app.route('/read/<int:id>/<int:page>/<int:half>')
+def read(id, page = None, half = None):
     yacreader = None
+    yacreader = yyreader.yacreader.get_comic_by_id(id)
     if (id in comic_cache):
-        yacreader = comic_cache[id]['yacreader']
+        #yacreader = comic_cache[id]['yacreader']
         c = comic_cache[id]['comic']
     else:
-        yacreader = yyreader.yacreader.get_comic_by_id(id)
         c = yyreader.comic.comic(comic_dir + '/' + yacreader['path'])
         comic_cache[id] = {}
         comic_cache[id]['yacreader'] = yacreader
@@ -154,45 +183,68 @@ def read(id, page = None):
         page = 1
         if ('current_page' in yacreader and yacreader['current_page'] is not None):
             page = int(yacreader['current_page'])
-        if (page < 1): page = 1
-        if (page > c.page_count()): page = c.page_count()
-        return redirect('/read/{}/{}'.format(id, page))
+        #if (page < 1): page = 1
+        #if (page > c.page_count()): page = c.page_count()
+        #return redirect('/read/{}/{}'.format(id, page))
 
     if (page < 1): page = 1
     if (page > c.page_count()): page = c.page_count()
 
-    image_height = 1000
+    (w, h) = c.page_size(page)
+    image_height = h
+    image_width = w
+    if (image_height < image_width and half is None):
+        half = 1
+    #if (h >= w):
+        #image_height = 950
+        #image_width = int((w/h) * image_height)
+    #else:
+        #image_width = 650
+        #image_height = int(image_width / (w/h))
 
     color = c.page_color(page)
     text_color = '#' + complementaryColor(color)
-    (w, h) = c.page_size(page)
-    image_width = int((w/h) * image_height)
 
-    back = '/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), id)
-    if (request.cookies.get('traversal_method') == 'bydate' and request.cookies.get('current_time')):
-        back = '/bydate/{}#{}'.format(request.cookies.get('current_time'), id)
-    elif (request.cookies.get('traversal_method') == 'byvolume'):
-        back = '/byvolume/{}#{}'.format(urllib.parse.quote(yacreader['volume']), id)
+    back = { 'url':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), id), 'text':'{}'.format(yacreader['date'].strftime('%m/%Y')) }
+    if (request.cookies.get('current_time')):
+        back = { 'url':'/bydate/{}#{}'.format(request.cookies.get('current_time'), id), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
 
-    previous_page_url = back
-    if (page > 1):
-        previous_page_url = '/read/{}/{}'.format(id, (page-1))
-
-    next_page_url = '/bydate/{}#{}'.format(request.cookies.get('current_time'), id)
-    if (page < c.page_count()):
-        next_page_url = '/read/{}/{}'.format(id, (page+1))
-    elif (page == c.page_count()):
-        if (request.cookies.get('traversal_method') == 'byvolume'):
+    previous_page_url = back['url']
+    next_page_url = back['url']
+    if (request.cookies.get('traversal_method') == 'byvolume'):
+        if (page == 1 or page == c.page_count()):
+        #back = {'url':'/byvolume/{}#{}'.format(urllib.parse.quote(yacreader['volume']), id), 'text':'{} #{}'.format(yacreader['volume'], yacreader['issue'])}
+        #forth = back
             issues = yyreader.yacreader.get_comics_by_volume(yacreader['volume'])
-            i = 0
-            while (i < len(issues)):
-                if (issues[i]['issue'] == yacreader['issue'] and i < (len(issues) - 1)):
-                    next_page_url = '/read/{}'.format(issues[i+1]['id'])
-                    break
-                i = i + 1
+            if (page == 1):
+                i = 0
+                while (i < len(issues)):
+                    if (issues[i]['issue'] == yacreader['issue'] and (i > 0)):
+                        previous_page_url =  '/read/{}'.format(issues[i-1]['id'])
+                        break
+                    i = i + 1
+            elif (page == c.page_count()):
+                i = 0
+                while (i < len(issues)):
+                    if (issues[i]['issue'] == yacreader['issue'] and (i < (len(issues) - 1))):
+                        next_page_url =  '/read/{}'.format(issues[i+1]['id'])
+                        break
+                    i = i + 1
+
+    if (page > 1):
+        if (half == 2):
+            previous_page_url = '/read/{}/{}/{}'.format(id, (page), 1)
+        else:
+            previous_page_url = '/read/{}/{}'.format(id, (page-1))
+
+    if (page < c.page_count()):
+        if (half == 1):
+            next_page_url = '/read/{}/{}/{}'.format(id, (page), 2)
+        else:
+            next_page_url = '/read/{}/{}'.format(id, (page+1))
 
     yyreader.yacreader.update_read_log(id, page, page_count = c.page_count())
-    return render_template('read.html', page = page, yacreader = yacreader, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), back = back, data_dir = c.data_dir, datelink='/bydate/{}#{}'.format(yacreader['date'].strftime("%Y/%m"), id), background_color = color, text_color = text_color)
+    return render_template('read.html', half = half, page = page, yacreader = yacreader, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), back = back, data_dir = c.data_dir, datelink='/bydate/{}#{}'.format(yacreader['date'].strftime("%Y/%-m"), id), background_color = color, text_color = text_color )
 
 @app.route('/page/<int:id>/<int:page>')
 def page(id, page):

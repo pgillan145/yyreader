@@ -5,12 +5,20 @@
 cache_file = /tmp/yyreader.cache
 # Smallest file size to consider a comic, in MB
 minimum_file_size = 5
-# Location of the 'tar' utility
-tar = /usr/bin/tar
+
+# Location of the 'rar' utility
+rar = /usr/local/bin/rar
 # Location of the 'unzip' system utility.
 unzip = /usr/bin/unzip
+
+# Where the comics live
+comic_dir = /Volumes/Media/Comics
 
 [comicvine]
 # https://comicvine.gamespot.com/api/
 api_key = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
+[server]
+port = 8000
+# Turn enable debugging mode on the flask server
+debug = False

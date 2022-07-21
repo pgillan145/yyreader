@@ -3,46 +3,49 @@
     <head>
         <meta name='viewport' content='width=device-width, initial-scale=1'/>
         <meta name="apple-mobile-web-app-capable" content="yes">
-        <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
         <title>{% block title %}{% endblock %}</title>
+        <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" type="text/css">
         <style>
-            .rel {
-                position: relative;
-            }
-            .comic {
-                height: 200px;
-                #background: yellow;
-                position: relative;
-            }
-            .comic-img {
-                top: 0;
-                left: 25%;
-                position: absolute;
-                #background: blue;
-            }
-            .status {
-                z-index: 9;
-                top: 0;
-                left: 27%;
-                height: 45px;
-                width: 30px;
-                opacity: .8;
-            }
-            .done {
-                background: red;
-            }
-            .inprogress {
-                background: yellow;
-            }
-            .read {
+            body {
                 background: {{background_color}};
                 color: {{text_color}};
+                height: 100%;
             }
-
+            div.page {
+                height: 100%;
+                position: relative;
+            }
+                
+            div.back {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 50%;
+                z-index: 9;
+            }
+            div.next {
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 50%;
+                z-index: 9;
+            }
+            img.page {
+                height: 85vh;
+                width: auto;
+                object-fit: cover; 
+            }
+            img.page1 {
+                object-position: 0% 0%; 
+            }
+            img.page2 {
+                width: 100vw;
+                object-position: 100% 0%; 
+            }
         </style>
     </head>
     <body>
-        <div class='w3-container w3-center read'>
+        <div class='w3-container w3-center'>
             {#}{% block header %}<a href='{% if back %}{{ back }}{% else %}/{% endif %}'>&lt;-- Back</a>{% endblock %}{#}
             {% block content %}{% endblock %}
         </div>
