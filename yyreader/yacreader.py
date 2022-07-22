@@ -60,9 +60,6 @@ def get_comic_by_id(id):
         current_page = row[6]
         hash = row[7]
 
-        if (re.search(r'^/ByDate', path)):
-            continue
-
         if (current_page is None or current_page == 0):
             current_page = 1
         comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash }

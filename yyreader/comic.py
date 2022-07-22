@@ -97,10 +97,8 @@ class comic():
                     line = f.readline()
         #print(match_log)
 
-        if (os.path.exists(target_dir + '/ByName') is False):
-            os.mkdir(target_dir + '/ByName')
-        #if (os.path.exists(target_dir + '/ByDate') is False):
-        #    os.mkdir(target_dir + '/ByDate')
+        if (os.path.exists(target_dir) is False):
+            os.mkdir(target_dir)
 
         minimum_file_size = 1
         if ('minimum_file_size' in config['default']):
@@ -116,9 +114,12 @@ class comic():
         comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
         if (comicvine_data is None):
             raise Exception("can't get comicvine data.")
+        if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
+            os.mkdir(target_dir + '/' + comicvine_data['publisher'])
+
         new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
         volume_name = parser.massage_volume(comicvine_data['volume_name'])
-        name_dir = f'{target_dir}/ByName/{volume_name} ({comicvine_data["start_year"]})'
+        name_dir = f'{target_dir}/{comicvine_data["publisher"]}/{volume_name} ({comicvine_data["start_year"]})'
 
         while (self.file != name_dir + '/' + new_comic):
             # Figure out how 'close' the filename is to what we got back from comicvine.
@@ -149,20 +150,19 @@ class comic():
                 print("  'y': Move the file")
             elif (c == 'c'):
                 comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_results = False,  cache_file = config['default']['cache_file'], args = args)
+                if (comicvine_data is None):
+                    raise Exception("can't get comicvine data.")
+                if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
+                    os.mkdir(target_dir + '/' + comicvine_data['publisher'])
                 new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
                 volume_name = parser.massage_volume(comicvine_data['volume_name'])
-                name_dir = f'{target_dir}/ByName/{volume_name} ({comicvine_data["start_year"]})'
+                name_dir = f'{target_dir}/{comicvine_data["publisher"]}/{volume_name} ({comicvine_data["start_year"]})'
             elif (c == 'd'):
                 print("Data parsed from filename:", parse_data)
                 print("Data collected online:", comicvine_data)
             elif (c == 'q'):
                 sys.exit()
             elif (c == 'y'):
-                # If this comic is already in the system, get the ByDate filename so we can delete it before we re-add it later.
-                #comic_date = parser.convert_name_to_date(self.file)
-                #if (comic_date is not None):
-                #    if (args.debug): print(comic_date)
-                #    comic_date = target_dir + '/ByDate/' + comic_date
 
                 self.data['volume'] = '{} ({})'.format(comicvine_data['volume_name'], comicvine_data['start_year'])
                 self.data['volume_name'] = comicvine_data['volume_name']
@@ -226,14 +226,6 @@ class comic():
                             self.data['writers'].append(person['name'])
                 if (args.verbose): print("  adding ComicInfo.xml to file")
                 if (args.dryrun is False): self._add_xml()
-                #if (args.debug): print(self._generate_xml_data())
-
-                #date_dir = f'{target_dir}/ByDate/{year}/{month}'
-                #if (os.path.exists(date_dir) is False):
-                #    if (args.dryrun is False): os.makedirs(f'{date_dir}', exist_ok=True)
-                #new_comic_date = parser.make_date(comicvine_data, extension, directors_cut = parse_data['directors_cut'])
-                #if (os.path.exists(f'{date_dir}/{new_comic_date}') is True):
-                #    raise Exception(f"{date_dir}/{new_comic_date} already exists")
 
                 if (args.debug): print(f"MOVE {self.file} => {name_dir}/{new_comic}")
                 if (args.dryrun is False):
@@ -243,12 +235,8 @@ class comic():
                         with open(config['default']['match_log_file'], 'a') as f:
                             f.write(f"{self.file} => {match_log[comic]}\n")
                     self.file = name_dir + '/' + new_comic
-                #if (comic_date is not None and os.path.exists(comic_date) is True):
-                #    if (args.verbose): print(f"REMOVE {comic_date}")
-                #    if (args.dryrun is False): os.remove(comic_date)
-
-                #if (args.verbose): print(f"LINK {name_dir}/{new_comic} => {date_dir}/{new_comic_date}")
-                #if (args.dryrun is False): os.link(name_dir + '/' + new_comic, date_dir + '/' + new_comic_date)
+                else:
+                    return
 
     def collect_info(self):
         pass

@@ -54,9 +54,6 @@ def main():
         #if (re.search('Black Panther \(2018\)', path) is None and issue != '017'): 
         #    continue
 
-        if (re.search('^/ByDate', path) is not None):
-            continue
-
         if (args.scan):
             #c = yyreader.comic.comic(config['default']['comic_dir'] + path, args = args)
             file_name = config['default']['comic_dir'] + path

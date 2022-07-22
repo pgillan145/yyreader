@@ -137,10 +137,18 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
         # Get an initial list of volumes from the site that we can start to check.
         results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], args = args, cache_file = cache_file, cache_results = use_cache)
 
+        for r in results:
+            if ('ratio' not in r):
+                ratio = fuzz.ratio(test_volume.lower(),r['name'].lower())
+                if ("The " + test_volume == r['name'] or "An " + test_volume == r['name'] or "A " + test_volume == r['name']):
+                    ratio = 100
+                r['ratio'] = ratio
+        results = sorted(results, key = lambda x:x['ratio'], reverse = True)
+
         if (args.verbose): print(f"  {len(results)} result(s) for '{test_volume}'")
         item = 0
         default = 0
-        max_lev = 0
+        max_ratio = 0
         issue_date = {}
         # If we have a date for the issue, then we can look through each volume for the given issue number to see if it has the
         #   same date.  If so, then then this is *probably* the correct volume.
@@ -151,26 +159,18 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
                 else:
                     print(f"  looking for an issue #{data['issue']} released in {data['year']}")
             for r in results:
-                ratio = fuzz.ratio(test_volume.lower(),r['name'].lower())
-                if ("The " + test_volume == r['name'] or "An " + test_volume == r['name'] or "A " + test_volume == r['name']):
-                    ratio = 100
-
-                r['ratio'] = ratio
-                if (ratio >= 80):
+                ratio = r['ratio']
+                if (ratio >= 80 and result is None and match_issue is None):
                     i = get_issue(r['id'], data['issue'], api_key, args = args, cache_results = use_cache, cache_file = cache_file)
                     if (i is not None):
-                        #print(i)
-                        #date = None
                         store_date = ''
                         cover_date = ''
                         if ('store_date' in i and i['store_date'] is not None):
                             store_date = i['store_date']
-                            #date = store_date
                         if ('cover_date' in i and i['cover_date'] is not None):
                             # Sometimes the cover daye is the first of day of the month, sometimes it's the last, so
                             #   for our generic 'date' comparison field, just force it to be the first, no one cares.
                             cover_date = re.sub('-\d\d$', '-01', i['cover_date'])
-                            #if (date is None): date = cover_date
 
                         if (store_date != '' or cover_date != ''):
                             issue_date[r['id']] = f'{store_date}/{cover_date}'
@@ -179,31 +179,20 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
                                     if (args.verbose): print(f"  found {r['name']} #{i['issue_number']} released on {store_date}/{cover_date}")
                                     result = r
                                     match_issue = i
-                                    break
                                 elif (re.search(r' Annual$', test_volume) and (re.search(f'^{data["year"]}-', cover_date) or re.search(f'^{data["year"]}-', store_date))):
                                     result = r
                                     match_issue = i
-                                    break
-
-                        #if (date is not None):
-                        #    issue_date[r['id']] = date
-                        #    if (date == data['date'] and ratio >= 93):
-                        #        if (args.verbose): print(f"  found {r['name']} #{i['issue_number']} released on {date}")
-                        #        result = r
-                        #        match_issue = i
-                        #        break
 
         if (result is not None or args.yes is True):
             break
 
         # We didn't find a date match, and we're not in auto-mode, so ask a grown-up for help.
-        results = sorted(results, key = lambda x:x['ratio'], reverse = True)
         for r in results:
             item = item + 1
-            if (r['ratio'] > max_lev):
+            if (r['ratio'] > max_ratio):
                 default = item
-                max_lev = ratio
-            menu_item = f"{item}: {r['name']} ({r['start_year']}) - {r['publisher']['name']}, {r['count_of_issues']} issue(s) (ratio: {ratio})"
+                max_ratio = r['ratio']
+            menu_item = f"{item}: {r['name']} ({r['start_year']}) - {r['publisher']['name']}, {r['count_of_issues']} issue(s) (ratio: {r['ratio']})"
             if (r['id'] in issue_date):
                 menu_item = f"{menu_item} - {issue_date[r['id']]}"
             print(menu_item)
@@ -265,6 +254,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
                 #if (args.debug): print(url)
                 results = get_results(url, cache_file = cache_file, cache_results = False)
                 result = results[0]
+                result['ratio'] = 100
                 test_volume = result['name']
                 if (args.verbose and match_issue is None): print("found volume:{}".format(test_volume))
         else:
@@ -316,8 +306,6 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
 
 def search_volumes(volume, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
     volume = parser.massage_volume(volume, reverse = True)
-    volume = re.sub('^Amazing Spider-Man$', 'The Amazing Spider-Man', volume)
-    volume = re.sub('^Immortal Hulk$', 'The Immortal Hulk', volume)
     if (args.debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
     results = []
@@ -342,9 +330,6 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
               or (results[i]['publisher']['name'] not in ('Marvel', 'Epic', 'IDW', 'Star Comics', 'Max', 'Max Comics', 'Atlas', 'Curtis Magazine', 'Curtis Magazines')) \
               or (volume.lower() == 'the amazing spider-man' and int(year) < 2014 and results[i]['start_year'] != '1963') \
               or (year is not None and int(results[i]['start_year']) > int(year)+1):
-              #or (start_year is not None and int(results[i]['start_year']) < (int(start_year) - 5))\
-              #or (start_year is not None and int(results[i]['start_year']) > (int(start_year) + 5))\
-              #or (fuzz.ratio(volume,results[i]['name']) < 60) \
                 del results[i]
                 pass
             i = i - 1
