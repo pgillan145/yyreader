@@ -6,11 +6,13 @@ from time import time
 
 import argparse
 from . import comic
+import magic
 import minorimpact
 import minorimpact.config
 import os
 import os.path
 import re
+import shutil
 import sys
 
 def main():
@@ -34,28 +36,55 @@ def main():
             args.dir = c_file
 
     if (args.dir is not None):
-        comic_dir = args.dir
-        if (os.path.exists(comic_dir) is False):
-            raise Exception(f"{comic_dir} does not exist")
+        if (os.path.exists(args.dir) is False):
+            raise Exception(f"{args.dir} does not exist")
 
-        files = minorimpact.readdir(comic_dir)
-        for c_file in files:
-            print("Analyzing {}...".format(c_file))
-            if ('ByName' in c_file or 'ByDate' in c_file):
-                continue
-            try:
-                c = comic.comic(c_file)
-                c.box(args.target, args = args)
-            except Exception as e:
-                print(e)
-        pass
+        for c_file in minorimpact.readdir(args.dir):
+            box(c_file, args.target, args = args)
+
     elif (args.file is not None):
-        c_file = re.sub('/$','', args.file)
-        if (os.path.exists(c_file) is False):
-            sys.exit(f"{c_file} does not exist")
-        try:
-            c = comic.comic(c_file)
-            c.box(args.target, args = args)
-        except Exception as e:
-            print(e)
+        box(args.file, args.target, args = args)
+
+def box(comic_file, target, args = minorimpact.default_arg_flags):
+    if (os.path.exists(comic_file) is False):
+        print(f"{comic_file} does not exist")
+        return
+    print("processing {}".format(comic_file))
+
+    (root, ext) = os.path.splitext(comic_file)
+    if (root + ext.lower() != comic_file):
+        comic_file = change_extension(comic_file, ext.lower())
+
+    try:
+        c = comic.comic(comic_file)
+        c.box(args.target, args = args)
+    except comic.ExtensionMismatchException as e:
+        print(e)
+        magic_str = magic.from_file(comic_file)
+        new_ext = None
+        for ext2 in comic.ext_map:
+            if (re.search('^{}'.format(comic.ext_map[ext2]), magic_str)):
+                new_ext = ext2
+                break
+        if (new_ext is not None):
+            new_comic_file = change_extension(comic_file, new_ext)
+            if (new_comic_file != comic_file and new_comic_file is not None):
+                try:
+                    c = comic.comic(new_comic_file)
+                    c.box(args.target, args = args)
+                except Exception as e:
+                    print(e)
+        else:
+            print("{} has unknown data: '{}'".format(comic_file, magic_str))
+    except Exception as e:
+        print(e)
+
+def change_extension(file_name, new_extension):
+    if (re.search(r'^\.', new_extension)):
+        new_extension = re.sub(r'^\.', '', new_extension)
+    (root, ext) = os.path.splitext(file_name)
+    new_file = re.sub(ext, '.' + new_extension, file_name)
+    print(f"  moving {file_name} to {new_file}")
+    shutil.move(file_name, new_file)
+    return new_file
 

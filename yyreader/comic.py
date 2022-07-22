@@ -16,6 +16,7 @@ import xml.etree.ElementTree as ET
 from . import comicvine
 from . import parser
 
+ext_map = { 'cbr': 'RAR archive data', 'cbz': 'Zip archive data' }
 xml_map = { 'Characters':'a_characters', 'Publisher':'publisher', 'Number':'issue', 'Summary':'description', 'Series':'volume_name', 'Volume':'start_year', 'Day':'day', 'Month':'month', 'Year':'year', 'StoryArc':'a_story_arcs', 'Writer':'a_writers', 'Penciller':'a_pencillers', 'Inker':'a_inkers', 'Letterer':'a_letterers', 'Colorist':'a_colorists', 'Title':'name' }
 
 config = minorimpact.config.getConfig(script_name = 'yyreader')
@@ -32,6 +33,12 @@ def dive(dir, ext = 'jpg'):
             if (bottom is not None):
                 return bottom
 
+class FileSizeException(Exception):
+    pass
+
+class ExtensionMismatchException(Exception):
+    pass
+
 class comic():
     data = {}
     data_dir = None
@@ -42,7 +49,6 @@ class comic():
         if (re.search('^/', file) is None):
             file = os.getcwd() + '/' + file
         self.file = file
-        self.parse_data = parser.parse(self.file, args = args)
         self._read_data()
         #print("_read_data()")
         #print(self.data)
@@ -67,7 +73,7 @@ class comic():
         if (self.is_cbr()):
             command = [config['default']['rar'], 'a', '-inul', self.file, xml_file]
         elif (self.is_cbz()):
-            command = [config['default']['zip'], self.file, xml_file]
+            command = [config['default']['zip'], '-q', self.file, xml_file]
 
         if (command is None): raise Exception("can't add xml files, unknown file type")
         result = subprocess.run(command)
@@ -116,16 +122,10 @@ class comic():
 
         while (self.file != name_dir + '/' + new_comic):
             # Figure out how 'close' the filename is to what we got back from comicvine.
-            ratio = 0
-            if (("The " + parse_data['volume']) == comicvine_data['volume_name']):
-                ratio = 100
-            elif (("A " + parse_data['volume']) == comicvine_data['volume_name']):
-                ratio = 100
-            else:
-                ratio = fuzz.ratio(f"{parse_data['volume']}", f"{comicvine_data['volume_name']}")
+            ratio = comicvine_data['ratio']
 
             c = ''
-            if ( 'date' in parse_data and 'date' in comicvine_data and comicvine_data['date'] == parse_data['date'] and ratio >= 93):
+            if (ratio >= 93 and ('date' in parse_data and (('store_date' in comicvine_data and comicvine_data['store_date'] == parse_data['date']) or ('cover_date' in comicvine_data and comicvine_data['cover_date'] == parse_data['date']))) or (re.search(r' Annual$', comicvine_data['volume_name']) and ('cover_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['cover_date']) or 'store_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['store_date'])))):
                 default_c = 'y'
                 default_text = 'Y/n'
             else:
@@ -142,21 +142,19 @@ class comic():
                 c = minorimpact.getChar(default=default_c, end='\n', prompt=f"move to {new_comic} (ratio:{ratio})? ({default_text}/?) ", echo=True).lower()
 
             if (c == '?'):
-                print("  'c': Search comicvine again")
+                print("  'c': Clear cache and search comicvine again")
                 print("  'd': Dump the data for this issue")
                 print("  'n': Don't move the file")
                 print("  'q': Quit")
                 print("  'y': Move the file")
             elif (c == 'c'):
-                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
+                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_results = False,  cache_file = config['default']['cache_file'], args = args)
                 new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
                 volume_name = parser.massage_volume(comicvine_data['volume_name'])
                 name_dir = f'{target_dir}/ByName/{volume_name} ({comicvine_data["start_year"]})'
             elif (c == 'd'):
-                print("Data parsed from filename:")
-                print(parse_data)
-                print("Data collected online:")
-                print(comicvine_data)
+                print("Data parsed from filename:", parse_data)
+                print("Data collected online:", comicvine_data)
             elif (c == 'q'):
                 sys.exit()
             elif (c == 'y'):
@@ -226,7 +224,7 @@ class comic():
                             self.data['pencillers'].append(person['name'])
                         elif (person['role'] == 'writer'):
                             self.data['writers'].append(person['name'])
-                if (args.verbose): print("Adding ComicInfo.xml file")
+                if (args.verbose): print("  adding ComicInfo.xml to file")
                 if (args.dryrun is False): self._add_xml()
                 #if (args.debug): print(self._generate_xml_data())
 
@@ -237,7 +235,7 @@ class comic():
                 #if (os.path.exists(f'{date_dir}/{new_comic_date}') is True):
                 #    raise Exception(f"{date_dir}/{new_comic_date} already exists")
 
-                if (args.verbose): print(f"MOVE {self.file} => {name_dir}/{new_comic}")
+                if (args.debug): print(f"MOVE {self.file} => {name_dir}/{new_comic}")
                 if (args.dryrun is False):
                     shutil.move(self.file, name_dir + '/' + new_comic)
                     if ('match_log_file' in config['default']):
@@ -251,7 +249,6 @@ class comic():
 
                 #if (args.verbose): print(f"LINK {name_dir}/{new_comic} => {date_dir}/{new_comic_date}")
                 #if (args.dryrun is False): os.link(name_dir + '/' + new_comic, date_dir + '/' + new_comic_date)
-
 
     def collect_info(self):
         pass
@@ -302,18 +299,18 @@ class comic():
         return ET.tostring(comicinfo, encoding='unicode')
 
     def is_cbr(self):
-        if (re.search('\.cbr$', self.file) or (re.search('\.rar$', self.file))):
+        if (re.search(r'\.cbr$', self.file, re.I) or (re.search(r'\.rar$', self.file))):
             magic_str = magic.from_file(self.file)
             if (re.search('^RAR archive data', magic_str) is None):
-                raise Exception("extension is rar, but filetype is '{}'".format(magic_str))
+                raise ExtensionMismatchException("file is rar, but file data is '{}'".format(magic_str[:16]))
             return True
         return False
 
     def is_cbz(self):
-        if (re.search('\.cbz$', self.file) or (re.search('\.zip$', self.file))):
+        if (re.search('\.cbz$', self.file, re.I) or (re.search('\.zip$', self.file))):
             magic_str = magic.from_file(self.file)
             if (re.search('^Zip archive data', magic_str) is None):
-                raise Exception("extension is zip, but filetype is '{}'".format(magic_str))
+                raise ExtensionMismatchException("file is zip, but file data is '{}'".format(magic_str[:16]))
             return True
         return False
 
@@ -421,6 +418,7 @@ class comic():
     def _read_data(self):
         """Collect as much information from the file as possible."""
 
+        self.parse_data = parser.parse(self.file)
         if (self.parse_data is not None):
             if ('day' in self.parse_data):
                 self.data['day'] = self.parse_data['day']

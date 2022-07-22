@@ -61,6 +61,7 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':'^FCBD (\d\d\d\d) ', 's':r'Free Comic Book Day \1 ' },
                  { 'm':' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', 's':r' - Marvel Legacy Primer Pages 001 (\1)' },
                  { 'm':'^\d+ - House of M - ', 's':'' },
+                 { 'm':r'Marvel Graphic Novel No (\d+) - .*\.(cb[rz])', 's':r'Marvel Graphic Novel \1.\2' },
                  { 'm':' - ', 's':': ', 'c':1 },
                ]
 
@@ -75,6 +76,8 @@ volume_subs = [
                 { 'm': 'Marvel Two In One: .*', 's': 'Marvel Two-in-One' },
                 { 'm': 'Marvel Two-in-One: .*', 's': 'Marvel Two-in-One' },
                 { 'm': 'Supernatural Thrillers and .*', 's': 'Supernatural Thrillers' },
+                { 'm': 'Peter Parker the Spectacular Spider-Man', 's':'The Spectacular Spider-Man' },
+                #{ 'm': 'US1', 's':'U.S. 1' },
              ]
 
 def make_date(data, extension, ver = None, directors_cut = False):
@@ -174,7 +177,7 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     if (os.path.exists(comic_file)):
         data['size'] = os.path.getsize(comic_file)
 
-    if (re.search('\.cb[rz]$', comic_file) is None):
+    if (re.search('\.cb[rz]$', comic_file, re.I) is None):
         raise Exception("invalid file type")
 
     if (args.debug is True): print(comic_file)
@@ -231,7 +234,7 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
 
     if (issue is None): issue = '001'
     if (volume is None or extension is None):
-        raise FileNameException("invalid filename")
+        raise Exception("invalid filename")
 
     if (re.search('amazing spider-man', volume) and year is not None):
         if (int(year) >= 1999 and int(year) < 2014 and (int(issue) <= 58)):

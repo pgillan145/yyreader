@@ -13,8 +13,6 @@ import yyreader.comic
 import yyreader.parser
 import yyreader.yacreader
 
-ext_map = { 'cbr': 'RAR archive data', 'cbz': 'Zip archive data' }
-
 def main():
     parser = argparse.ArgumentParser(description="Scan comic directory")
     parser.add_argument('-v', '--verbose', action='store_true')
@@ -22,7 +20,7 @@ def main():
     parser.add_argument('-1', '--once', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
     parser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
     parser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
-    parser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update,  otherwise just update with can be parsed from the filename.", action='store_true')
+    parser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
     parser.add_argument('--volume', metavar = 'VOL', help = "Only update comics in VOL.")
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--dryrun', action='store_true')
@@ -71,12 +69,12 @@ def main():
                     if (comicvine_id is not None):
                         print("comicvine url: https://comicvine.gamespot.com/unknown/4000-{}".format(comicvine_id))
             magic_str = magic.from_file(file_name)
-            for ext in ext_map:
-                if (re.search('\\.{}$'.format(ext), file_name) and re.search('^{}'.format(ext_map[ext]), magic_str) is None):
+            for ext in yyreader.comic.ext_map:
+                if (re.search('\\.{}$'.format(ext), file_name) and re.search('^{}'.format(yyreader.comic.ext_map[ext]), magic_str) is None):
                     print("{}: extension '{}' doesn't match file type '{}'".format(file_name, ext, magic_str[:16]))
                     new_ext = None
-                    for ext2 in ext_map:
-                        if (re.search('^{}'.format(ext_map[ext2]), magic_str)):
+                    for ext2 in yyreader.comic.ext_map:
+                        if (re.search('^{}'.format(yyreader.comic.ext_map[ext2]), magic_str)):
                             new_ext = ext2
                             break
                     if (new_ext is None):
