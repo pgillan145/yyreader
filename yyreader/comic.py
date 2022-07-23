@@ -5,7 +5,7 @@ import minorimpact
 import minorimpact.config
 import os
 import os.path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageStat
 import re
 import shutil
 import subprocess
@@ -314,16 +314,23 @@ class comic():
         return data
 
     def page_color(self, page = 1):
-        """Returns the hex code for the color that appears most often on the page."""
+        """Returns the hex code for the median color that appears along the outer edge of the page."""
 
         img = Image.open(self.page_file(page))
-        #(w, h) = img.size
-        #d = ImageDraw.Draw(img)
-        #d.rectangle([(50,50), (w-50, h-50)], fill=(0,0,0,255))
-        colors = sorted(img.getcolors(maxcolors=1024*1024), key=lambda x:x[0], reverse = True)
-        #img.save(self.data_dir + "/fuck.png")
-        #print(self.data_dir + "/fuck.png")
-        return '#{:02x}{:02x}{:02x}'.format(colors[0][1][0], colors[0][1][1], colors[0][1][2])
+        #colors = sorted(img.getcolors(maxcolors=2028*2048), key=lambda x:x[0], reverse = True)
+        #return '#{:02x}{:02x}{:02x}'.format(colors[0][1][0], colors[0][1][1], colors[0][1][2])
+        (w, h) = img.size
+        mask = Image.new('1', img.size, 1)
+        d = ImageDraw.Draw(mask)
+        d.rectangle([(50,50), (w-50, h-50)], fill=0)
+        stat = ImageStat.Stat(img, mask)
+        #print("extrema:", stat.extrema)
+        #print("count:", stat.count)
+        #print("median:", stat.median)
+        #print("mean:", stat.mean)
+        #print("rms:", stat.rms)
+        colors = stat.median
+        return '#{:02x}{:02x}{:02x}'.format(int(colors[0]), int(colors[1]), int(colors[2]))
 
     def page_color1(self, page = 1):
         img = Image.open(self.page_file(page))
@@ -331,13 +338,11 @@ class comic():
         mask = Image.new('1', img.size, 1)
         d = ImageDraw.Draw(mask)
         d.rectangle([(50,50), (w-50, h-50)], fill=0)
-        #mask.save(self.data_dir + "/fuck.png")
-        #print(self.data_dir + "/fuck.png")
 
         r,g,b = img.split()
         big_r = 0
         tr = 0
-        h =  r.histogram() #mask=mask)
+        h =  r.histogram(mask=mask)
         i = 0
         while (i < len(h)):
             if (h[i] > big_r):
@@ -348,7 +353,7 @@ class comic():
 
         big_g = 0
         tg = 0
-        h =  g.histogram() #mask=mask)
+        h =  g.histogram(mask=mask)
         i = 0
         while (i < len(h)):
             if (h[i] > big_g):
@@ -359,7 +364,7 @@ class comic():
 
         big_b = 0
         tb = 0
-        h =  b.histogram() #mask=mask)
+        h =  b.histogram(mask=mask)
         i = 0
         while (i < len(h)):
             if (h[i] > big_b):
