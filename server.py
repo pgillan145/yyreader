@@ -162,6 +162,23 @@ def cover(id):
     if (cover_data is not None):
         return Response(cover_data, mimetype = 'image/jpeg')
 
+@app.route('/history')
+def history():
+    back = None
+    if (request.cookies.get('current_time')):
+        back = { 'url':'/bydate/{}#{}'.format(request.cookies.get('current_time'), id), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
+    up = { 'url':'/', 'text':'Index' }
+    forth = None
+    items = []
+    for yacreader in yyreader.yacreader.get_history():
+        status = ''
+        if (yacreader['read'] == 1):
+            status = "DONE"
+        elif (yacreader['current_page'] > 1):
+            status = '*'
+        items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'short_volume':yacreader['volume'][0:25], 'datelink':'/bydate/{}'.format(yacreader['date'].strftime('%Y/%m')) }) 
+    return render_template('history.html',  items = items, nav = { 'up':up, 'back':back, 'forth':forth })
+
 @app.route('/read/<int:id>')
 @app.route('/read/<int:id>/<int:page>')
 @app.route('/read/<int:id>/<int:page>/<int:half>')
@@ -181,11 +198,8 @@ def read(id, page = None, half = None):
 
     if (page is None):
         page = 1
-        if ('current_page' in yacreader and yacreader['current_page'] is not None):
+        if ('current_page' in yacreader and yacreader['current_page'] is not None and yacreader['current_page'] < c.page_count()):
             page = int(yacreader['current_page'])
-        #if (page < 1): page = 1
-        #if (page > c.page_count()): page = c.page_count()
-        #return redirect('/read/{}/{}'.format(id, page))
 
     if (page < 1): page = 1
     if (page > c.page_count()): page = c.page_count()
@@ -195,12 +209,6 @@ def read(id, page = None, half = None):
     image_width = w
     if (image_height < image_width and half is None):
         half = 1
-    #if (h >= w):
-        #image_height = 950
-        #image_width = int((w/h) * image_height)
-    #else:
-        #image_width = 650
-        #image_height = int(image_width / (w/h))
 
     color = c.page_color(page)
     text_color = '#' + complementaryColor(color)

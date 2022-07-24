@@ -28,7 +28,7 @@ def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, c
     #if (args.debug is True): print(url)
     volume_results = get_results(url, cache_results = cache_results, cache_file = cache_file)
     
-    volume_name = '{} ({})'.format(parser.massage_volume(volume_results[0]['name']), volume_results[0]['start_year'])
+    volume_name = '{} ({}) - {}'.format(volume_results[0]['name'], volume_results[0]['start_year'], volume_results[0]['publisher']['name'])
 
     url = base_url + '/issues/?api_key=' + api_key + f'&format=json&sort=name:asc&filter=volume:{volume_id}&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
     #if (args.debug is True): print(url)
@@ -316,6 +316,7 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
     except Exception as e:
         pass
     
+    #valid_publishers = ['Marvel', 'Epic', 'IDW', 'Star Comics', 'Max', 'Max Comics', 'Atlas', 'Curtis Magazine', 'Curtis Magazines']
     volume_year = {}
     if (len(results) > 0):
         i = len(results) - 1
@@ -327,9 +328,9 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
               or results[i]['first_issue'] is None \
               or ( results[i]['first_issue']['name'] is not None and (re.search('TPB$', results[i]['first_issue']['name']) or re.search('^Volume \d+$', results[i]['first_issue']['name']))) \
               or results[i]['publisher'] is None  \
-              or (results[i]['publisher']['name'] not in ('Marvel', 'Epic', 'IDW', 'Star Comics', 'Max', 'Max Comics', 'Atlas', 'Curtis Magazine', 'Curtis Magazines')) \
               or (volume.lower() == 'the amazing spider-man' and int(year) < 2014 and results[i]['start_year'] != '1963') \
               or (year is not None and int(results[i]['start_year']) > int(year)+1):
+              #or (results[i]['publisher']['name'] not in valid_publishers) \
                 del results[i]
                 pass
             i = i - 1

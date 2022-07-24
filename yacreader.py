@@ -19,9 +19,11 @@ def main():
     parser.add_argument('-y', '--yes', action='store_true')
     parser.add_argument('-1', '--once', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
     parser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
+    parser.add_argument('--filedate', help = "With --scan, finds all files with mismatches database date entries.", action='store_true')
+    parser.add_argument('--filetype', help = "With --scan, finds all files with data that doesn't match their extension.", action='store_true')
     parser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
-    parser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
-    parser.add_argument('--volume', metavar = 'VOL', help = "Only update comics in VOL.")
+    #parser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
+    parser.add_argument('--volume', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--dryrun', action='store_true')
 
@@ -51,73 +53,79 @@ def main():
         penciller = row[10]
         fileName = row[11]
 
-        #if (re.search('Black Panther \(2018\)', path) is None and issue != '017'): 
-        #    continue
+        if (args.volume is not None):
+            if (re.search(args.volume, volume) is None or re.search(args.volume, path) is None):
+                continue
 
         if (args.scan):
             #c = yyreader.comic.comic(config['default']['comic_dir'] + path, args = args)
-            file_name = config['default']['comic_dir'] + path
-            parse_data = yyreader.parser.parse(file_name, args = args)
-            if ('date' in parse_data):
-                file_date = parse_data['date']
-                dbdate = yyreader.yacreader.convert_yacreader_date(date)
-                if (file_date != dbdate.strftime('%Y-%m-%d')):
-                    print("{}: dbdate '{}' doesn't match file date '{}'".format(file_name, dbdate.strftime('%Y-%m-%d'), file_date))
-                    if (comicvine_id is not None):
-                        print("comicvine url: https://comicvine.gamespot.com/unknown/4000-{}".format(comicvine_id))
-            magic_str = magic.from_file(file_name)
-            for ext in yyreader.comic.ext_map:
-                if (re.search('\\.{}$'.format(ext), file_name) and re.search('^{}'.format(yyreader.comic.ext_map[ext]), magic_str) is None):
-                    print("{}: extension '{}' doesn't match file type '{}'".format(file_name, ext, magic_str[:16]))
-                    new_ext = None
-                    for ext2 in yyreader.comic.ext_map:
-                        if (re.search('^{}'.format(yyreader.comic.ext_map[ext2]), magic_str)):
-                            new_ext = ext2
+            if (args.filedate):
+                file_name = config['default']['comic_dir'] + path
+                parse_data = yyreader.parser.parse(file_name, args = args)
+                if ('date' in parse_data):
+                    file_date = parse_data['date']
+                    dbdate = yyreader.yacreader.convert_yacreader_date(date)
+                    if (file_date != dbdate.strftime('%Y-%m-%d')):
+                        print("{}: dbdate '{}' doesn't match file date '{}'".format(file_name, dbdate.strftime('%Y-%m-%d'), file_date))
+                        if (comicvine_id is not None):
+                            print("comicvine url: https://comicvine.gamespot.com/unknown/4000-{}".format(comicvine_id))
+            if (args.filetype):
+                magic_str = magic.from_file(file_name)
+                for ext in yyreader.comic.ext_map:
+                    if (re.search('\\.{}$'.format(ext), file_name) and re.search('^{}'.format(yyreader.comic.ext_map[ext]), magic_str) is None):
+                        print("{}: extension '{}' doesn't match file type '{}'".format(file_name, ext, magic_str[:16]))
+                        new_ext = None
+                        for ext2 in yyreader.comic.ext_map:
+                            if (re.search('^{}'.format(yyreader.comic.ext_map[ext2]), magic_str)):
+                                new_ext = ext2
+                                break
+                        if (new_ext is None):
+                            print("'{}' is unknown".format(magic_str))
                             break
-                    if (new_ext is None):
-                        print("'{}' is unknown".format(magic_str))
+
+                        if (args.yes):
+                            c = 'y'
+                        else:
+                            c = minorimpact.getChar(default='y', end='\n', prompt="change file extension to {}? (Y/n) ".format(new_ext), echo=True).lower()
+                        if (c == 'q'):
+                            sys.exit()
+                        elif (c == 'y'):
+                                new_file_name = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), file_name)
+                                print("moving {} to {}".format(file_name, new_file_name))
+                                if (args.dryrun is False):
+                                    shutil.move(file_name, new_file_name)
+
+                                new_path = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), path)
+                                new_fileName = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), fileName)
+                                print("update comic set path = {}, fileName = {} where comicInfoId = {}".format(new_path, new_fileName, comic_info_id))
+                                if (args.dryrun is False):
+                                    try:
+                                        cur.execute('update comic set path = ?, fileName = ? where comicInfoId = ?', (new_path, new_fileName, comic_info_id))
+                                        con.commit()
+                                    except Exception as e:
+                                        print(e)
                         break
-
-                    if (args.yes):
-                        c = 'y'
-                    else:
-                        c = minorimpact.getChar(default='y', end='\n', prompt="change file extension to {}? (Y/n) ".format(new_ext), echo=True).lower()
-                    if (c == 'q'):
-                        sys.exit()
-                    elif (c == 'y'):
-                            new_file_name = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), file_name)
-                            print("moving {} to {}".format(file_name, new_file_name))
-                            if (args.dryrun is False):
-                                shutil.move(file_name, new_file_name)
-
-                            new_path = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), path)
-                            new_fileName = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), fileName)
-                            print("update comic set path = {}, fileName = {} where comicInfoId = {}".format(new_path, new_fileName, comic_info_id))
-                            if (args.dryrun is False):
-                                try:
-                                    cur.execute('update comic set path = ?, fileName = ? where comicInfoId = ?', (new_path, new_fileName, comic_info_id))
-                                    con.commit()
-                                except Exception as e:
-                                    print(e)
-                    break
             
         elif (args.update):
             #if (comicvine_id is not None and date is not None and title is not None and writer is not None and penciller is not None):
             #    continue
-            if (date is not None):
+            if (date is not None and issue is not None):
+                if (args.debug): print("--SKIP--")
+                if (args.debug): print("path: " + path)
+                if (args.debug): print("issue: " + str(issue))
+                if (args.debug): print("date: " + str(date))
+                if (args.debug): print("comicInfoId: " + str(comic_info_id))
+                if (args.debug): print("comicVineID: " + str(comicvine_id))
                 continue
 
-            if (args.debug): print("-----")
+            if (args.debug): print("--UPDATE--")
             if (args.debug): print("path: " + path)
             if (args.debug): print("date: " + str(date))
             if (args.debug): print("comicInfoId: " + str(comic_info_id))
-            if (args.debug): print("comicVineID: " + str(row[6]))
+            if (args.debug): print("comicVineID: " + str(comicvine_id))
 
             c = yyreader.comic.comic(config['default']['comic_dir'] + path, args = args)
             if (c.get('date') is not None):
-                    if (args.volume is not None and volume is not None):
-                        if (re.search(args.volume, volume) is None):
-                            continue
                     print("updating " + path)
 
                     arcs = c.get('story_arcs')

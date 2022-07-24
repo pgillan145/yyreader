@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import datetime
+from datetime import datetime, timedelta
 import minorimpact.config
 import os
 import os.path
@@ -30,7 +30,7 @@ def init():
     db = connect()
     cursor = db.cursor()
     cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
-    cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
     db.commit()
     try:
         cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
@@ -41,7 +41,7 @@ def init():
     db.close()
 
 def convert_yacreader_date(yacreader_date):
-    date = datetime.datetime.strptime(yacreader_date, '%d/%m/%Y')
+    date = datetime.strptime(yacreader_date, '%d/%m/%Y')
     return date
     
 def get_comic_by_id(id):
@@ -132,6 +132,28 @@ def get_comics_by_volume(volume):
     db.close()
     return sorted(comics, key=lambda x:(x['date'], x['volume']) )
 
+def get_history():
+    db = connect()
+    cursor = db.cursor()
+    comics = []
+    cursor.execute('select ci.volume, ci.number, ci.date, ci.id, ci.read, ci.currentPage from comic_info ci, read_log where ci.id=read_log.comicInfoID order by read_log.mod_date desc')
+    rows = cursor.fetchall()
+    for row in rows:
+        volume = row[0]
+        issue = row[1]
+        date = convert_yacreader_date(row[2])
+        id = row[3]
+        read = row[4]
+        current_page = row[5]
+
+        if (current_page is None or current_page == 0):
+            current_page = 1
+
+        comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
+
+    db.close()
+    return comics
+
 def get_months(year):
     db = connect()
     cursor = db.cursor()
@@ -186,16 +208,16 @@ def update_read_log(id, page, page_count = None):
     db.commit()
     cursor.execute('select id, start_date, end_date from read_log where comicInfoId = ? order by id desc limit 1', (id,))
     rows = cursor.fetchall()
-    if (len(rows) == 0 or (rows[0][2] is not None)): 
-        #TODO: If end-date is within a couple of hours, don't make a new record
+    if (len(rows) == 0 or (rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) < (datetime.now() - timedelta(hours = 1)))): 
+        #TODO: If end_date is within a couple of hours, don't make a new record
         cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
     else:
-        cursor.execute('update read_log set currentPage = ? where id = ?', (page, rows[0][0]))
+        cursor.execute('update read_log set currentPage = ?, mod_date = DATETIME("now","localtime") where id = ?', (page, rows[0][0]))
     db.commit()
 
     if (page_count is not None and page == page_count):
-        cursor.execute('update comic_info set read = TRUE where comic_info.id = ?', (id,))
-        cursor.execute('update read_log set end_date = DATETIME("now","localtime") where end_date is NULL and comicInfoID = ?', (id,))
+        cursor.execute('update comic_info set read = TRUE where comic_info.id = ?', (id, ))
+        cursor.execute('update read_log set end_date = DATETIME("now","localtime"), mod_date = DATETIME("now","localtime") where end_date is NULL and comicInfoID = ?', (id,))
         db.commit()
     db.close()
 
