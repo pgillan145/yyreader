@@ -23,7 +23,6 @@ def connect():
     if (os.path.exists(db_file) is None):
         raise Exception("{} does not exist".format(db_file))
 
-
     db = sqlite3.connect(db_file)
     return db
     
@@ -31,6 +30,7 @@ def init():
     db = connect()
     cursor = db.cursor()
     cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
     db.commit()
     try:
         cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
@@ -183,10 +183,19 @@ def update_read_log(id, page, page_count = None):
     db = connect()
     cursor = db.cursor()
     cursor.execute('update comic_info set hasBeenOpened = TRUE, currentPage = ? where comic_info.id = ?', (page, id))
+    db.commit()
+    cursor.execute('select id, start_date, end_date from read_log where comicInfoId = ? order by id desc limit 1', (id,))
+    rows = cursor.fetchall()
+    if (len(rows) == 0 or (rows[0][2] is not None)): 
+        #TODO: If end-date is within a couple of hours, don't make a new record
+        cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
+    else:
+        cursor.execute('update read_log set currentPage = ? where id = ?', (page, rows[0][0]))
+    db.commit()
+
     if (page_count is not None and page == page_count):
         cursor.execute('update comic_info set read = TRUE where comic_info.id = ?', (id,))
-    db.commit()
+        cursor.execute('update read_log set end_date = DATETIME("now","localtime") where end_date is NULL and comicInfoID = ?', (id,))
+        db.commit()
     db.close()
-    
-    
 
