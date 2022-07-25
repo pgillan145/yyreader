@@ -1,6 +1,6 @@
 <a name='{{item.yacreader.id}}'>
 <div class='w3-row w3-margin'>
-    <div class='w3-cell m3 w3-leftbar {% if item.status == "DONE" %}w3-border-red{% elif item.status == "*" %}w3-border-yellow{% else %}w3-border-white{% endif %}'>
+    <div class='w3-cell m3 w3-leftbar {% if item.yacreader.read == 1 %}w3-border-red{% elif item.yacreader.current_page > 1 %}w3-border-yellow{% else %}w3-border-white{% endif %}'>
         <a href='/read/{{item.yacreader.id}}'><img class='w3-round w3-card' src='/cover/{{item.yacreader.id}}' height=200></a>
     </div>
     <div class='w3-cell m3'>
