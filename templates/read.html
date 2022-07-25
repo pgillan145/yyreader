@@ -17,6 +17,9 @@
     {% endif %}
 </div>
 <div id='nav' class='navigation' style='display:none' onclick="document.getElementById('nav').style.display='none'">
+    {% include 'nav.html' %}
+    <div>(page&nbsp;{{page}}&nbsp;of&nbsp;{{page_count}})</div>
+    {#
     <div class='w3-center w3-padding-16'>
         <a href='{{nav.back.url}}'>&lArr;&nbsp;{{nav.back.text}}</a>
         {% if nav.up is not none %}
@@ -29,5 +32,6 @@
             {{yacreader.date.strftime("%m/%d/%Y")}}
         {% endif %}
     </div>
+    #}
 </div>
 {% endblock %}

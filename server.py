@@ -20,7 +20,6 @@ app.config.from_mapping(
         #DATABASE=config['default']['db'],
     )
 
-
 comic_cache = {}
 comic_dir = config['default']['comic_dir']
 comic_dir = re.sub(r'/$', '', comic_dir)
@@ -53,15 +52,19 @@ def complementaryColor(my_hex):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    if (request.cookies.get('current_time')):
+        return redirect('/bydate/{}'.format(request.cookies.get('current_time')))
+    return redirect('/bydate')
 
 @app.route('/bydate')
 @app.route('/bydate/<int:year>')
 @app.route('/bydate/<int:year>/<int:month>')
 def bydate(year = None, month = None):
     items = []
-    up = { 'url':'/', 'text':'Index' }
+    up = None
     back = None
+    if (request.cookies.get('current_time')):
+        back = {'url':'/bydate/{}'.format(request.cookies.get('current_time')), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
     forth = None
     clean_cache()
     if (year is None and month is None):
@@ -102,7 +105,7 @@ def bydate(year = None, month = None):
             elif (yacreader['current_page'] > 1):
                 status = '*'
             items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'short_volume':yacreader['volume'][0:25], 'datelink':'/bydate/{}'.format(yacreader['date'].strftime('%Y/%m')) }) 
-        response = Response(render_template('comics_bydate.html', back = back, forth = forth, items = items, nav = {'back':back, 'forth':forth, 'up':up }))
+        response = Response(render_template('comics.html', items = items, nav = {'back':back, 'forth':forth, 'up':up, 'view':{'url':'/byvolume', 'text':'Volumes' } }))
         response.set_cookie('traversal_method', 'bydate', max_age=60*60*24*365)
         response.set_cookie('current_time', '{}/{}'.format(year, month), max_age=60*60*24*365)
         response.delete_cookie('up')
@@ -113,8 +116,9 @@ def bydate(year = None, month = None):
 def byvolume(volume = None):
     items = []
     back = { 'url':'/bydate/{}'.format(request.cookies.get('current_time')), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
-    up = { 'url':'/', 'text':'Index' }
+    up = None
     forth = None
+    view = {'url':'/bydate', 'text':'Dates' }
     clean_cache()
     if (volume is None):
         last = None
@@ -126,7 +130,7 @@ def byvolume(volume = None):
                 index.append({ 'url':'#{}'.format(last), 'text':last })
 
             items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume, 'name':None })
-        return render_template('byvolume.html', items = items, nav = {'back':back, 'forth':forth, 'up':up }, index = index)
+        return render_template('byvolume.html', items = items, nav = {'back':back, 'forth':forth, 'up':up, 'view':view }, index = index)
     else:
         up = { 'url':'/byvolume', 'text':'By Volume' }
         volume = urllib.parse.unquote(volume)
@@ -136,9 +140,9 @@ def byvolume(volume = None):
                 status = 'DONE'
             elif (yacreader['current_page'] > 1):
                 status = '*'
-            items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'short_volume':yacreader['volume'][0:25], 'datelink':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), yacreader['id']) }) 
+            items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), yacreader['id']) }) 
 
-        response = Response(render_template('comics.html', back = back, items = items, nav = {'back':back, 'forth':forth, 'up':up }))
+        response = Response(render_template('comics.html', back = back, items = items, nav = {'back':back, 'forth':forth, 'up':up, 'view':view} ))
         response.set_cookie('traversal_method', 'byvolume', max_age=60*60*24*365)
         response.delete_cookie('up')
         return response
@@ -178,7 +182,7 @@ def history():
             status = "DONE"
         elif (yacreader['current_page'] > 1):
             status = '*'
-        items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'short_volume':yacreader['volume'][0:25], 'datelink':'/bydate/{}'.format(yacreader['date'].strftime('%Y/%m')) }) 
+        items.append({ 'status': status, 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}'.format(yacreader['date'].strftime('%Y/%m')) }) 
     response = Response(render_template('history.html',  items = items, nav = { 'up':up, 'back':back, 'forth':forth }))
     response.set_cookie('up', '/history|History')
     return response
@@ -217,12 +221,18 @@ def read(id, page = None, half = None):
     color = c.page_color(page)
     text_color = '#' + complementaryColor(color)
 
-    back = { 'url':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), id), 'text':'{}'.format(yacreader['date'].strftime('%m/%Y')) }
+    forth = None
+    back = None
     if (request.cookies.get('current_time')):
         back = { 'url':'/bydate/{}#{}'.format(request.cookies.get('current_time'), id), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
-    up = None
-    if (request.cookies.get('up')):
-        up = { 'url':request.cookies.get('up').split('|')[0], 'text':request.cookies.get('up').split('|')[1] }
+        if (yacreader['date'].strftime('%Y/%-m') != request.cookies.get('current_time')):
+            forth = { 'url':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), id), 'text':'{}'.format(yacreader['date'].strftime('%m/%d/%Y')) }
+    
+    #up = None
+    #if (request.cookies.get('up')):
+    #    up = { 'url':request.cookies.get('up').split('|')[0], 'text':request.cookies.get('up').split('|')[1] }
+    up = { 'url':'/byvolume/{}#{}'.format(urllib.parse.quote(yacreader['volume']), yacreader['id']), 'text':'{} #{}'.format(yacreader['volume'], yacreader['issue']) }
+    view = None
 
     previous_page_url = back['url']
     next_page_url = back['url']
@@ -259,7 +269,7 @@ def read(id, page = None, half = None):
             next_page_url = '/read/{}/{}'.format(id, (page+1))
 
     yyreader.yacreader.update_read_log(id, page, page_count = c.page_count())
-    return render_template('read.html', half = half, page = page, yacreader = yacreader, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = { 'back':back, 'up': up, 'forth':None }, data_dir = c.data_dir, datelink='/bydate/{}#{}'.format(yacreader['date'].strftime("%Y/%-m"), id), background_color = color, text_color = text_color )
+    return render_template('read.html', half = half, page = page, yacreader = yacreader, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = { 'back':back, 'up': up, 'forth':forth, 'view':view }, data_dir = c.data_dir, background_color = color, text_color = text_color )
 
 @app.route('/page/<int:id>/<int:page>')
 def page(id, page):
