@@ -209,13 +209,13 @@ def update_read_log(id, page, page_count = None):
     cursor.execute('select id, start_date, end_date from read_log where comicInfoId = ? order by id desc limit 1', (id,))
     rows = cursor.fetchall()
     if (len(rows) == 0 or (rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) < (datetime.now() - timedelta(hours = 1)))): 
-        #TODO: If end_date is within a couple of hours, don't make a new record
-        cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
+        if (page > 1):
+            cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
     else:
         cursor.execute('update read_log set currentPage = ?, mod_date = DATETIME("now","localtime") where id = ?', (page, rows[0][0]))
     db.commit()
 
-    if (page_count is not None and page == page_count):
+    if (page_count is not None and page >= page_count):
         cursor.execute('update comic_info set read = TRUE where comic_info.id = ?', (id, ))
         cursor.execute('update read_log set end_date = DATETIME("now","localtime"), mod_date = DATETIME("now","localtime") where end_date is NULL and comicInfoID = ?', (id,))
         db.commit()

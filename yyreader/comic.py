@@ -162,6 +162,8 @@ class comic():
                 print("Data collected online:", comicvine_data)
             elif (c == 'q'):
                 sys.exit()
+            elif (c == 'n'):
+                return
             elif (c == 'y'):
 
                 self.data['volume'] = '{} ({})'.format(comicvine_data['volume_name'], comicvine_data['start_year'])

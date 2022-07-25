@@ -165,7 +165,7 @@ def history(page = 1):
     back = None
     index = []
     if (request.cookies.get('current_time')):
-        back = { 'url':'/bydate/{}#{}'.format(request.cookies.get('current_time'), id), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
+        back = { 'url':'/bydate/{}'.format(request.cookies.get('current_time')), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
     up = { 'url':'/', 'text':'Index' }
     forth = None
     items = []
