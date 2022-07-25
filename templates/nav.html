@@ -1,11 +1,11 @@
-<div>
+<div class='w3-bar'>
     {% if nav.back is not none %}
-        <a href='{{nav.back.url}}'>&lt;--{{nav.back.text}}</a>
+        <a class='w3-button' href='{{nav.back.url}}'>&lArr;&nbsp;{{nav.back.text}}</a>
     {% endif %}
     {% if nav.up is not none %}
-        <a href='{{nav.up.url}}'>{{nav.up.text}}</a>
+        <a class='w3-button' href='{{nav.up.url}}'>&uArr;&nbsp;{{nav.up.text}}</a>
     {% endif %}
     {% if nav.forth is not none %}
-        <a href='{{nav.forth.url}}'>{{nav.forth.text}}--&gt;</a>
+        <a class='w3-button' href='{{nav.forth.url}}'>{{nav.forth.text}}&nbsp;&rArr;</a>
     {% endif %}
 </div>

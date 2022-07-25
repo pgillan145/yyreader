@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
-<div onclick="document.getElementById('nav').style.display='block'; document.getElementById('nav').style.background='{{background_color}}';" class='w3-panel navigation'></div>
+<div onclick="document.getElementById('nav').style.display='block'; document.getElementById('nav').style.background='{{background_color}}';" class='navigation'></div>
 <div class='page'>
     {% if half == 2 %}
         <img class='page page2' src='/page/{{yacreader.id}}/{{page}}'>
@@ -16,14 +16,18 @@
         <a href='{{next_page_url}}'><div class='page next'></div></a>
     {% endif %}
 </div>
-<div id='nav' class='w3-panel navigation' style='display:none' onclick="document.getElementById('nav').style.display='none'">
-    <a href='{{back.url}}'>&lt;--{{back.text}}</a>
-    <a href='/byvolume/{{yacreader.volume}}#{{yacreader.id}}'>{{yacreader.volume}}</a> #{{yacreader.issue}} (page {{page}} of {{page_count}})
-    {% if datelink != back.url %}
-        <a href='{{datelink}}'>{{yacreader.date.strftime("%m/%d/%Y")}}</a>
-    {% else %}
-        {{yacreader.date.strftime("%m/%d/%Y")}}
-    {% endif %}
+<div id='nav' class='navigation' style='display:none' onclick="document.getElementById('nav').style.display='none'">
+    <div class='w3-center w3-padding-16'>
+        <a href='{{nav.back.url}}'>&lArr;&nbsp;{{nav.back.text}}</a>
+        {% if nav.up is not none %}
+            <a href='{{nav.up.url}}'>&uArr;&nbsp;{{nav.up.text}}</a>
+        {% endif %}
+        <a href='/byvolume/{{yacreader.volume}}#{{yacreader.id}}'>{{yacreader.volume}}</a> #{{yacreader.issue}} (page&nbsp;{{page}}&nbsp;of&nbsp;{{page_count}})
+        {% if datelink != nav.back.url %}
+            <a href='{{datelink}}'>{{yacreader.date.strftime("%m/%d/%Y")}}</a>
+        {% else %}
+            {{yacreader.date.strftime("%m/%d/%Y")}}
+        {% endif %}
+    </div>
 </div>
-{#}<br />{{data_dir}}{#}
 {% endblock %}
