@@ -4,6 +4,7 @@ from dateutil.relativedelta import relativedelta
 from fuzzywuzzy import fuzz
 import json
 import minorimpact
+import minorimpact.config
 import os
 import os.path
 import pickle
@@ -22,6 +23,7 @@ cache_setup = False
 headers = {'User-Agent': 'yyreader'}
 params = {}
 
+config = minorimpact.config.getConfig(script_name = 'yyreader')
 
 def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
     url = base_url + f'/volume/4050-{volume_id}/?api_key=' + api_key + f'&format=json&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
@@ -112,8 +114,11 @@ def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cac
 
 def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
     global cache 
-    if (('date' not in data or data['date'] is None) and args.yes is True):
-        raise Exception("Can't auto confirm without file date. skipping.")
+    if (args.yes is True):
+        if ('year' in data and re.search(' Annual$', data['volume'])):
+            pass
+        elif (('date' not in data or data['date'] is None) and args.yes is True):
+            raise Exception("Can't auto confirm without strict file date, skipping.")
 
     use_cache = cache_results
     if (cache_setup is False):
@@ -316,7 +321,8 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
     except Exception as e:
         pass
     
-    #valid_publishers = ['Marvel', 'Epic', 'IDW', 'Star Comics', 'Max', 'Max Comics', 'Atlas', 'Curtis Magazine', 'Curtis Magazines']
+    skip_publishers = eval(config['default']['skip_publishers']) if ('skip_publishers' in config['default']) else []
+
     volume_year = {}
     if (len(results) > 0):
         i = len(results) - 1
@@ -328,9 +334,9 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
               or results[i]['first_issue'] is None \
               or ( results[i]['first_issue']['name'] is not None and (re.search('TPB$', results[i]['first_issue']['name']) or re.search('^Volume \d+$', results[i]['first_issue']['name']))) \
               or results[i]['publisher'] is None  \
+              or (results[i]['publisher']['name'] in skip_publishers) \
               or (volume.lower() == 'the amazing spider-man' and int(year) < 2014 and results[i]['start_year'] != '1963') \
               or (year is not None and int(results[i]['start_year']) > int(year)+1):
-              #or (results[i]['publisher']['name'] not in valid_publishers) \
                 del results[i]
                 pass
             i = i - 1
