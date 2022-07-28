@@ -21,6 +21,9 @@ def main():
     parser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
     parser.add_argument('--filedate', help = "With --scan, finds all files with mismatches database date entries.", action='store_true')
     parser.add_argument('--filetype', help = "With --scan, finds all files with data that doesn't match their extension.", action='store_true')
+    parser.add_argument('--holes', help = "With --scan, finds volumes with missing issues. (NOT IMPLEMENTED)", action='store_true')
+    parser.add_argument('--verify', help = "With --scan, recheck database items against file and comicvine data. (NOT IMPLEMENTED)", action='store_true')
+    parser.add_argument('--xml', help = "With --scan, finds files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)", action='store_true')
     parser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
     #parser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
     parser.add_argument('--volume', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
@@ -105,11 +108,30 @@ def main():
                                     except Exception as e:
                                         print(e)
                         break
+            if (args.xml):
+                #TODO: scan files for valid, up-to-date ComicInfo.xml files.  The Notes field should contain "yyreader xml v1", at this point...
+                #TODO: Make the xml version a variable.
+                print("This isn't written yet, check back, like, later, and stuff.")
+                pass
+            if (args.holes):
+                #TODO: Scan all the existing volumes for "holes" -- places where the numbers either don't start with 1, or skip some value.  (Check comicvine for "total
+                #   number of issues"?  I mean, that's a good idea, but for current titles the caching tends to make more difficult than it ought to be.)
+                print("This doesn't exist yet either.")
+                pass
+            if (args.verify):
+                #TODO: Compare what's in the database to what's in the file and what's in comicvine, and then retrieve, rewrite and reupdate everything.
+                #TODO: Make an optional "subset" value (ie, a number of items or a percentage) that can be set, so that only a portion of the whole will be checked rather
+                #   than however many thousands of items exist?  Maybe add also add a "last_checked" field somewhere so we know not to check the same items more than
+                #   once every x days.
+                print("Nope.")
+                pass
             
         elif (args.update):
+            #TODO: Settle on what 'done' means when it comes to what data should be in the yacreader database.  Technically all we need is issue number, date and volume to
+            #   just read the books, but I also want arcs, publishers and some of the creatives in there for filtering and searching.
             #if (comicvine_id is not None and date is not None and title is not None and writer is not None and penciller is not None):
             #    continue
-            if (date is not None and issue is not None):
+            if (date is not None and issue is not None and volume is not None):
                 if (args.debug): print("--SKIP--")
                 if (args.debug): print("path: " + path)
                 if (args.debug): print("issue: " + str(issue))
@@ -126,48 +148,45 @@ def main():
 
             c = yyreader.comic.comic(config['default']['comic_dir'] + path, args = args)
             if (c.get('date') is not None):
-                    print("updating " + path)
+                print("updating " + path)
 
-                    arcs = c.get('story_arcs')
-                    arc_name = arcs[0] if (len(arcs) > 0) else None
-                    characters = '\n'.join(c.get('characters')) if (c.get('characters')) else None
-                    colorist = '\n'.join(c.get('colorists')) if (c.get('colorists')) else None
-                    description = c.get('description')
-                    inker = '\n'.join(c.get('inkers')) if (c.get('inkers')) else None
-                    issue = c.get('issue')
-                    issue_id = c.get('issue_id')
-                    issue_name = c.get('name')
-                    letterer = '\n'.join(c.get('letterers')) if (c.get('letterers')) else None
-                    date = c.get('date')
-                    penciller = '\n'.join(c.get('pencillers')) if (c.get('pencillers')) else None
-                    publisher = c.get('publisher')
-                    volume = c.get('volume')
-                    writer = '\n'.join(c.get('writers')) if (c.get('writers')) else None
+                arcs = c.get('story_arcs')
+                arc_name = arcs[0] if (len(arcs) > 0) else None
+                characters = '\n'.join(c.get('characters')) if (c.get('characters')) else None
+                colorist = '\n'.join(c.get('colorists')) if (c.get('colorists')) else None
+                description = c.get('description')
+                inker = '\n'.join(c.get('inkers')) if (c.get('inkers')) else None
+                issue = c.get('issue')
+                issue_id = c.get('issue_id')
+                issue_name = c.get('name')
+                letterer = '\n'.join(c.get('letterers')) if (c.get('letterers')) else None
+                date = c.get('date')
+                penciller = '\n'.join(c.get('pencillers')) if (c.get('pencillers')) else None
+                publisher = c.get('publisher')
+                volume = c.get('volume')
+                writer = '\n'.join(c.get('writers')) if (c.get('writers')) else None
 
-                    i = i + 1
-                    m = re.search('^(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)$', date)
-                    dbdate = m.group('day') + '/' + m.group('month') + '/' + m.group('year')
-                    if (args.debug): print("update comic_info set edited = TRUE, date = {}, volume = {}, number = {}, title = {}, comicVineID = {}, storyArc = {}, publisher = {}, writer = {}, penciller = {}, synopsis = {}, letterer = {}, inker = {}, colorist = {}, characters = {} where id = {}".format(dbdate, volume, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
+                i = i + 1
+                m = re.search('^(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)$', date)
+                dbdate = m.group('day') + '/' + m.group('month') + '/' + m.group('year')
+                if (args.debug): print("update comic_info set edited = TRUE, date = {}, volume = {}, number = {}, title = {}, comicVineID = {}, storyArc = {}, publisher = {}, writer = {}, penciller = {}, synopsis = {}, letterer = {}, inker = {}, colorist = {}, characters = {} where id = {}".format(dbdate, volume, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
+                try:
+                    if (args.dryrun is False):
+                        cur.execute('update comic_info set edited = TRUE, date = ?, volume = ?, number = ?, title = ?, comicVineID = ?, storyArc = ?, publisher = ?, writer = ?, penciller = ?, synopsis = ?, letterer = ?, inker = ?, colorist = ?, characters = ? where id = ?', (dbdate, volume, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
+                except Exception as e:
+                    print(e)
+                    break
+
+                for arc in arcs:
+                    if (args.debug): print("insert into comic_info_arc (storyArc, comicInfoId) values ({}, {})".format(arc, comic_info_id))
                     try:
                         if (args.dryrun is False):
-                            cur.execute('update comic_info set edited = TRUE, date = ?, volume = ?, number = ?, title = ?, comicVineID = ?, storyArc = ?, publisher = ?, writer = ?, penciller = ?, synopsis = ?, letterer = ?, inker = ?, colorist = ?, characters = ? where id = ?', (dbdate, volume, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
-                            con.commit()
-                        pass
+                            cur.execute('insert into comic_info_arc (storyArc, comicInfoId) values (?, ?)', (arc, comic_info_id))
                     except Exception as e:
-                        print(e)
-                        break
-
-                    for arc in arcs:
-                        if (args.debug): print("insert into comic_info_arc (storyArc, comicInfoId) values ({}, {})".format(arc, comic_info_id))
-                        try:
-                            if (args.dryrun is False):
-                                cur.execute('insert into comic_info_arc (storyArc, comicInfoId) values (?, ?)', (arc, comic_info_id))
-                                con.commit()
+                        if (str(e) != 'UNIQUE constraint failed: comic_info_arc.storyArc, comic_info_arc.comicInfoId'):
+                            print(e)
                             pass
-                        except Exception as e:
-                            if (str(e) != 'UNIQUE constraint failed: comic_info_arc.storyArc, comic_info_arc.comicInfoId'):
-                                print(e)
-                                break
+                con.commit()
 
         #if (i > 10): break
         if (args.once is True): break
