@@ -1,4 +1,5 @@
 
+from io import BytesIO
 from fuzzywuzzy import fuzz
 import magic
 import minorimpact
@@ -32,6 +33,9 @@ def dive(dir, ext = 'jpg'):
             bottom = dive(dir + '/' + f)
             if (bottom is not None):
                 return bottom
+
+def to_hex(r, g, b):
+    return '#{:02x}{:02x}{:02x}'.format(int(r), int(g), int(b))
 
 class FileSizeException(Exception):
     pass
@@ -309,18 +313,155 @@ class comic():
             self.temp_dir = tempfile.TemporaryDirectory()
         return self.temp_dir.name
 
-    def page(self, number = 1):
-        f = open(self.page_file(number), 'rb')
-        data = f.read()
-        f.close()
+    def border(self, img):
+        (w, h) = img.size
+        #print("(",h,w,")")
+        max_border_percent = 10
+        interval_count = 5
+        max_w = int(w * (max_border_percent/100))
+        max_h = int(h * (max_border_percent/100))
+        interval_w = int(w/interval_count)
+        interval_h = int(h/interval_count)
+        #mask = Image.new('1', img.size, 1)
+        #d = ImageDraw.Draw(mask)
+        #d.rectangle([(0,50), (50, 51)], fill=0)
+        #stat = ImageStat.Stat(img, mask)
+
+        #TODO: A lot of these pages have a slight tilt, which makes the cropping look weird.  See if I can find a reliable
+        #   way to track the increase in crop along along one side to try and determine how much to rotate the page so it's
+        #   perfectly vertical.
+        #min_left = max_w
+        #max_left = 0
+        #direction = 0
+        ##print("max_w:", max_w)
+        #interval_tilt = int(h/20)
+        #for x in range(1, 20):
+        #    test = img.crop((0, x*interval_tilt, max_w, (x*interval_tilt)+1))
+        #    test.save(f'/Users/pgillan/tmp/left{x}.jpg')
+        #    size = 0
+        #    last = None
+        #    for b in test.getdata():
+        #        hex = to_hex(b[0], b[1], b[2])
+        #        #print(size, hex)
+        #        if (hex != last and last is not None):
+        #            size = size - 1
+        #            break
+        #        size = size + 1
+        #        last = hex
+        #    if (size < min_left):
+        #        min_left = size
+        #        direction = direction - 1
+        #    if (size > max_left):
+        #        max_left = size
+        #        direction = direction + 1
+        #    print("size:", size)
+        #    print("min_left:", min_left)
+        #    print("max_left:", max_left)
+        #    print("dir:", direction)
+
+        top = max_h
+        for x in range(1, interval_count):
+            test = img.crop((x*interval_w, 0,(x*interval_w) + 1, max_h))
+            #test.save(f'/Users/pgillan/tmp/top{x}.jpg')
+            width = 0
+            last = None
+            for b in test.getdata():
+                hex = to_hex(b[0], b[1], b[2])
+                if (hex != last and last is not None):
+                    width = width - 1
+                    break
+                width = width + 1
+                last = hex
+            if (width < top):
+                top = width
+        #print("top:", top)
+
+        right = max_w
+        #print("max_w:", max_w)
+        for x in range(1, interval_count):
+            test = img.crop((w-max_w, x*interval_h, w, (x*interval_h)+1)).rotate(180)
+            #test = test.rotate(180)
+            #test.save(f'/Users/pgillan/tmp/right{x}.jpg')
+            size = 0
+            last = None
+            for b in test.getdata():
+                hex = to_hex(b[0], b[1], b[2])
+                #print(size, hex)
+                if (hex != last and last is not None):
+                    size = size - 1
+                    break
+                size = size + 1
+                last = hex
+            if (size < right):
+                right = size
+        #print("right:", right)
+
+        bottom = max_h
+        for x in range(1, interval_count):
+            test = img.crop((x*interval_w, h-max_h, (x*interval_w) + 1, h)).rotate(180)
+            width = 0
+            last = None
+            for b in test.getdata():
+                hex = to_hex(b[0], b[1], b[2])
+                if (hex != last and last is not None):
+                    width = width - 1
+                    break
+                width = width + 1
+                last = hex
+            if (width < bottom):
+                bottom = width
+        #print("bottom:", bottom)
+
+        left = max_w
+        #print("max_w:", max_w)
+        for x in range(1, interval_count):
+            test = img.crop((0, x*interval_h, max_w, (x*interval_h)+1))
+            #test.save(f'/Users/pgillan/tmp/left{x}.jpg')
+            size = 0
+            last = None
+            for b in test.getdata():
+                hex = to_hex(b[0], b[1], b[2])
+                #print(size, hex)
+                if (hex != last and last is not None):
+                    size = size - 1
+                    break
+                size = size + 1
+                last = hex
+            if (size < left):
+                left = size
+        #print("left:", left)
+        return (left, top, w-right, h-bottom)
+
+    def _page_img(self, number, crop = True):
+        img = Image.open(self.page_file(number))
+        if (crop is True):
+            img = img.crop(self.border(img))
+        return img
+
+    def page(self, number, crop = True):
+        #test = img.crop((0, 0, 200, 200))
+        #tmp = "/Users/pgillan/tmp/crop.jpg"
+        #return test.tobytes() 
+        #f = open(tmp, 'bw')
+        #f.write(data)
+        #f.close()
+        #return data
+
+        img = self._page_img(number, crop = crop)
+        out = BytesIO()
+        img.save(out, format='JPEG')
+        return out.getvalue()
+        
+        # Return raw file
+        with (open(self.page_file(number), 'rb') as f):
+            data = f.read()
         return data
 
-    def page_color(self, page = 1):
+    def page_color(self, page):
         """Returns the hex code for the median color that appears along the outer edge of the page."""
 
-        img = Image.open(self.page_file(page))
-        #colors = sorted(img.getcolors(maxcolors=2028*2048), key=lambda x:x[0], reverse = True)
-        #return '#{:02x}{:02x}{:02x}'.format(colors[0][1][0], colors[0][1][1], colors[0][1][2])
+        img = self._page_img(page)
+
         (w, h) = img.size
         mask = Image.new('1', img.size, 1)
         d = ImageDraw.Draw(mask)
@@ -332,51 +473,7 @@ class comic():
         #print("mean:", stat.mean)
         #print("rms:", stat.rms)
         colors = stat.median
-        return '#{:02x}{:02x}{:02x}'.format(int(colors[0]), int(colors[1]), int(colors[2]))
-
-    def page_color1(self, page = 1):
-        img = Image.open(self.page_file(page))
-        (w, h) = img.size
-        mask = Image.new('1', img.size, 1)
-        d = ImageDraw.Draw(mask)
-        d.rectangle([(50,50), (w-50, h-50)], fill=0)
-
-        r,g,b = img.split()
-        big_r = 0
-        tr = 0
-        h =  r.histogram(mask=mask)
-        i = 0
-        while (i < len(h)):
-            if (h[i] > big_r):
-                big_r = h[i]
-                tr = i
-            #print("{}:{}".format(i, h[i]))
-            i = i + 1
-
-        big_g = 0
-        tg = 0
-        h =  g.histogram(mask=mask)
-        i = 0
-        while (i < len(h)):
-            if (h[i] > big_g):
-                big_g = h[i]
-                tg = i
-            #print("{}:{}".format(i, h[i]))
-            i = i + 1
-
-        big_b = 0
-        tb = 0
-        h =  b.histogram(mask=mask)
-        i = 0
-        while (i < len(h)):
-            if (h[i] > big_b):
-                big_b = h[i]
-                tb = i
-            #print("{}:{}".format(i, h[i]))
-            i = i + 1
-        h = re.sub('0x', '', "#" + str(hex((tr*256*256) + (tg*256) + tb)))
-        #print(h)
-        return h
+        return to_hex(colors[0], colors[1], colors[2])
 
     def page_count(self):
         return len(self._page_files())
@@ -401,7 +498,7 @@ class comic():
         return sorted(page_files)
 
     def page_size(self, page = 1):
-        img = Image.open(self.page_file(page))
+        img = self._page_img(page)
         return img.size
 
     def _parse_xml_data(self, xml_data):
