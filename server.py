@@ -91,6 +91,8 @@ def bydate(year = None, month = None):
         return render_template('bymonth.html', back = back, items = items, nav = nav)
 
     elif (year is not None and month is not None):
+        yyreader.yacreader.update_beacon('{}/{}'.format(year, month))
+
         up = { 'url':'/bydate/{}'.format(year), 'text':str(year) }
         (prev_year, prev_month) = yyreader.yacreader.get_prevdate(year, month)
         if (prev_year is not None):

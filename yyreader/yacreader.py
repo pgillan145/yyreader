@@ -55,7 +55,7 @@ def add_beacon(name):
     db = connect()
     cursor = db.cursor()
     try:
-        cursor.execute('insert into beacon (name) values (?)', (name, ))
+        cursor.execute('insert into beacon (name, mod_date) values (?,  CURRENT_TIMESTAMP)', (name, ))
         db.commit()
     except Exception as e:
         print(e)
@@ -304,6 +304,16 @@ def get_years():
             years.append(year)
     db.close()
     return sorted(years, key=lambda x: x)
+
+def update_beacon(name):
+    db = connect()
+    cursor = db.cursor()
+    try:
+        cursor.execute('update beacon set mod_date =  CURRENT_TIMESTAMP where name = ?', (name, ))
+        db.commit()
+    except Exception as e:
+        pass
+    db.close()
 
 def update_read_log(id, page, page_count = None):
     db = connect()
