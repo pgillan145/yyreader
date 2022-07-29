@@ -8,7 +8,7 @@ import re
 import requests
 import time
 
-date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)',
+date_formats = [ '\(?(?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
                  '\((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)' ]
@@ -63,6 +63,16 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':'^\d+ - House of M - ', 's':'' },
                  { 'm':r'Marvel Graphic Novel No (\d+) - .*\.(cb[rz])', 's':r'Marvel Graphic Novel \1.\2' },
                  { 'm':' - ', 's':': ', 'c':1 },
+                 { 'm':' Book One of [^ ]+', 's':' 001' },
+                 { 'm':' Book Two of [^ ]+', 's':' 002' },
+                 { 'm':' Book Three of [^ ]+', 's':' 003' },
+                 { 'm':' Book One', 's':' 001' },
+                 { 'm':' Book Two', 's':' 002' },
+                 { 'm':' Book Three', 's':' 003' },
+                 { 'm':' Part One', 's':' 001' },
+                 { 'm':' Part Two', 's':' 002' },
+                 { 'm':' Part Three', 's':' 003' },
+                 { 'm':' Part Four', 's':' 004' },
                ]
 
 volume_subs = [ 
@@ -77,7 +87,7 @@ volume_subs = [
                 { 'm': 'Marvel Two-in-One: .*', 's': 'Marvel Two-in-One' },
                 { 'm': 'Supernatural Thrillers and .*', 's': 'Supernatural Thrillers' },
                 { 'm': 'Peter Parker the Spectacular Spider-Man', 's':'The Spectacular Spider-Man' },
-                #{ 'm': 'US1', 's':'U.S. 1' },
+                { 'm': 'US1', 's':'U.S. 1' },
              ]
 
 def make_date(data, extension, ver = None, directors_cut = False):

@@ -37,6 +37,9 @@ def dive(dir, ext = 'jpg'):
 def to_hex(r, g, b):
     return '#{:02x}{:02x}{:02x}'.format(int(r), int(g), int(b))
 
+class FileExistsException(Exception):
+    pass
+
 class FileSizeException(Exception):
     pass
 
@@ -61,7 +64,7 @@ class comic():
         return self.file
 
     def _add_xml(self):
-        if (self.data_dir is None):
+        if (self.data_dir is None or os.path.exists(self.data_dir) is False):
             self._unpack()
 
         xml_data = self._generate_xml_data()
@@ -180,7 +183,7 @@ class comic():
                 if (os.path.exists(name_dir) is False):
                     if (args.dryrun is False): os.mkdir(name_dir)
                 if (os.path.exists(f'{name_dir}/{new_comic}') is True):
-                    raise Exception(f"{name_dir}/{new_comic} already exists")
+                    raise FileExistsException(f"{name_dir}/{new_comic} already exists")
 
                 m = re.search('(\d\d\d\d)-(\d\d)-(\d\d)', comicvine_data['date'])
                 if (m is None):
@@ -578,7 +581,7 @@ class comic():
         #print(result)
 
     def _unpack(self):
-        if (self.data_dir is not None):
+        if (self.data_dir is not None and os.path.exists(self.data_dir) is True):
             return
 
         temp_dir = self.make_temp_dir()

@@ -23,12 +23,18 @@ def main():
     parser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
     parser.add_argument('--target', metavar = 'TARGET',  help = "Move files to TARGET", default = config['default']['comic_dir'])
     parser.add_argument('--year', metavar = 'YEAR', help = "Assume YEAR for any file that doesn't include it")
+    parser.add_argument('--existing', metavar = 'EXIST', help = "Move any files that already exist to EXIST")
     parser.add_argument('--debug', help = "extra extra loud output", action='store_true')
     parser.add_argument('-d', '--dryrun', help = "don't actually make any changes to anything", action='store_true')
     parser.add_argument('-v', '--verbose', help = "extra loud output", action='store_true')
     parser.add_argument('-y', '--yes', help = "Always say yes", action='store_true')
     args = parser.parse_args()
     if (args.debug): args.verbose = True
+
+    if (args.existing is not None):
+        args.existing = re.sub('/$','', args.existing)
+        if (os.path.isdir(args.existing) is False):
+            sys.exit(f"{args.existing} doesn't exist.")
 
     if (args.file is not None):
         c_file = re.sub('/$','', args.file)
@@ -72,10 +78,18 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
                 try:
                     c = comic.comic(new_comic_file)
                     c.box(args.target, args = args)
+                except comic.FileExistsException as e:
+                    if (args.existing is not None):
+                        print(f"{new_comic_file} already exists, moving to {args.existing}")
+                        if (args.dryrun is False): shutil.move(new_comic_file, args.existing)
                 except Exception as e:
                     print(e)
         else:
             print("{} has unknown data: '{}'".format(comic_file, magic_str))
+    except comic.FileExistsException as e:
+        if (args.existing is not None):
+            print(f"{comic_file} already exists, moving to {args.existing}")
+            if (args.dryrun is False): shutil.move(comic_file, args.existing)
     except Exception as e:
         print(e)
 
