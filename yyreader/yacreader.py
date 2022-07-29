@@ -26,24 +26,79 @@ def connect():
     db = sqlite3.connect(db_file)
     return db
     
-def init():
+def init_db():
     db = connect()
     cursor = db.cursor()
     cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
     cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS beacon (id INTEGER PRIMARY KEY, name TEXT NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
     db.commit()
     try:
         cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
         db.commit()
     except Exception as e:
-        if (str(e) != 'index comic_info_arc_idx already exists'):
+        if (re.search('^index (.+) already exists$', str(e)) is None):
+            raise e
+    try:
+        cursor.execute('CREATE UNIQUE INDEX beacon_idx on beacon(name)')
+        db.commit()
+    except Exception as e:
+        if (re.search('^index (.+) already exists$', str(e)) is None):
             raise e
     db.close()
 
 def convert_yacreader_date(yacreader_date):
     date = datetime.strptime(yacreader_date, '%d/%m/%Y')
     return date
-    
+
+def add_beacon(name):
+    db = connect()
+    cursor = db.cursor()
+    try:
+        cursor.execute('insert into beacon (name) values (?)', (name, ))
+        db.commit()
+    except Exception as e:
+        print(e)
+    db.close()
+
+def delete_beacon(name):
+    db = connect()
+    cursor = db.cursor()
+    try:
+        cursor.execute('delete from beacon where name = ?', (name, ))
+        db.commit()
+    except Exception as e:
+        print(e)
+    db.close()
+
+def get_beacon(name):
+    beacon = None
+    db = connect()
+    cursor = db.cursor()
+    cursor.execute('select id, name, mod_date from beacon where name = ?', (name, ))
+    rows = cursor.fetchall()
+    if (len(rows) > 0):
+        id = rows[0][0]
+        name = rows[0][1]
+        mod_date = rows[0][2]
+        beacon = { 'id':id, 'name':name, 'mod_date':mod_date }
+    db.close()
+    return beacon
+
+def get_beacons():
+    db = connect()
+    cursor = db.cursor()
+    cursor.execute('select id, name, mod_date from beacon order by mod_date desc')
+    rows = cursor.fetchall()
+    beacons = []
+    for row in rows:
+        id = row[0]
+        name = row[1]
+        mod_date = row[2]
+        beacons.append({ 'id':id, 'name':name, 'mod_date':mod_date })
+    db.close()
+    return beacons
+
 def get_comic_by_id(id):
     db = connect()
     cursor = db.cursor()
@@ -155,6 +210,7 @@ def get_history():
     return comics
 
 def get_months(year):
+    year = int(year)
     db = connect()
     cursor = db.cursor()
     months = []
@@ -164,13 +220,61 @@ def get_months(year):
         if (row[0] is None):
             continue
         date = convert_yacreader_date(row[0])
-        if (date.year != int(year)):
+        if (date.year != year):
             continue
-        month = date.strftime('%m')
+        month = int(date.strftime('%m'))
         if (month not in months):
             months.append(month)
     db.close()
     return sorted(months, key=lambda x:x)
+
+def get_nextdate(year, month):
+    year = int(year)
+    month = int(month)
+    next_year = None
+    next_month = None
+    db = connect()
+    cursor = db.cursor()
+    months = get_months(year)
+    if (month == months[len(months)-1]):
+        years = get_years()
+        for i in range(0, len(years)):
+            if (years[i] == year and i < len(years)):
+                next_year = years[i+1]
+                break
+        if (next_year is not None):
+            months = get_months(next_year)
+            next_month = months[0]
+    else:
+        next_year = year
+        next_month = month + 1
+    db.close()
+    return (next_year, next_month)
+
+def get_prevdate(year, month):
+    year = int(year)
+    month = int(month)
+    prev_year = None
+    prev_month = None
+    db = connect()
+    cursor = db.cursor()
+    months = get_months(year)
+    if (month == months[0]):
+        years = get_years()
+        for i in range(0, len(years)):
+            if (years[i] == year and i > 0):
+                prev_year = years[i-1]
+                break
+            
+        if (prev_year is not None):
+            months = get_months(prev_year)
+            prev_month = months[len(months)-1]
+    else:
+        prev_year = year
+        prev_month = month - 1
+
+    db.close()
+    return (prev_year, prev_month)
 
 def get_volumes():
     db = connect()

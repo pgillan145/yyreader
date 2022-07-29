@@ -37,7 +37,7 @@ def main():
         args.verbose = True
         args.debug = True
 
-    yyreader.yacreader.init()
+    yyreader.yacreader.init_db()
     con = yyreader.yacreader.connect()
     cur = con.cursor()
 
