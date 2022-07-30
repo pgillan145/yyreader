@@ -79,6 +79,7 @@ def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cac
             cache['results'][offset_url] = { 'text': r.text, 'mod_date': datetime.now() }
             pickle_data = pickle.dumps(cache)
             done = False
+            interrupted = False
             while done is False:
                 try:
                     with open(cache_file, 'wb') as f:
@@ -86,7 +87,10 @@ def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cac
                     done = True
                 except KeyboardInterrupt:
                     print("cache dump interrupted - retrying")
+                    interrupted = True
                     continue
+            if (interrupted is True):
+                sys.exit()
     
     if (text is None):
         raise Exception(f"Unable to request '{offset_url}'")
