@@ -180,10 +180,6 @@ class comic():
                 issue = parser.massage_issue(comicvine_data['issue'])
                 self.data['issue'] = comicvine_data['issue']
                 extension = parse_data['extension']
-                if (os.path.exists(name_dir) is False):
-                    if (args.dryrun is False): os.mkdir(name_dir)
-                if (os.path.exists(f'{name_dir}/{new_comic}') is True):
-                    raise FileExistsException(f"{name_dir}/{new_comic} already exists")
 
                 m = re.search('(\d\d\d\d)-(\d\d)-(\d\d)', comicvine_data['date'])
                 if (m is None):
@@ -235,6 +231,17 @@ class comic():
                             self.data['writers'].append(person['name'])
                 if (args.verbose): print("  adding ComicInfo.xml to file")
                 if (args.dryrun is False): self._add_xml()
+
+                dirname = os.path.dirname(self.file)
+                if (args.debug): print(f"RENAME {self.file} => {dirname}/{new_comic}")
+                if (args.dryrun is False):
+                    shutil.move(self.file, dirname + '/' + new_comic)
+                    self.file = dirname + '/' + new_comic
+
+                if (os.path.exists(name_dir) is False):
+                    if (args.dryrun is False): os.mkdir(name_dir)
+                if (os.path.exists(f'{name_dir}/{new_comic}') is True):
+                    raise FileExistsException(f"{name_dir}/{new_comic} already exists")
 
                 if (args.debug): print(f"MOVE {self.file} => {name_dir}/{new_comic}")
                 if (args.dryrun is False):
