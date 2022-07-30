@@ -259,10 +259,22 @@ class comic():
 
     def _files(self):
         files = []
-        self._unpack()
-        for f in os.listdir(self.data_dir):
-            files.append(f)
-
+        if (self.is_cbr() and True):
+            command = [config['default']['rar'], 'lb', self.file]
+            result = subprocess.run(command, capture_output = True, text = True)
+            for f in result.stdout.split('\n'):
+                files.append(f)
+        elif (self.is_cbz() and True):
+            command = [config['default']['unzip'], '-l', self.file]
+            result = subprocess.run(command, capture_output = True, text = True)
+            for f in result.stdout.split('\n'):
+                m = re.search(r'^ *\d+ +[\d-]+ [\d:]+ +(.+)$', f)
+                if (m is not None):
+                    files.append(m.group(1))
+        else:
+            self._unpack()
+            for f in os.listdir(self.data_dir):
+                files.append(f)
         return files
 
     def get(self, name):
@@ -319,7 +331,7 @@ class comic():
         return False
 
     def make_temp_dir(self):
-        if (self.temp_dir is None):
+        if (self.temp_dir is None or os.path.isdir(self.temp_dir.name) is False):
             self.temp_dir = tempfile.TemporaryDirectory()
         return self.temp_dir.name
 
@@ -443,8 +455,23 @@ class comic():
         return (left, top, w-right, h-bottom)
 
     def _page_img(self, number, crop = True):
-        img = Image.open(self.page_file(number))
-        if (crop is True):
+        img = None
+        if (self.is_cbr()):
+            command = [config['default']['rar'], 'p', self.file, self.page_file(number)]
+            result = subprocess.run(command, capture_output = True)
+            tmp = BytesIO()
+            tmp.write(result.stdout)
+            img = Image.open(tmp, formats=['JPEG'])
+        elif (self.is_cbz()):
+            command = [config['default']['unzip'], '-p', self.file, self.page_file(number)]
+            result = subprocess.run(command, capture_output = True)
+            tmp = BytesIO()
+            tmp.write(result.stdout)
+            img = Image.open(tmp, formats=['JPEG'])
+        else:
+            img = Image.open(self.page_file(number))
+
+        if (img is not None and crop is True):
             img = img.crop(self.border(img))
         return img
 
@@ -494,6 +521,7 @@ class comic():
 
         files = self._page_files()
         page_file = files[page - 1]
+        return page_file
         return self.data_dir + '/' + page_file
 
     def _page_files(self):
