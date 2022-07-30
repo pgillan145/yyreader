@@ -37,7 +37,9 @@ formats = [ '^(?P<year>\d\d\d\d)00 (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<exten
 
 credit_pages = [ 'z.jpg',
                  'zSoU-Nerd.jpg',
+                 'zaquila.jpg',
                  'zWater.jpg',
+                 'zz-AVigilante407DCPScan-JLU.jpg',
                  'zzGGtag.jpg',
                  'zzoroboros.jpg',
                  'zzoronewtag10.jpg',
