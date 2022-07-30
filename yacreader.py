@@ -19,6 +19,7 @@ def main():
     parser.add_argument('-y', '--yes', action='store_true')
     parser.add_argument('-1', '--once', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
     parser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
+    parser.add_argument('--dupes', help = "With --scan, tries to identify duplicated records. (NOT IMPLEMENTED)", action='store_true')
     parser.add_argument('--filedate', help = "With --scan, finds all files with mismatches database date entries.", action='store_true')
     parser.add_argument('--filetype', help = "With --scan, finds all files with data that doesn't match their extension.", action='store_true')
     parser.add_argument('--holes', help = "With --scan, finds volumes with missing issues. (NOT IMPLEMENTED)", action='store_true')
@@ -124,6 +125,10 @@ def main():
                 #   than however many thousands of items exist?  Maybe add also add a "last_checked" field somewhere so we know not to check the same items more than
                 #   once every x days.
                 print("Nope.")
+                pass
+            if (args.dupes):
+                #TODO: Identify duplicate issues.
+                print("Nein.")
                 pass
             
         elif (args.update):
