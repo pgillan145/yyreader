@@ -71,7 +71,7 @@ def bydate(year = None, month = None):
         for year in yyreader.yacreader.get_years():
             items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
         view = {'url':'/byvolume', 'text':'Volumes' }
-        nav = { 'back':None, 'up':None, 'forth':None, 'view':view }
+        nav = { 'back':None, 'up':None, 'forth':None, 'view':view, 'fixed':True }
         return render_template('byyear.html', back = back, items = items, nav = nav)
 
     elif (year is not None and month is None):
@@ -87,7 +87,7 @@ def bydate(year = None, month = None):
             items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(month, year) })
 
         up = { 'url':'/bydate', 'text':'Years' }
-        nav = { 'back':back, 'forth':forth, 'up': up  }
+        nav = { 'back':back, 'forth':forth, 'up': up, 'fixed':True  }
         return render_template('bymonth.html', back = back, items = items, nav = nav)
 
     elif (year is not None and month is not None):
@@ -113,7 +113,7 @@ def bydate(year = None, month = None):
             drop = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'} 
         elif (len(yyreader.yacreader.get_beacons()) > 1):
             drop = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'} 
-        nav = {'back':back, 'forth':forth, 'up':up, 'drop':drop }
+        nav = {'back':back, 'forth':forth, 'up':up, 'drop':drop, 'fixed':True }
         response = Response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal_method', 'bydate', max_age=60*60*24*365)
         response.set_cookie('current_time', '{}/{}'.format(year, month), max_age=60*60*24*365)
@@ -141,7 +141,7 @@ def byvolume(volume = None):
 
             items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume, 'name':None })
         view = {'url':'/bydate', 'text':'Dates' }
-        nav = {'back':back, 'forth':forth, 'up':up, 'view':view }
+        nav = {'back':back, 'forth':forth, 'up':up, 'view':view, 'fixed':True }
         return render_template('byvolume.html', items = items, nav = nav, index = index)
     else:
         volume = urllib.parse.unquote(volume)
@@ -149,7 +149,7 @@ def byvolume(volume = None):
             items.append({ 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), yacreader['id']) })
 
         up = { 'url':'/byvolume', 'text':'Volumes' }
-        nav = { 'back':back, 'forth':forth, 'up':up, 'view':view}
+        nav = { 'back':back, 'forth':forth, 'up':up, 'view':view, 'fixed':True}
         response = Response(render_template('comics.html', back = back, items = items, nav = nav))
         response.set_cookie('traversal_method', 'byvolume', max_age=60*60*24*365)
         response.delete_cookie('up')

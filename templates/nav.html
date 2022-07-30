@@ -1,4 +1,4 @@
-<div class='w3-bar'>
+<div class='w3-bar w3-black {% if nav.fixed is defined and nav.fixed is true %}fixed-nav{% endif %}'>
     {% if nav.back is defined and nav.back is not none %}
         <a class='w3-button' href='{{nav.back.url}}'>&lArr;&nbsp;{{nav.back.text}}</a>
     {% endif %}

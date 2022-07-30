@@ -10,6 +10,9 @@
                 background: {{background_color}};
                 color: {{text_color}};
                 height: 100%;
+                {% if nav.fixed is defined and nav.fixed is true %}
+                margin-top: 40px;
+                {% endif %}
             }
             div.page {
                 height: 100%;
@@ -22,6 +25,11 @@
                 height: 92%;
                 width: 50%;
                 z-index: 9;
+            }
+            div.fixed-nav {
+                position: fixed;
+                top: 0;
+                width: 100%;
             }
             div.navigation {
                 position: absolute;
