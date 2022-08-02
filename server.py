@@ -64,8 +64,6 @@ def bydate(year = None, month = None):
     up = None
     back = None
     forth = None
-    #if (request.cookies.get('current_time')):
-    #    back = {'url':'/bydate/{}'.format(request.cookies.get('current_time')), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
     clean_cache()
     if (year is None and month is None):
         for year in yyreader.yacreader.get_years():
@@ -116,7 +114,7 @@ def bydate(year = None, month = None):
         nav = {'back':back, 'forth':forth, 'up':up, 'drop':drop, 'fixed':True }
         response = Response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal_method', 'bydate', max_age=60*60*24*365)
-        response.set_cookie('current_time', '{}/{}'.format(year, month), max_age=60*60*24*365)
+        response.set_cookie('back', '/bydate/{}/{}|{}/{}'.format(year, month, month, year), max_age=60*60*24*365)
         response.delete_cookie('up')
         return response
 
@@ -124,7 +122,6 @@ def bydate(year = None, month = None):
 @app.route('/byvolume/<volume>')
 def byvolume(volume = None):
     items = []
-    #back = { 'url':'/bydate/{}'.format(request.cookies.get('current_time')), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
     back = None
     up = None
     forth = None
@@ -152,7 +149,7 @@ def byvolume(volume = None):
         nav = { 'back':back, 'forth':forth, 'up':up, 'view':view, 'fixed':True}
         response = Response(render_template('comics.html', back = back, items = items, nav = nav))
         response.set_cookie('traversal_method', 'byvolume', max_age=60*60*24*365)
-        response.delete_cookie('up')
+        response.set_cookie('back', '/byvolume/{}|{}'.format(urllib.parse.quote(volume), volume), max_age=60*60*24*365)
         return response
 
 @app.route('/cover/<int:id>')
@@ -188,8 +185,6 @@ def history(page = 1):
     per_page = 50
     back = None
     index = []
-    if (request.cookies.get('current_time')):
-        back = { 'url':'/bydate/{}'.format(request.cookies.get('current_time')), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
     up = { 'url':'/', 'text':'Index' }
     forth = None
     items = []
@@ -211,7 +206,7 @@ def history(page = 1):
         items.append({ 'yacreader': yacreader, 'date':yacreader['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}'.format(yacreader['date'].strftime('%Y/%m')) })
     nav = { 'up':None, 'back':None, 'forth':None, 'home':True, 'drop':{'url':'/beacons', 'text':'Beacons' } }
     response = Response(render_template('history.html',  items = items, nav = nav, index = index))
-    response.set_cookie('up', '/history|History')
+    response.set_cookie('back', '/history|History')
     return response
 
 @app.route('/')
@@ -263,21 +258,16 @@ def read(id, page = None, half = None):
 
     forth = None
     back = None
-    #if (request.cookies.get('current_time')):
-    #    back = { 'url':'/bydate/{}#{}'.format(request.cookies.get('current_time'), id), 'text':'/'.join(list(reversed(request.cookies.get('current_time').split('/')))) }
-    #    if (yacreader['date'].strftime('%Y/%-m') != request.cookies.get('current_time')):
-    #        forth = { 'url':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%m'), id), 'text':'{}'.format(yacreader['date'].strftime('%m/%d/%Y')) }
 
-    #up = None
-    #if (request.cookies.get('up')):
-    #    up = { 'url':request.cookies.get('up').split('|')[0], 'text':request.cookies.get('up').split('|')[1] }
     up = { 'url':'/byvolume/{}#{}'.format(urllib.parse.quote(yacreader['volume']), yacreader['id']), 'text':'{} #{}'.format(yacreader['volume'], yacreader['issue']) }
     forth = { 'url':'/bydate/{}#{}'.format(yacreader['date'].strftime('%Y/%-m'), yacreader['id']), 'text':'{}'.format(yacreader['date'].strftime('%m/%d/%Y')) }
     view = None
 
-    # TODO: Make the page turns past the start/end of the book go to the previous or next volume, rather than defaulting back to the month view?  Maybe?
-    previous_page_url = '/bydate/{}#{}'.format((yyreader.yacreader.get_beacons()[0]['name']), id)
+    previous_page_url = forth['url']
+    if (request.cookies.get('back')):
+        previous_page_url = request.cookies.get('back').split('|')[0]
     next_page_url = previous_page_url
+
     if (request.cookies.get('traversal_method') == 'byvolume'):
         # If the user was looking specifically at the issues in a particular volume, then the page turns on the first and last pages will go the prev/next issues.
         if (page == 1 or page == c.page_count()):
@@ -311,7 +301,8 @@ def read(id, page = None, half = None):
 
     yyreader.yacreader.update_read_log(id, page, page_count = c.page_count())
     nav = { 'back':back, 'up': up, 'forth':forth, 'view':view, 'history':False, 'home':True }
-    return render_template('read.html', half = half, page = page, yacreader = yacreader, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color )
+    response = Response(render_template('read.html', half = half, page = page, yacreader = yacreader, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color ))
+    return response
 
 @app.route('/page/<int:id>/<int:page>')
 def page(id, page):

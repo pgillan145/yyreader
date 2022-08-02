@@ -51,6 +51,8 @@ class comic():
     data_dir = None
     file = None
     temp_dir = None
+    _page_count = None
+    files = []
 
     def __init__(self, file, args = minorimpact.default_arg_flags):
         if (re.search('^/', file) is None):
@@ -240,10 +242,10 @@ class comic():
 
                 if (os.path.exists(name_dir) is False):
                     if (args.dryrun is False): os.mkdir(name_dir)
-                if (os.path.exists(f'{name_dir}/{new_comic}') is True):
-                    raise FileExistsException(f"{name_dir}/{new_comic} already exists")
 
                 if (args.debug): print(f"MOVE {self.file} => {name_dir}/{new_comic}")
+                if (os.path.exists(f'{name_dir}/{new_comic}') is True):
+                    raise FileExistsException(f"{name_dir}/{new_comic} already exists")
                 if (args.dryrun is False):
                     shutil.move(self.file, name_dir + '/' + new_comic)
                     if ('match_log_file' in config['default']):
@@ -258,6 +260,9 @@ class comic():
         pass
 
     def _files(self):
+        if (len(self.files) > 0):
+            return self.files
+
         files = []
         if (self.is_cbr() and True):
             command = [config['default']['rar'], 'lb', self.file]
@@ -275,7 +280,8 @@ class comic():
             self._unpack()
             for f in os.listdir(self.data_dir):
                 files.append(f)
-        return files
+        self.files = files
+        return self.files
 
     def get(self, name):
         if (name in self.data):
@@ -513,7 +519,9 @@ class comic():
         return to_hex(colors[0], colors[1], colors[2])
 
     def page_count(self):
-        return len(self._page_files())
+        if (self._page_count is None):
+            self._page_count = len(self._page_files())
+        return self._page_count
 
     def page_file(self, page):
         if (page < 1): page = 1

@@ -79,16 +79,18 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
                     c = comic.comic(new_comic_file)
                     c.box(args.target, args = args)
                 except comic.FileExistsException as e:
+                    print(e)
                     if (args.existing is not None):
-                        print(f"{e}, moving {c.file} to {args.existing}")
+                        print(f"  moving {c.file} to {args.existing}")
                         if (args.dryrun is False): shutil.move(c.file, args.existing)
                 except Exception as e:
                     print(e)
         else:
             print("{} has unknown data: '{}'".format(comic_file, magic_str))
     except comic.FileExistsException as e:
+        print(e)
         if (args.existing is not None):
-            print(f"{e}, moving {c.file} to {args.existing}")
+            print(f"  moving {c.file} to {args.existing}")
             if (args.dryrun is False): shutil.move(c.file, args.existing)
     except Exception as e:
         print(e)
