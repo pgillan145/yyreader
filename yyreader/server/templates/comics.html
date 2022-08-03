@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% include 'nav.html' %}
+    {% for item in items %}
+        {% include 'comic.html' %}
+    {% endfor %}
+{% endblock %}

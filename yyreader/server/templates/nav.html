@@ -1,0 +1,26 @@
+<div class='w3-bar w3-black {% if nav.fixed is defined and nav.fixed is true %}fixed-nav{% endif %}'>
+    {% if nav.back is defined and nav.back is not none %}
+        <a class='w3-button' href='{{nav.back.url}}'>&lArr;&nbsp;{{nav.back.text}}</a>
+    {% endif %}
+    {% if nav.up is defined and nav.up is not none %}
+        <a class='w3-button' href='{{nav.up.url}}'>&uArr;&nbsp;{{nav.up.text}}</a>
+    {% endif %}
+    {% if nav.volume is defined and nav.volume is not none %}
+        <a class='w3-button' href='{{nav.volume.url}}'>{{nav.volume.text}}</a>
+    {% endif %}
+    {% if nav.view is defined and nav.view is not none %}
+        <a class='w3-button' href='{{nav.view.url}}'>{{nav.view.text}}</a>
+    {% endif %}
+    {% if nav.forth is defined and nav.forth is not none %}
+        <a class='w3-button' href='{{nav.forth.url}}'>{{nav.forth.text}}&nbsp;&rArr;</a>
+    {% endif %}
+    {% if nav.history is not defined or nav.history is defined and nav.history is true %}
+        <a class='w3-button' href='/history'>History</a>
+    {% endif %}
+    {% if nav.home is not defined or nav.home is defined and nav.home is true %}
+        <a class='w3-button' href='/home'>Home</a>
+    {% endif %}
+    {% if nav.drop is defined and nav.drop is not none %}
+        <a class='w3-button' href='{{nav.drop.url}}'>{{nav.drop.text}}</a>
+    {% endif %}
+</div>
