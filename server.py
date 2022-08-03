@@ -265,7 +265,7 @@ def read(id, page = None, half = None):
 
     previous_page_url = forth['url']
     if (request.cookies.get('back')):
-        previous_page_url = request.cookies.get('back').split('|')[0]
+        previous_page_url = request.cookies.get('back').split('|')[0] + '#{}'.format(id)
     next_page_url = previous_page_url
 
     if (request.cookies.get('traversal_method') == 'byvolume'):
