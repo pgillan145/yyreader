@@ -503,7 +503,7 @@ def update_beacon(name):
 def update_read_log(id, page, page_count = None):
     db = connect()
     cursor = db.cursor()
-    cursor.execute('update comic_info set hasBeenOpened = TRUE, currentPage = ? where comic_info.id = ?', (page, id))
+    cursor.execute('update comic_info set hasBeenOpened = TRUE, read = FALSE, currentPage = ? where comic_info.id = ?', (page, id))
     db.commit()
     cursor.execute('select id, start_date, end_date from read_log where comicInfoId = ? order by id desc limit 1', (id,))
     rows = cursor.fetchall()

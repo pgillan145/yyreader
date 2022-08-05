@@ -373,12 +373,12 @@ def setup_cache(cache_file):
 
     urls = [key for key in cache['results']]
     for url in urls:
-        if cache['results'][url]['mod_date'] < (datetime.now() - timedelta(weeks = 2)):
+        if cache['results'][url]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
             del cache['results'][url]
 
     volumes = [key for key in cache['volumes']]
     for volume in volumes:
-        if cache['volumes'][volume]['mod_date'] < (datetime.now() - timedelta(weeks = 2)):
+        if cache['volumes'][volume]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
             del cache['volumes'][volume]
 
     cache_setup = True

@@ -83,6 +83,7 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
 
 volume_subs = [ 
                 { 'm': '(.+) starring .*', 's': r'\1' },
+                { 'm': '(Marvel Action Hour) featuring (.*)', 's': r'\1 - \2' },
                 { 'm': '(.+) featuring .*', 's': r'\1' },
                 { 'm': 'Astonishing Tales and .*', 's': 'Astonishing Tales' },
                 { 'm': 'Marvel Premiere and .*', 's': 'Marvel Premiere' },

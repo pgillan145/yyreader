@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
 from datetime import datetime,timedelta
-from flask import current_app, Flask, g, render_template, redirect, request, Response
+from flask import current_app, Flask, g, make_response, render_template, redirect, request, Response
 import minorimpact.config
+import base64
 import os
+import pickle
 import re
 import sqlite3
 import urllib.parse
@@ -114,10 +116,9 @@ def bydate(year = None, month = None):
         elif (len(yacreader.get_beacons()) > 1):
             drop = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'} 
         nav = {'back':back, 'forth':forth, 'up':up, 'drop':drop, 'fixed':True }
-        response = Response(render_template('comics.html', items = items, nav = nav ))
-        response.set_cookie('traversal_method', 'bydate', max_age=60*60*24*365)
-        response.set_cookie('back', '/bydate/{}/{}|{}/{}'.format(year, month, month, year), max_age=60*60*24*365)
-        response.delete_cookie('up')
+        response = make_response(render_template('comics.html', items = items, nav = nav ))
+        response.set_cookie('traversal', 'date', max_age=60*60*24*365)
+        response.set_cookie('date', '/bydate/{}/{}|{}/{}'.format(year, month, month, year), max_age=60*60*24*365)
         return response
 
 @app.route('/byvolume')
@@ -149,9 +150,9 @@ def byvolume(volume = None):
 
         up = { 'url':'/byvolume', 'text':'Volumes' }
         nav = { 'back':back, 'forth':forth, 'up':up, 'view':view, 'fixed':True}
-        response = Response(render_template('comics.html', back = back, items = items, nav = nav))
-        response.set_cookie('traversal_method', 'byvolume', max_age=60*60*24*365)
-        response.set_cookie('back', '/byvolume/{}|{}'.format(urllib.parse.quote(volume), volume), max_age=60*60*24*365)
+        response = make_response(render_template('comics.html', back = back, items = items, nav = nav))
+        response.set_cookie('traversal', 'volume', max_age=60*60*24*365)
+        response.set_cookie('volume', '/byvolume/{}|{}'.format(urllib.parse.quote(volume), volume), max_age=60*60*24*365)
         return response
 
 @app.route('/cover/<int:id>')
@@ -208,7 +209,8 @@ def history(page = 1):
         items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}'.format(y['date'].strftime('%Y/%m')) })
     nav = { 'up':None, 'back':None, 'forth':None, 'home':True, 'drop':{'url':'/beacons', 'text':'Beacons' } }
     response = Response(render_template('history.html',  items = items, nav = nav, index = index))
-    response.set_cookie('back', '/history|History')
+    response.set_cookie('traversal', 'history')
+    response.set_cookie('history', '/history/{}|History'.format(page))
     return response
 
 @app.route('/')
@@ -249,47 +251,56 @@ def read(id, page = None, half = None):
     if (page < 1): page = 1
     if (page > c.page_count()): page = c.page_count()
 
-    (w, h) = c.page_size(page)
+    crop = get_setting(request.cookies.get('settings'), 'crop') if request.cookies.get('settings') else True
+    if (request.args.get('crop','')):
+        crop = False if (request.args.get('crop','') == 'False') else True
+    
+    (w, h) = c.page_size(page, crop = crop)
     image_height = h
     image_width = w
     if (image_height < image_width and half is None):
         half = 1
 
-    color = c.page_color(page)
+    color = c.page_color(page, crop = crop)
     text_color = '#' + complementaryColor(color)
 
     forth = None
     back = None
-
-    up = { 'url':'/byvolume/{}#{}'.format(urllib.parse.quote(y['volume']), y['id']), 'text':'{} #{}'.format(y['volume'], y['issue']) }
-    forth = { 'url':'/bydate/{}#{}'.format(y['date'].strftime('%Y/%-m'), y['id']), 'text':'{}'.format(y['date'].strftime('%m/%d/%Y')) }
     view = None
+    next_page_url = None
+    previous_page_url = None
+    up = { 'url':'/byvolume/{}#{}'.format(urllib.parse.quote(y['volume']), y['id']), 'text':'{} #{}'.format(y['volume'], y['issue']) }
 
-    previous_page_url = forth['url']
-    if (request.cookies.get('back')):
-        previous_page_url = request.cookies.get('back').split('|')[0] + '#{}'.format(id)
-    next_page_url = previous_page_url
+    traversal = request.cookies.get('traversal') if request.cookies.get('traversal') else 'date'
+    traversal_date = request.cookies.get('date') if request.cookies.get('date') else '/bydate/{}|{}'.format(y['date'].strftime('%Y/%-m'), y['date'].strftime('%d/%Y'))
+    home = {'url':traversal_date.split('|')[0] + '#{}'.format(id), 'text':traversal_date.split('|')[1]}
 
-    if (request.cookies.get('traversal_method') == 'byvolume'):
+    if (traversal == 'volume'):
         # If the user was looking specifically at the issues in a particular volume, then the page turns on the first and last pages will go the prev/next issues.
-        if (page == 1 or page == c.page_count()):
-            issues = yacreader.get_comics_by_volume(y['volume'])
-            if (page == 1):
-                i = 0
-                while (i < len(issues)):
-                    if (issues[i]['issue'] == y['issue'] and (i > 0)):
-                        previous_page_url =  '/read/{}'.format(issues[i-1]['id'])
-                        break
-                    i = i + 1
-            elif (page == c.page_count()):
-                i = 0
-                while (i < len(issues)):
-                    if (issues[i]['issue'] == y['issue'] and (i < (len(issues) - 1))):
-                        next_page_url =  '/read/{}'.format(issues[i+1]['id'])
-                        break
-                    i = i + 1
+        issues = yacreader.get_comics_by_volume(y['volume'])
+        i = 0
+        while (i < len(issues)):
+            if (issues[i]['issue'] == y['issue'] and (i > 0) and back is None):
+                back = {'url': '/read/{}'.format(issues[i-1]['id']), 'text': '#{}'.format(issues[i-1]['issue']) }
+            if (issues[i]['issue'] == y['issue'] and (i < (len(issues) - 1)) and forth is None):
+                forth = {'url': '/read/{}'.format(issues[i+1]['id']), 'text': '#{}'.format(issues[i+1]['issue']) }
+            if (back is not None and forth is not None):
+                break
+            i = i + 1
+        if (back is None):
+            back = {'url': '/byvolume/{}#{}'.format(urllib.parse.quote(y['volume']), id), 'text': '{}'.format(y['volume']) }
+        if (forth is None):
+            forth = {'url': '/byvolume/{}#{}'.format(urllib.parse.quote(y['volume']), id), 'text': '{}'.format(y['volume']) }
+    else:
+        #TODO: Get the actual next and previous issues from our traversal date.
+        #TODO: Figure out how I'm going to display long ass titles in what are supposed to be small buttons.  Just the first few
+        #   characters?  Maybe tiny cover thumbnails?
+        back = {'url':traversal_date.split('|')[0] + '#{}'.format(id), 'text':traversal_date.split('|')[1]}
+        forth = back
 
-    if (page > 1):
+    if (page == 1):
+        previous_page_url =  back['url']
+    elif (page > 1):
         if (half == 2):
             previous_page_url = '/read/{}/{}/{}'.format(id, (page), 1)
         else:
@@ -300,10 +311,14 @@ def read(id, page = None, half = None):
             next_page_url = '/read/{}/{}/{}'.format(id, (page), 2)
         else:
             next_page_url = '/read/{}/{}'.format(id, (page+1))
+    elif (page == c.page_count()):
+        next_page_url =  forth['url']
 
     yacreader.update_read_log(id, page, page_count = c.page_count())
-    nav = { 'back':back, 'up': up, 'forth':forth, 'view':view, 'history':False, 'home':True }
-    response = Response(render_template('read.html', half = half, page = page, yacreader = y, img = { 'height': image_height, 'width': image_width , 'half_width': int(image_width/2) }, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color ))
+    nav = { 'back':back, 'up': up, 'forth':forth, 'view':view, 'history':False, 'home':home }
+    response = make_response(render_template('read.html', half = half, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal ))
+    response.set_cookie('volume', '/byvolume/{}|{}'.format(urllib.parse.quote(y['volume']), y['volume']), max_age=60*60*24*365)
+    response.set_cookie('date', traversal_date, max_age=60*60*24*365)
     return response
 
 @app.route('/page/<int:id>/<int:page>')
@@ -324,11 +339,54 @@ def page(id, page):
     if (page < 0): page = 1
     if (page > c.page_count()): page = c.page_count()
 
-    return Response(c.page(page), mimetype = 'image/jpeg')
+    crop = True if (request.args.get('crop','True') == 'True') else False
+    return Response(c.page(page, crop = crop), mimetype = 'image/jpeg')
 
+@app.route('/settings')
+@app.route('/settings/<setting>/<value>')
+@app.route('/settings/<setting>/<value>/<int:id>')
+def settings(setting = None, value = None, id = None):
+    cookie_settings = request.cookies.get('settings')
+    if (cookie_settings):
+        settings = get_setting(cookie_settings)
+    else:
+        settings = { 'crop':True }
+
+    if (setting == 'crop'):
+        if (id is not None):
+            settings['crop'] = True if (settings['crop'] is False) else False
+        else:
+            settings['crop'] = True if (value == 'True') else False
+
+    if (id is not None):
+        response = make_response(redirect('/read/{}'.format(id)))
+    else:
+        response = make_response(render_template('settings.html', settings = settings, nav = {'home':True, 'fixed':True }))
+    pickled = str(base64.urlsafe_b64encode(pickle.dumps(settings)), 'utf-8')
+    response.set_cookie('settings', pickled)
+    return response
+
+def get_setting(cookie_settings, setting = None):
+    if (cookie_settings):
+        settings = pickle.loads(base64.urlsafe_b64decode(cookie_settings))
+        if (setting is None):
+            return settings
+        if (setting in settings):
+            return settings[setting]
+    return None
+    
 @app.route('/take/<int:year>/<int:month>')
 def take(year, month):
     beacon = '{}/{}'.format(year, month)
     yacreader.delete_beacon(beacon)
     return redirect('/bydate/' + beacon)
 
+@app.route('/traverse/<method>/<int:id>')
+def traverse(method, id):
+    response = make_response(redirect('/read/{}'.format(id)))
+    if (method =='volume'):
+        response.set_cookie('traversal', 'volume', max_age=60*60*24*365)
+    else:
+        response.set_cookie('traversal', 'date', max_age=60*60*24*365)
+    return response
+    

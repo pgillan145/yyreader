@@ -17,8 +17,8 @@
     {% if nav.history is not defined or nav.history is defined and nav.history is true %}
         <a class='w3-button' href='/history'>History</a>
     {% endif %}
-    {% if nav.home is not defined or nav.home is defined and nav.home is true %}
-        <a class='w3-button' href='/home'>Home</a>
+    {% if nav.home is defined and nav.home is not none %}
+        <a class='w3-button' href='{{nav.home.url}}'>{{nav.home.text}}</a>
     {% endif %}
     {% if nav.drop is defined and nav.drop is not none %}
         <a class='w3-button' href='{{nav.drop.url}}'>{{nav.drop.text}}</a>

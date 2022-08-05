@@ -479,6 +479,7 @@ class comic():
 
         if (img is not None and crop is True):
             img = img.crop(self.border(img))
+            pass
         return img
 
     def page(self, number, crop = True):
@@ -500,10 +501,10 @@ class comic():
             data = f.read()
         return data
 
-    def page_color(self, page):
+    def page_color(self, page, crop = True):
         """Returns the hex code for the median color that appears along the outer edge of the page."""
 
-        img = self._page_img(page)
+        img = self._page_img(page, crop = crop)
 
         (w, h) = img.size
         mask = Image.new('1', img.size, 1)
@@ -543,8 +544,8 @@ class comic():
         #return sorted(list(filter(lambda x:re.search(r'.jpg$', x), os.listdir(self.data_dir))))
         return sorted(page_files)
 
-    def page_size(self, page = 1):
-        img = self._page_img(page)
+    def page_size(self, page = 1, crop = True):
+        img = self._page_img(page, crop = crop)
         return img.size
 
     def _parse_xml_data(self, xml_data):

@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block content %}
+    <div>
+        Crop: {% if settings.crop is true %} <a href='/settings/crop/False'>True</a>{% else %}<a href='/settings/crop/True'>False</a>{% endif  %}
+    </div>
+{% endblock %}
