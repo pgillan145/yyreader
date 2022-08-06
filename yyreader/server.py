@@ -69,13 +69,16 @@ def bydate(year = None, month = None):
     up = None
     back = None
     forth = None
+    home = {'url':'/home', 'text':'Home'}
+
     clean_cache()
+
     if (year is None and month is None):
         for year in yacreader.get_years():
             items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
-        view = {'url':'/byvolume', 'text':'Volumes' }
-        nav = { 'back':None, 'up':None, 'forth':None, 'view':view, 'fixed':True }
-        return render_template('byyear.html', back = back, items = items, nav = nav)
+        up = {'url':'/byvolume', 'text':'Volumes' }
+        nav = { 'back':None, 'up':up, 'forth':None, 'home':home, 'fixed':True }
+        return render_template('byyear.html', items = items, nav = nav)
 
     elif (year is not None and month is None):
         years = yacreader.get_years()
@@ -90,8 +93,8 @@ def bydate(year = None, month = None):
             items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(month, year) })
 
         up = { 'url':'/bydate', 'text':'Years' }
-        nav = { 'back':back, 'forth':forth, 'up': up, 'fixed':True  }
-        return render_template('bymonth.html', back = back, items = items, nav = nav)
+        nav = { 'back':back, 'forth':forth, 'up': up,'home':home,  'fixed':True  }
+        return render_template('bymonth.html', items = items, nav = nav)
 
     elif (year is not None and month is not None):
         yacreader.update_beacon('{}/{}'.format(year, month))
@@ -108,14 +111,18 @@ def bydate(year = None, month = None):
         if (next_year is not None):
             forth = { 'url':'/bydate/{}/{}'.format(next_year, next_month), 'text':'{}/{}'.format(next_month, next_year) }
 
+        beacons = yacreader.get_beacons()
+        if (len(beacons) > 0):
+            if (beacons[0]['name'] == '{}/{}'.format(year, month)):
+                home = { 'url':'/beacons', 'text':'Beacons' }
+            
         for y in yacreader.get_comics_by_date(year, month):
             items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'short_volume':y['volume'][0:25], 'datelink':'/bydate/{}'.format(y['date'].strftime('%Y/%m')) })
-        drop = None
         if (yacreader.get_beacon('{}/{}'.format(year, month)) is None):
-            drop = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'} 
+            beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'} 
         elif (len(yacreader.get_beacons()) > 1):
-            drop = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'} 
-        nav = {'back':back, 'forth':forth, 'up':up, 'drop':drop, 'fixed':True }
+            beacon = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'} 
+        nav = {'back':back, 'forth':forth, 'up':up, 'beacon':beacon, 'home':home, 'fixed':True }
         response = make_response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
         response.set_cookie('date', '/bydate/{}/{}|{}/{}'.format(year, month, month, year), max_age=60*60*24*365)
@@ -125,10 +132,9 @@ def bydate(year = None, month = None):
 @app.route('/byvolume/<volume>')
 def byvolume(volume = None):
     items = []
-    back = None
     up = None
-    forth = None
-    view = None #{'url':'/bydate', 'text':'Dates' }
+    home = { 'url':'/home', 'text':'Home' }
+
     clean_cache()
     if (volume is None):
         last = None
@@ -140,17 +146,20 @@ def byvolume(volume = None):
                 index.append({ 'url':'#{}'.format(last), 'text':last })
 
             items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume, 'name':None })
-        view = {'url':'/bydate', 'text':'Dates' }
-        nav = {'back':back, 'forth':forth, 'up':up, 'view':view, 'fixed':True }
+        up = {'url':'/bydate', 'text':'Dates' }
+        nav = {'up':up, 'fixed':True, 'home':home }
         return render_template('byvolume.html', items = items, nav = nav, index = index)
     else:
         volume = urllib.parse.unquote(volume)
         for y in yacreader.get_comics_by_volume(volume):
             items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}#{}'.format(y['date'].strftime('%Y/%m'), y['id']) })
 
+        traversal_date = request.cookies.get('date')
+        if (traversal_date):
+            home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         up = { 'url':'/byvolume', 'text':'Volumes' }
-        nav = { 'back':back, 'forth':forth, 'up':up, 'view':view, 'fixed':True}
-        response = make_response(render_template('comics.html', back = back, items = items, nav = nav))
+        nav = { 'up':up, 'home':home, 'fixed':True }
+        response = make_response(render_template('comics.html', items = items, nav = nav))
         response.set_cookie('traversal', 'volume', max_age=60*60*24*365)
         response.set_cookie('volume', '/byvolume/{}|{}'.format(urllib.parse.quote(volume), volume), max_age=60*60*24*365)
         return response
@@ -207,7 +216,7 @@ def history(page = 1):
 
     for y in history[((page-1)*per_page):(page*per_page)]:
         items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}'.format(y['date'].strftime('%Y/%m')) })
-    nav = { 'up':None, 'back':None, 'forth':None, 'home':True, 'drop':{'url':'/beacons', 'text':'Beacons' } }
+    nav = { 'up':None, 'back':None, 'forth':None, 'home':True, 'beacon':{'url':'/beacons', 'text':'Beacons' } }
     response = Response(render_template('history.html',  items = items, nav = nav, index = index))
     response.set_cookie('traversal', 'history')
     response.set_cookie('history', '/history/{}|History'.format(page))
@@ -266,14 +275,19 @@ def read(id, page = None, half = None):
 
     forth = None
     back = None
-    view = None
     next_page_url = None
     previous_page_url = None
     up = { 'url':'/byvolume/{}#{}'.format(urllib.parse.quote(y['volume']), y['id']), 'text':'{} #{}'.format(y['volume'], y['issue']) }
 
     traversal = request.cookies.get('traversal') if request.cookies.get('traversal') else 'date'
-    traversal_date = request.cookies.get('date') if request.cookies.get('date') else '/bydate/{}|{}'.format(y['date'].strftime('%Y/%-m'), y['date'].strftime('%d/%Y'))
-    home = {'url':traversal_date.split('|')[0] + '#{}'.format(id), 'text':traversal_date.split('|')[1]}
+    traversal_date = '/bydate/{}#{}|{}'.format(y['date'].strftime('%Y/%-m'), id, y['date'].strftime('%d/%Y'))
+    if (request.cookies.get('date')):
+        traversal_date = request.cookies.get('date')
+        # Tack on the id of the first book we look at to the last date we visited, so we can always snap back to this point.
+        if (re.search(r'^/bydate/\d+/\d+#\d+\|', traversal_date) is None):
+            traversal_date = traversal_date.split('|')[0] + '#{}'.format(id) + '|' + traversal_date.split('|')[1]
+            
+    home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
 
     if (traversal == 'volume'):
         # If the user was looking specifically at the issues in a particular volume, then the page turns on the first and last pages will go the prev/next issues.
@@ -295,7 +309,7 @@ def read(id, page = None, half = None):
         #TODO: Get the actual next and previous issues from our traversal date.
         #TODO: Figure out how I'm going to display long ass titles in what are supposed to be small buttons.  Just the first few
         #   characters?  Maybe tiny cover thumbnails?
-        back = {'url':traversal_date.split('|')[0] + '#{}'.format(id), 'text':traversal_date.split('|')[1]}
+        back = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         forth = back
 
     if (page == 1):
@@ -315,7 +329,7 @@ def read(id, page = None, half = None):
         next_page_url =  forth['url']
 
     yacreader.update_read_log(id, page, page_count = c.page_count())
-    nav = { 'back':back, 'up': up, 'forth':forth, 'view':view, 'history':False, 'home':home }
+    nav = { 'back':back, 'up': up, 'forth':forth, 'history':False, 'home':home }
     response = make_response(render_template('read.html', half = half, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal ))
     response.set_cookie('volume', '/byvolume/{}|{}'.format(urllib.parse.quote(y['volume']), y['volume']), max_age=60*60*24*365)
     response.set_cookie('date', traversal_date, max_age=60*60*24*365)

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
     {% include 'nav.html' %}
-    <div>
+    <div class='w3-center'>
     {% for item in index %}
         {% if item.url is defined %}
             <a class='w3-button w3-blue' href='{{item.url}}'>{{item.text}}</a>

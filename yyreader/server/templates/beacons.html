@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
     {% include 'nav.html' %}
+    <div class='w3-center'>
     {% for beacon in beacons %}
         {% include 'beacon.html' %}
     {% endfor %}
-    {% include 'nav.html' %}
+    </div>
 {% endblock %}

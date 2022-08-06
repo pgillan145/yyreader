@@ -1,7 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
     {% include 'nav.html' %}
+    <div class='w3-center'>
     {% for item in items %}
         {% include 'comic.html' %}
     {% endfor %}
+    </div>
 {% endblock %}
