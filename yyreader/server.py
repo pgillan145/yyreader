@@ -11,7 +11,7 @@ import sqlite3
 import urllib.parse
 from . import comic, yacreader
 
-app = Flask(__name__, template_folder='server/templates')
+app = Flask(__name__, template_folder='templates')
 app.config.from_mapping(
         #EXPLAIN_TEMPLATE_LOADING=True,
         #SECRET_KEY='dev',
