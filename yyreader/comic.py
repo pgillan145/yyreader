@@ -469,7 +469,10 @@ class comic():
             tmp.write(result.stdout)
             img = Image.open(tmp, formats=['JPEG'])
         elif (self.is_cbz()):
-            command = [config['default']['unzip'], '-p', self.file, self.page_file(number)]
+            page_file = self.page_file(number)
+            page_file = re.sub('\[', '\\\[', page_file)
+            page_file = re.sub('\]', '\\\]', page_file)
+            command = [config['default']['unzip'], '-p', self.file, page_file]
             result = subprocess.run(command, capture_output = True)
             tmp = BytesIO()
             tmp.write(result.stdout)
