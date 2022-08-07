@@ -217,6 +217,7 @@ def init_db():
     cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
     cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
     cursor.execute('CREATE TABLE IF NOT EXISTS beacon (id INTEGER PRIMARY KEY, name TEXT NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS link (id INTEGER PRIMARY KEY, name TEXT, foreComicId INTEGER NOT NULL, aftComicId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(foreComicId) REFERENCES comic_info(id), FOREIGN KEY(aftComicId) REFERENCES comic_info(id))')
     db.commit()
     try:
         cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
@@ -226,6 +227,12 @@ def init_db():
             raise e
     try:
         cursor.execute('CREATE UNIQUE INDEX beacon_idx on beacon(name)')
+        db.commit()
+    except Exception as e:
+        if (re.search('^index (.+) already exists$', str(e)) is None):
+            raise e
+    try:
+        cursor.execute('CREATE UNIQUE INDEX link_idx on link(foreComicId)')
         db.commit()
     except Exception as e:
         if (re.search('^index (.+) already exists$', str(e)) is None):
@@ -284,9 +291,12 @@ def get_beacons():
     db.close()
     return beacons
 
-def get_comic_by_id(id):
-    db = connect()
-    cursor = db.cursor()
+def get_comic_by_id(id, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    cursor = local_db.cursor()
     cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
     rows = cursor.fetchall()
     comic_data = None
@@ -299,21 +309,38 @@ def get_comic_by_id(id):
         read = row[5]
         current_page = row[6]
         hash = row[7]
+        fore_id = None
+        aft_id = None
+        
+        cursor.execute('select foreComicId from link where aftComicId=?', (id, ))
+        linkrow = cursor.fetchone()
+        if (linkrow is not None):
+            fore_id = linkrow[0]
+        cursor.execute('select aftComicId from link where foreComicId=?', (id, ))
+        linkrow = cursor.fetchone()
+        if (linkrow is not None):
+            aft_id = linkrow[0]
 
         if (current_page is None or current_page == 0):
             current_page = 1
-        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash }
+        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'fore_id':fore_id, 'aft_id': aft_id }
 
-    db.close()
+    if (db is None):
+        local_db.close()
+
     if (comic_data is None):
         raise Exception("invalid comic_info id: '{}'".format(id))
 
     return comic_data
 
 # TODO: Turn these two "get_comics_by_*" into a single function, they do the same thing but with a slightly different SELECT.
-def get_comics_by_date(year, month):
-    db = connect()
-    cursor = db.cursor()
+def get_comics_by_date(year, month, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+
+    cursor = local_db.cursor()
     if (month < 10): month = '0{}'.format(month)
     comics = []
     sql = 'select volume, number, date, id, read, currentPage from comic_info where date like "%/{}/{}"'
@@ -332,7 +359,8 @@ def get_comics_by_date(year, month):
             current_page = 1
 
         comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
-    db.close()
+    if (db is None):
+        local_db.close()
     return sorted(comics, key=lambda x:(x['date'], x['volume']) )
 
 def get_cover(id, hash = None):
@@ -350,9 +378,13 @@ def get_cover_file(id, hash = None):
 
     return cover_file
 
-def get_comics_by_volume(volume):
-    db = connect()
-    cursor = db.cursor()
+def get_comics_by_volume(volume, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    
+    cursor = local_db.cursor()
     comics = []
     cursor.execute('select volume, number, date, id, read, currentPage from comic_info where volume = "{}"'.format(volume))
     rows = cursor.fetchall()
@@ -369,14 +401,15 @@ def get_comics_by_volume(volume):
 
         comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
 
-    db.close()
+    if (db is None):
+        local_db.close()
     return sorted(comics, key=lambda x:(x['date'], x['volume']) )
 
 def get_history():
     db = connect()
     cursor = db.cursor()
     comics = []
-    cursor.execute('select ci.volume, ci.number, ci.date, ci.id, ci.read, ci.currentPage from comic_info ci, read_log where ci.id=read_log.comicInfoID order by read_log.mod_date desc')
+    cursor.execute('select ci.volume, ci.number, ci.date, ci.id, ci.read, ci.currentPage, read_log.end_date, read_log.mod_date from comic_info ci, read_log where ci.id=read_log.comicInfoID')
     rows = cursor.fetchall()
     for row in rows:
         volume = row[0]
@@ -385,14 +418,16 @@ def get_history():
         id = row[3]
         read = row[4]
         current_page = row[5]
+        end_date = row[6]
+        mod_date = row[7]
 
         if (current_page is None or current_page == 0):
             current_page = 1
 
-        comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
+        comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page, 'end_date':end_date, 'mod_date':mod_date })
 
     db.close()
-    return comics
+    return sorted(comics, key=lambda x:(x['end_date'] if (x['end_date'] is not None) else x['mod_date']), reverse = True)
 
 def get_months(year):
     year = int(year)
@@ -413,7 +448,58 @@ def get_months(year):
     db.close()
     return sorted(months, key=lambda x:x)
 
-def get_nextdate(year, month):
+def get_head_comic(id, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    cursor = local_db.cursor()
+
+    y = get_comic_by_id(id, local_db)
+    while (y['fore_id'] is not None):
+        y = get_comic_by_id(y['fore_id'], local_db)
+
+    if (db is None):
+        local_db.close()
+    return y
+
+def get_next_comic(id, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    cursor = local_db.cursor()
+
+    comic_data = None
+    y = get_comic_by_id(id, local_db)
+
+    if (y['aft_id'] is not None):
+        comic_data = get_comic_by_id(y['aft_id'], db = local_db)
+    else:
+        head = get_head_comic(id)
+
+        (year, month) = head['date'].strftime('%Y|%-m').split('|')
+        month = int(month)
+        year = int(year)
+        issues = get_comics_by_date(year, month, db = local_db)
+        i = 0
+        for issue in issues:
+            if (issue['id'] == head['id'] and i < len(issues) - 1):
+                comic_data = issues[i+1]
+                break
+            i = i + 1
+
+        if (comic_data is None):
+            (year, month) = get_next_date(year, month)
+            issues = get_comics_by_date(year, month, db = local_db)
+            if (len(issues) > 0):
+                comic_data = issues[0]
+
+    if (db is None):
+        local_db.close()
+    return comic_data
+
+def get_next_date(year, month):
     year = int(year)
     month = int(month)
     next_year = None
@@ -436,7 +522,42 @@ def get_nextdate(year, month):
     db.close()
     return (next_year, next_month)
 
-def get_prevdate(year, month):
+def get_previous_comic(id, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    cursor = local_db.cursor()
+
+    comic_data = None
+    y = get_comic_by_id(id, local_db)
+
+    if (y['fore_id'] is not None):
+        comic_data = get_comic_by_id(y['fore_id'], db = local_db)
+    else:
+        (year, month) = y['date'].strftime('%Y|%-m').split('|')
+        month = int(month)
+        year = int(year)
+        issues = get_comics_by_date(year, month, db = local_db)
+        if (len(issues) > 0):
+            if (issues[0]['id'] == y['id']):
+                (year, month) = get_previous_date(year, month)
+                issues = get_comics_by_date(year, month, db = local_db)
+                if (len(issues) > 0):
+                    comic_data = issues[len(issues) - 1]
+            else:
+                i = 0
+                for issue in issues:
+                    if (issue['id'] == y['id'] and i > 0):
+                        comic_data = issues[i-1]
+                        break
+                    i = i + 1
+
+    if (db is None):
+        local_db.close()
+    return comic_data
+
+def get_previous_date(year, month):
     year = int(year)
     month = int(month)
     prev_year = None
@@ -490,6 +611,27 @@ def get_years():
     db.close()
     return sorted(years, key=lambda x: x)
 
+def link(foreid, aftid):
+    db = connect()
+    cursor = db.cursor()
+    try:
+        cursor.execute('insert into link(foreComicId, aftComicId) values (?, ?)', (foreid, aftid))
+        db.commit()
+    except Exception as e:
+        if (re.search('^UNIQUE constraint failed:', str(e)) is None):
+            raise e
+    db.close()
+
+def unlink(aftid):
+    db = connect()
+    cursor = db.cursor()
+    try:
+        cursor.execute('delete from link where aftComicId = ?', (aftid, ))
+        db.commit()
+    except Exception as e:
+        raise e
+    db.close()
+
 def update_beacon(name):
     db = connect()
     cursor = db.cursor()
@@ -503,16 +645,30 @@ def update_beacon(name):
 def update_read_log(id, page, page_count = None):
     db = connect()
     cursor = db.cursor()
-    cursor.execute('update comic_info set hasBeenOpened = TRUE, read = FALSE, currentPage = ? where comic_info.id = ?', (page, id))
-    db.commit()
+    if (page > 1):
+        cursor.execute('update comic_info set hasBeenOpened = TRUE, currentPage = ? where comic_info.id = ?', (page, id))
+        db.commit()
+
     cursor.execute('select id, start_date, end_date from read_log where comicInfoId = ? order by id desc limit 1', (id,))
     rows = cursor.fetchall()
-    if (len(rows) == 0 or (rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) < (datetime.now() - timedelta(hours = 1)))): 
-        if (page > 1):
-            cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
-    else:
+    if (len(rows) == 0 and page > 1):
+        # Never been read, start a new record
+        cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
+        db.commit()
+    elif (len(rows) > 0 and rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) < (datetime.now() - timedelta(hours = 24)) and page > 1): 
+        # Previously completed, but more than 24 hours have gone by, so start a new record. 
+        cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
+        db.commit()
+    elif (len(rows) > 0 and rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) > (datetime.now() - timedelta(hours = 24)) and page > 1): 
+        # Completed less than 24 hours ago, just update the currentPage.
         cursor.execute('update read_log set currentPage = ?, mod_date = DATETIME("now","localtime") where id = ?', (page, rows[0][0]))
-    db.commit()
+        db.commit()
+    elif (len(rows) > 0 and rows[0][2] is None):
+        # Started, but not completed: set the current page.
+        cursor.execute('update read_log set currentPage = ?, mod_date = DATETIME("now","localtime") where id = ?', (page, rows[0][0]))
+        db.commit()
+    # This falls through if there's no existing record and the page number is '1', because sometimes I like to peruse the covers and I don't want to litter
+    #   up the log with a bunch of lookey-loo's.
 
     if (page_count is not None and page >= page_count):
         cursor.execute('update comic_info set read = TRUE where comic_info.id = ?', (id, ))

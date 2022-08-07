@@ -25,7 +25,19 @@
             <a class='w3-button' href='{{nav.forth.url}}'>{{nav.forth.text}}&nbsp;&rArr;</a>
             {% if nav.home is defined %}<a class='w3-button' href='{{nav.home.url}}'>&uArr;&nbsp;{{nav.home.text}}</a>{% endif %}
         </div>
-        <div><a href='{{nav.up.url}}'>{{nav.up.text}}</a>&nbsp;(page&nbsp;{{page}}&nbsp;of&nbsp;{{page_count}}) Crop&nbsp;<a href='/settings/crop/{{crop}}/{{yacreader.id}}'>{% if crop is true %}On{% else %}Off{% endif %}</a></div>
+        <div>
+            <a href='{{nav.up.url}}'>{{nav.up.text}}</a>
+            (page&nbsp;{{page}}&nbsp;of&nbsp;{{page_count}})
+        </div>
+        {# TODO: Pass the cropped and uncropped image sizes so I can indicate whether the image has been altered from the original.
+              Sometimes it appears to have been cropped, but hasn't, and hitting the link and trying to eyeball the difference is
+              annoying.  Also, when you hit a button and nothing happens, that's a bad design: if nothing's *supposed* to happen, then
+              dont' include the button at all.
+        #}
+        <div>
+            <a class='w3-button' href='/settings/crop/{{crop}}/{{yacreader.id}}'>Crop {% if crop is true %}On{% else %}Off{% endif %}</a>
+            <a class='w3-button' href='/link/{{yacreader.id}}'>{% if linked is true %}Unlink{% else %}Link{% endif %}</a>
+        </div>
     </div>
 </div>
 {% endblock %}
