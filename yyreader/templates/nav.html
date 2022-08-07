@@ -8,13 +8,17 @@
     {% if nav.forth is defined and nav.forth is not none %}
         <a class='w3-button' href='{{nav.forth.url}}'>{{nav.forth.text}}&nbsp;&rArr;</a>
     {% endif %}
-    {% if nav.home is defined and nav.home is not none %}
+    {% if nav.home is defined and nav.home is true %}
+        <a class='w3-button' href='/home'>Home</a>
+    {% elif nav.home is defined and nav.home is not none %}
         <a class='w3-button' href='{{nav.home.url}}'>{{nav.home.text}}</a>
     {% endif %}
     {% if nav.history is not defined or nav.history is defined and nav.history is true %}
         <a class='w3-button' href='/history'>History</a>
     {% endif %}
-    {% if nav.beacon is defined and nav.beacon is not none %}
+    {% if nav.beacon is defined and nav.beacon is true %}
+        <a class='w3-button' href='/beacons'>Beacons</a>
+    {% elif nav.beacon is defined and nav.beacon is not none %}
         <a class='w3-button' href='{{nav.beacon.url}}'>{{nav.beacon.text}}</a>
     {% endif %}
 </div>

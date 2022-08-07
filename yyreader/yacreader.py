@@ -355,10 +355,7 @@ def get_comics_by_date(year, month, db = None):
         read = row[4]
         current_page = row[5]
 
-        if (current_page is None or current_page == 0):
-            current_page = 1
-
-        comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
+        comics.append(get_comic_by_id(id, db = local_db))
     if (db is None):
         local_db.close()
     return sorted(comics, key=lambda x:(x['date'], x['volume']) )
@@ -396,10 +393,7 @@ def get_comics_by_volume(volume, db = None):
         read = row[4]
         current_page = row[5]
 
-        if (current_page is None or current_page == 0):
-            current_page = 1
-
-        comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page })
+        comics.append(get_comic_by_id(id, db = local_db))
 
     if (db is None):
         local_db.close()

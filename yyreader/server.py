@@ -69,7 +69,7 @@ def bydate(year = None, month = None):
     up = None
     back = None
     forth = None
-    home = {'url':'/home', 'text':'Home'}
+    home = True
 
     clean_cache()
 
@@ -324,7 +324,10 @@ def read(id, page = None, half = None):
         i = 0
         while (i < len(issues)):
             if (issues[i]['issue'] == y['issue'] and (i > 0) and back is None):
-                back = {'url': '/read/{}'.format(issues[i-1]['id']), 'text': '#{}'.format(issues[i-1]['issue']) }
+                p = issues[i-1]
+                back = {'url': '/read/{}'.format(p['id']), 'text': '#{}'.format(p['issue']) }
+                if (p['aft_id'] == y['id']):
+                    linked = True
             if (issues[i]['issue'] == y['issue'] and (i < (len(issues) - 1)) and forth is None):
                 forth = {'url': '/read/{}'.format(issues[i+1]['id']), 'text': '#{}'.format(issues[i+1]['issue']) }
             if (back is not None and forth is not None):
@@ -344,7 +347,7 @@ def read(id, page = None, half = None):
         p = yacreader.get_previous_comic(y['id'])
         #TODO: Figure out how to display long ass titles in what are supposed to be small buttons.  Just the first few
         #   characters?  Maybe tiny cover thumbnails?
-        if (p['volume'] == y['volume']):
+        if (p['id']['aft_id'] == y['id']):
             linked = True
         back = {'url': '/read/{}'.format(p['id']), 'text':'{} #{}'.format(p['volume'], p['issue'])}
         forth = {'url': '/read/{}'.format(n['id']), 'text':'{} #{}'.format(n['volume'], n['issue'])}
@@ -365,7 +368,9 @@ def read(id, page = None, half = None):
     elif (page == c.page_count()):
         next_page_url =  forth['url']
 
-    yacreader.update_read_log(id, page, page_count = c.page_count())
+    if (get_setting(request.cookies.get('settings'), 'logging') is True):
+        yacreader.update_read_log(id, page, page_count = c.page_count())
+
     nav = { 'back':back, 'up': up, 'forth':forth, 'history':False, 'home':home }
     response = make_response(render_template('read.html', half = half, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal, linked = linked ))
     response.set_cookie('volume', '/byvolume/{}|{}'.format(urllib.parse.quote(y['volume']), y['volume']), max_age=60*60*24*365)
@@ -398,10 +403,12 @@ def page(id, page):
 @app.route('/settings/<setting>/<value>/<int:id>')
 def settings(setting = None, value = None, id = None):
     cookie_settings = request.cookies.get('settings')
+    settings = {}
     if (cookie_settings):
         settings = get_setting(cookie_settings)
-    else:
-        settings = { 'crop':True }
+
+    if ('crop' not in settings): settings['crop'] = True
+    if ('logging' not in settings): settings['logging'] = True
 
     if (setting == 'crop'):
         if (id is not None):
@@ -409,10 +416,25 @@ def settings(setting = None, value = None, id = None):
         else:
             settings['crop'] = True if (value == 'True') else False
 
+    if (setting == 'logging'):
+        if (id is not None):
+            settings['logging'] = True if (settings['logging'] is False) else False
+        else:
+            settings['logging'] = False if (value == 'False') else True
+
     if (id is not None):
         response = make_response(redirect('/read/{}'.format(id)))
     else:
-        response = make_response(render_template('settings.html', settings = settings, nav = {'home':True, 'fixed':True }))
+        home = True
+        if (request.cookies.get('date')):
+            traversal_date = request.cookies.get('date')
+            # Tack on the id of the first book we look at to the last date we visited, so we can always snap back to this point.
+            if (re.search(r'^/bydate/\d+/\d+#\d+\|', traversal_date) is None):
+                traversal_date = traversal_date.split('|')[0] + '#{}'.format(id) + '|' + traversal_date.split('|')[1]
+            home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+        nav = nav = {'home':home, 'fixed':True, 'history': True, 'beacon':True }
+        response = make_response(render_template('settings.html', settings = settings, nav = nav))
+
     pickled = str(base64.urlsafe_b64encode(pickle.dumps(settings)), 'utf-8')
     response.set_cookie('settings', pickled)
     return response
