@@ -347,7 +347,7 @@ def read(id, page = None, half = None):
         p = yacreader.get_previous_comic(y['id'])
         #TODO: Figure out how to display long ass titles in what are supposed to be small buttons.  Just the first few
         #   characters?  Maybe tiny cover thumbnails?
-        if (p['id']['aft_id'] == y['id']):
+        if (p['aft_id'] == y['id']):
             linked = True
         back = {'url': '/read/{}'.format(p['id']), 'text':'{} #{}'.format(p['volume'], p['issue'])}
         forth = {'url': '/read/{}'.format(n['id']), 'text':'{} #{}'.format(n['volume'], n['issue'])}
