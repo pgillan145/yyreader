@@ -26,6 +26,7 @@ def main():
     parser.add_argument('--filetype', help = "With --scan, finds all files with data that doesn't match their extension.", action='store_true')
     parser.add_argument('--holes', help = "With --scan, finds volumes with missing issues. (NOT IMPLEMENTED)", action='store_true')
     parser.add_argument('--verify', help = "With --scan, recheck database items against file and comicvine data. (NOT IMPLEMENTED)", action='store_true')
+    parser.add_argument('--deleted', help = "With --scan, looks for files that have been deleted but are still in the database.", action='store_true')
     parser.add_argument('--xml', help = "With --scan, finds files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)", action='store_true')
     parser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
     #parser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
@@ -41,8 +42,23 @@ def main():
         args.debug = True
 
     init_db()
-    con = connect()
-    cur = con.cursor()
+    db = connect()
+    cur = db.cursor()
+
+    if (args.scan and args.deleted):
+        if (args.deleted):
+            cur.execute("SELECT id, volume, number from comic_info")
+            rows = cur.fetchall()
+            for row in rows:
+                id = row[0]
+                volume = row[1]
+                number = row[2]
+                cur.execute("SELECT path, fileName from comic where comicInfoId=?", (id, ))
+                rows2 = cur.fetchall()
+                if (len(rows2) == 0):
+                    print("deleting", id, volume, number)
+                    cur.execute('delete from comic_info where id = ?', (id, ))
+                    db.commit()
 
     cur.execute('select comic.path, comic_info.volume, comic_info.number, comic_info.date, comic.id, comic_info.id, comic_info.comicVineID, comic_info.title, comic_info.storyArc, comic_info.writer, comic_info.penciller, comic.fileName from comic, comic_info where comic.comicInfoId=comic_info.id')
     rows = cur.fetchall()
@@ -107,7 +123,7 @@ def main():
                                 if (args.dryrun is False):
                                     try:
                                         cur.execute('update comic set path = ?, fileName = ? where comicInfoId = ?', (new_path, new_fileName, comic_info_id))
-                                        con.commit()
+                                        db.commit()
                                     except Exception as e:
                                         print(e)
                         break
@@ -193,10 +209,11 @@ def main():
                         if (str(e) != 'UNIQUE constraint failed: comic_info_arc.storyArc, comic_info_arc.comicInfoId'):
                             print(e)
                             pass
-                con.commit()
+                db.commit()
 
         #if (i > 10): break
         if (args.once is True): break
+    db.close()
 
 def connect():
     global config
@@ -214,10 +231,10 @@ def connect():
 def init_db():
     db = connect()
     cursor = db.cursor()
-    cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
-    cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     cursor.execute('CREATE TABLE IF NOT EXISTS beacon (id INTEGER PRIMARY KEY, name TEXT NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS link (id INTEGER PRIMARY KEY, name TEXT, foreComicId INTEGER NOT NULL, aftComicId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(foreComicId) REFERENCES comic_info(id), FOREIGN KEY(aftComicId) REFERENCES comic_info(id))')
+    cursor.execute('CREATE TABLE IF NOT EXISTS link (id INTEGER PRIMARY KEY, name TEXT, foreComicId INTEGER NOT NULL, aftComicId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(foreComicId) REFERENCES comic_info(id) ON DELETE CASCADE, FOREIGN KEY(aftComicId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     db.commit()
     try:
         cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
