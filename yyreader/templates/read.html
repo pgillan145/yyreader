@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class='w3-center'>
-    <div onclick="document.getElementById('nav').style.display='block'; document.getElementById('nav').style.background='{{background_color}}';" class='navigation'></div>
+    <div onclick="readnav_open();" class='readnav'></div>
     <div class='page'>
         {% if half == 2 %}
             <img class='page page2' src='/page/{{yacreader.id}}/{{page}}?crop={{crop}}'>
@@ -15,15 +15,11 @@
         <a href='{{next_page_url}}'><div class='page next'></div></a>
     {% endif %}
     </div>
-    <div id='nav' class='navigation' style='display:none' onclick="document.getElementById('nav').style.display='none'">
+    <div id='readnav' class='readnav' style='display:none' onclick="readnav_close();">
         <div>
             <a class='w3-button' href='{{nav.back.url}}'>&lArr;&nbsp;{{nav.back.text}}</a>
-            <select id=traversal onchange="document.location='/traverse/' + document.getElementById('traversal').value + '/{{yacreader.id}}'">
-                <option value='date' {% if traversal == 'date' %}selected{% endif %}>By Date</option>
-                <option value='volume' {% if traversal == 'volume' %}selected{% endif %}>By Volume</option>
-            </select>
-            <a class='w3-button' href='{{nav.forth.url}}'>{{nav.forth.text}}&nbsp;&rArr;</a>
             {% if nav.home is defined %}<a class='w3-button' href='{{nav.home.url}}'>&uArr;&nbsp;{{nav.home.text}}</a>{% endif %}
+            <a class='w3-button' href='{{nav.forth.url}}'>{{nav.forth.text}}&nbsp;&rArr;</a>
         </div>
         <div>
             <a href='{{nav.up.url}}'>{{nav.up.text}}</a>
@@ -35,6 +31,10 @@
               dont' include the button at all.
         #}
         <div>
+            <select id=traversal onchange="document.location='/traverse/' + document.getElementById('traversal').value + '/{{yacreader.id}}'">
+                <option value='date' {% if traversal == 'date' %}selected{% endif %}>By Date</option>
+                <option value='volume' {% if traversal == 'volume' %}selected{% endif %}>By Volume</option>
+            </select>
             <a class='w3-button' href='/settings/crop/{{crop}}/{{yacreader.id}}'>Crop {% if crop is true %}On{% else %}Off{% endif %}</a>
             <a class='w3-button' href='/link/{{yacreader.id}}'>{% if linked is true %}Unlink{% else %}Link{% endif %}</a>
         </div>

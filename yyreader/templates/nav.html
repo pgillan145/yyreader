@@ -1,4 +1,5 @@
-<div class='w3-bar w3-black {% if nav.fixed is defined and nav.fixed is true %}fixed-nav{% endif %}'>
+<div class='w3-bar w3-black {% if nav.unfixed is defined and nav.unfixed is true %}{%else%}fixed-nav{% endif %}'>
+    <button class="w3-button w3-black w3-xlarge" onclick="sidebar_open()">☰</button>
     {% if nav.back is defined and nav.back is not none %}
         <a class='w3-button' href='{{nav.back.url}}'>&lArr;&nbsp;{{nav.back.text}}</a>
     {% endif %}
@@ -9,19 +10,24 @@
         <a class='w3-button' href='{{nav.forth.url}}'>{{nav.forth.text}}&nbsp;&rArr;</a>
     {% endif %}
     {% if nav.home is defined and nav.home is true %}
-        <a class='w3-button' href='/home'>Home</a>
+        <a class='w3-button' href='/home'>&crarr;&nbsp;Home</a>
     {% elif nav.home is defined and nav.home is not none %}
-        <a class='w3-button' href='{{nav.home.url}}'>{{nav.home.text}}</a>
+        <a class='w3-button' href='{{nav.home.url}}'>&crarr;&nbsp;{{nav.home.text}}</a>
     {% endif %}
-    {% if nav.history is not defined or nav.history is defined and nav.history is true %}
-        <a class='w3-button' href='/history'>History</a>
-    {% endif %}
-    {% if nav.beacon is defined and nav.beacon is true %}
-        <a class='w3-button' href='/beacons'>Beacons</a>
-    {% elif nav.beacon is defined and nav.beacon is not none %}
+    {% if nav.beacon is defined and nav.beacon is not none %}
         <a class='w3-button' href='{{nav.beacon.url}}'>{{nav.beacon.text}}</a>
     {% endif %}
-    {% if nav.settings is defined and nav.settings is true %}
-        <a class='w3-button' href='/settings'>Settings</a>
-    {% endif %}
+</div>
+<div class="w3-sidebar w3-bar-block w3-border-right" style="display:none" id="sidebar">
+  {#<button onclick="sidebar_close()" class="w3-bar-item w3-large">Close &times;</button>#}
+  <a href="/bydate" class="w3-bar-item w3-button">Browse by Date</a>
+  <a href="/byvolume" class="w3-bar-item w3-button">Browse by Volume</a>
+  <a href="/arcs" class="w3-bar-item w3-button">Browse by Arcs</a>
+  </br>
+  <a href="/beacons" class="w3-bar-item w3-button">Beacons</a>
+  <a href="/history" class="w3-bar-item w3-button">History</a>
+  <a href="/settings" class="w3-bar-item w3-button">Settings</a>
+  </br>
+  <em>Experimental</em>
+  <a href="/arclink" class="w3-bar-item w3-button">ArcLinks</a>
 </div>

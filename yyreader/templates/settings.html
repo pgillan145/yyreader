@@ -1,10 +1,12 @@
 {% extends 'base.html' %}
 {% block content %}
     {% include "nav.html" %}
-    <div>
-        Crop: {% if settings.crop is true %} <a href='/settings/crop/False'>True</a>{% else %}<a href='/settings/crop/True'>False</a>{% endif  %}
-    </div>
-    <div>
-        Logging: {% if settings.logging is true %} <a href='/settings/logging/False'>True</a>{% else %}<a href='/settings/logging/True'>False</a>{% endif  %}
+    <div class='w3-center'>
+        <div>
+            Crop: {% if settings.crop is true %} <a href='/settings/crop/False'>True</a>{% else %}<a href='/settings/crop/True'>False</a>{% endif  %}
+        </div>
+        <div>
+            Logging: {% if settings.logging is true %} <a href='/settings/logging/False'>True</a>{% else %}<a href='/settings/logging/True'>False</a>{% endif  %}
+        </div>
     </div>
 {% endblock %}

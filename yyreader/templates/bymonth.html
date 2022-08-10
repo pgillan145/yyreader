@@ -1,9 +1,9 @@
 {% extends 'base.html' %}
 {% block content %}
     {% include 'nav.html' %}
-<div class='w3-center'>
-    {% for item in items %}
-        <a class='w3-button w3-blue w3-margin' href='{{ item.url }}'>{{ item.text }}</a>
-    {% endfor %}
-</div>
+    <div class='w3-center'>
+        {% for item in items %}
+            <a class='w3-button w3-blue w3-margin' href='{{ item.url }}'>{{ item.text }}</a>
+        {% endfor %}
+    </div>
 {% endblock %}

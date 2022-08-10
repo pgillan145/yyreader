@@ -5,13 +5,38 @@
         <meta name="apple-mobile-web-app-capable" content="yes">
         <title>{% block title %}{% endblock %}</title>
         <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css" type="text/css">
+        <script>
+            var sidebar = false;
+            function sidebar_open() {
+              if (sidebar == true) {
+                  document.getElementById("sidebar").style.display = "none";
+                  sidebar = false;
+              } else {
+                  document.getElementById("sidebar").style.display = "block";
+                  sidebar = true;
+              }
+            }
+            function sidebar_close() {
+              document.getElementById("sidebar").style.display = "none";
+            }
+
+            function readnav_open() {
+                document.getElementById('readnav').style.display='block';
+                document.getElementById('readnav').style.background='{{background_color}}';
+            }
+            function readnav_close() {
+                document.getElementById('readnav').style.display='none'
+            }
+        </script>
         <style>
             body {
                 background: {{background_color}};
                 color: {{text_color}};
                 height: 100%;
-                {% if nav.fixed is defined and nav.fixed is true %}
-                margin-top: 40px;
+                {% if nav.unfixed is defined and nav.unfixed is true %}
+                margin-top: 0px;
+                {% else %}
+                margin-top: 50px;
                 {% endif %}
             }
             div.page {
@@ -31,7 +56,7 @@
                 top: 0;
                 width: 100%;
             }
-            div.navigation {
+            div.readnav {
                 position: absolute;
                 top: 0;
                 left: 0;
