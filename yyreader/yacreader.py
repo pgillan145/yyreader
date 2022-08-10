@@ -49,16 +49,74 @@ def main():
         if (args.deleted):
             cur.execute("SELECT id, volume, number from comic_info")
             rows = cur.fetchall()
+            i = 1
             for row in rows:
                 id = row[0]
                 volume = row[1]
                 number = row[2]
+                print("scanning comic_info {} of {}".format(i, len(rows)), end='\r')
                 cur.execute("SELECT path, fileName from comic where comicInfoId=?", (id, ))
                 rows2 = cur.fetchall()
                 if (len(rows2) == 0):
-                    print("deleting", id, volume, number)
+                    print("\ndeleting", id, volume, number, "from comic_info")
                     cur.execute('delete from comic_info where id = ?', (id, ))
                     db.commit()
+                i = i + 1
+
+            cur.execute("SELECT id, comicInfoId from read_log")
+            rows = cur.fetchall()
+            i = 1
+            for row in rows:
+                id = row[0]
+                comic_info_id = row[1]
+                print("scanning read_log {} of {}".format(i, len(rows)), end='\r')
+                cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
+                rows2 = cur.fetchall()
+                if (len(rows2) == 0):
+                    print("\ndeleting", id, "from read_log")
+                    cur.execute('delete from comic_info where id = ?', (id, ))
+                    db.commit()
+                i = i + 1
+            print('')
+
+            cur.execute("SELECT id, comicInfoId from comic_info_arc")
+            rows = cur.fetchall()
+            i = 1
+            for row in rows:
+                id = row[0]
+                comic_info_id = row[1]
+                print("scanning comic_info_arc {} of {}".format(i, len(rows)), end='\r')
+                cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
+                rows2 = cur.fetchall()
+                if (len(rows2) == 0):
+                    print("\ndeleting", id, "from comic_info_arc")
+                    cur.execute('delete from comic_info_arc where id = ?', (id, ))
+                    db.commit()
+                i = i + 1
+            print('')
+
+            cur.execute("SELECT id, foreComicId, aftComicId from link")
+            i = 1
+            rows = cur.fetchall()
+            for row in rows:
+                id = row[0]
+                fore_id = row[1]
+                aft_id = row[2]
+                print("scanning link {} of {}".format(i, len(rows)), end='\r')
+                cur.execute("SELECT id, volume, number from comic_info where id=?", (fore_id, ))
+                rows2 = cur.fetchall()
+                if (len(rows2) == 0):
+                    print("\ndeleting", id, "from link")
+                    cur.execute('delete from link where id = ?', (id, ))
+                    db.commit()
+                cur.execute("SELECT id, volume, number from comic_info where id=?", (aft_id, ))
+                rows2 = cur.fetchall()
+                if (len(rows2) == 0):
+                    print("\ndeleting", id, "from link")
+                    cur.execute('delete from link where id = ?', (id, ))
+                    db.commit()
+                i = i + 1
+            print('')
 
     cur.execute('select comic.path, comic_info.volume, comic_info.number, comic_info.date, comic.id, comic_info.id, comic_info.comicVineID, comic_info.title, comic_info.storyArc, comic_info.writer, comic_info.penciller, comic.fileName from comic, comic_info where comic.comicInfoId=comic_info.id')
     rows = cur.fetchall()
@@ -233,7 +291,7 @@ def init_db():
     db = connect()
     cursor = db.cursor()
     cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
-    cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, comicInfoId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     cursor.execute('CREATE TABLE IF NOT EXISTS beacon (id INTEGER PRIMARY KEY, name TEXT NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
     cursor.execute('CREATE TABLE IF NOT EXISTS link (id INTEGER PRIMARY KEY, name TEXT, foreComicId INTEGER NOT NULL, aftComicId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(foreComicId) REFERENCES comic_info(id) ON DELETE CASCADE, FOREIGN KEY(aftComicId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     cursor.execute('CREATE TABLE IF NOT EXISTS arclinkskip (id INTEGER PRIMARY KEY, comicInfoId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
