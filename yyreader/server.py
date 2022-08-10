@@ -130,18 +130,23 @@ def arclink(aft_id = None, fore_id = None):
     nav = { 'home':home }
     return render_template('arclink.html',  story_arc = storyArc, issue = arc_issue, issue_page_count = c1.page_count(),  previous_issue = previous_issue, previous_issue_page_count = c2.page_count(), nav = nav)
     
-    
 def get_home_link(year = None, month = None):
     # I can't decide if going back to the latest beacon or going back to the last date viewed is a better definition of 'home'
-    #if (request.cookies.get('date')):
-    #    traversal_date = request.cookies.get('date')
-    #    home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
     beacons = yacreader.get_beacons()
     if (len(beacons) > 0):
         if ( year is not None and month is not None and beacons[0]['name'] == '{}/{}'.format(year, month)):
             return None
+        # TODO: Just change everything on the frontend over to 'year/month' so I can stop all these stupid translations.
         return { 'url':'/dates/' + beacons[0]['name'], 'text': "{}/{}".format(beacons[0]['name'].split('/')[1], beacons[0]['name'].split('/')[0]) }
-    return None
+    elif (request.cookies.get('date')):
+        traversal_date = request.cookies.get('date')
+        return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+
+    year = yacreader.get_years()[0]
+    month = yacreader.get_months(year)[0]
+    home = '{}/{}'.format(year, month)
+    yacreader.add_beacon(home)
+    return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
         
 @app.route('/beacons')
 def beacons():
@@ -305,15 +310,7 @@ def history(page = 1):
 @app.route('/')
 @app.route('/home')
 def home():
-    beacons = yacreader.get_beacons()
-    if (len(beacons) == 0):
-        year = yacreader.get_years()[0]
-        month = yacreader.get_months(year)[0]
-        home = '{}/{}'.format(year, month)
-        yacreader.add_beacon(home)
-    else:
-        home = beacons[0]['name']
-    return redirect('/dates/' + home)
+    return redirect(get_home_link()['url'])
 
 @app.route('/link/<int:aft_id>')
 @app.route('/link/<int:aft_id>/<int:fore_id>')
