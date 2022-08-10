@@ -540,7 +540,7 @@ class comic():
         page_files = []
         files = self._files()
         for f in files:
-            if (re.search(r'.jpg$', f, re.I) is None or f in parser.credit_pages):
+            if (re.search(r'.jpg$', f, re.I) is None or parser.is_credit_page(f)):
                 continue
             page_files.append(f)
 

@@ -21,4 +21,7 @@
     {% elif nav.beacon is defined and nav.beacon is not none %}
         <a class='w3-button' href='{{nav.beacon.url}}'>{{nav.beacon.text}}</a>
     {% endif %}
+    {% if nav.settings is defined and nav.settings is true %}
+        <a class='w3-button' href='/settings'>Settings</a>
+    {% endif %}
 </div>

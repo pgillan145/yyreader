@@ -35,10 +35,12 @@ formats = [ '^(?P<year>\d\d\d\d)00 (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<exten
             '^(?P<volume>.+)\.(?P<extension>cb[rz])$',
           ]
 
-credit_pages = [ 'z.jpg',
+credit_pages = [ 'Scanned By Gird.jpg',
+                 'z.jpg',
                  'zSoU-Nerd.jpg',
                  'xsou2.jpg',
                  'zaquila.jpg',
+                 'zGGtag',
                  'zWater.jpg',
                  'zz-AVigilante407DCPScan-JLU.jpg',
                  'zzGGtag.jpg',
@@ -184,6 +186,12 @@ def convert_name_to_date(comic):
     day = m.group(6)
     extension = m.group(7)
     return f'{year}/{month}/{year}-{month}-{day} {volume_name} ({start_year}) {issue}.{extension}'
+
+def is_credit_page(filename):
+    for credit_page in credit_pages:
+        if filename == credit_page or re.search(credit_page, filename):
+            return True
+    return False
 
 def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     """Analyze the file name and pull as much information about it as possible."""

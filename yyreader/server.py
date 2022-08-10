@@ -56,6 +56,78 @@ def complementaryColor(my_hex):
     comp = ['%02X' % (255 - int(a, 16)) for a in rgb]
     return ''.join(comp)
 
+@app.route('/arcs')
+def arcs():
+    db = yacreader.connect()
+    cursor = db.cursor()
+    arcs = []
+    #TODO: Add an index.
+    #TODO: Fix navigation.
+    for row in cursor.execute('select distinct(storyArc) as arc from comic_info_arc order by arc').fetchall():
+        arcs.append({ 'url':'/arc/{}'.format(urllib.parse.quote(row['arc'])), 'text':row['arc'] })
+
+    db.close()
+    nav = { 'home':True }
+    return render_template('arcs.html',  items = arcs, nav = nav)
+
+
+@app.route('/arc/<arc>')
+def arc(arc = None):
+    db = yacreader.connect()
+    cursor = db.cursor()
+    comics = []
+    #TODO: yacreader.get_comics_by_arc()
+    #TODO: Fix navigation.
+    for row in cursor.execute('select id, storyArc, comicInfoId from comic_info_arc where storyArc=?', (arc,)).fetchall():
+        comics.append({ 'yacreader':yacreader.get_comic_by_id(row['comicInfoId'], db = db) })
+
+    db.close()
+    nav = { 'home':True }
+    return render_template('comics.html',  items = comics, nav = nav)
+
+@app.route('/arclink')
+@app.route('/arclink/<int:aft_id>')
+@app.route('/arclink/<int:aft_id>/<int:fore_id>')
+def arclink(aft_id = None, fore_id = None):
+    db = yacreader.connect()
+    cursor = db.cursor()
+     
+    if (aft_id is not None):
+        if (fore_id is not None):
+            yacreader.link(fore_id, aft_id, db = db)
+        else:
+            cursor.execute('insert into arclinkskip(comicInfoId) values (?)', (aft_id,))
+            db.commit()
+        return redirect('/arclink')
+
+    for row in cursor.execute('select id, storyArc, comicInfoId from comic_info_arc').fetchall():
+        storyArc = row['storyArc']
+        arclinkskip = cursor.execute('select id from arclinkskip where comicInfoId=?', (row['comicInfoId'],)).fetchone()
+        if (arclinkskip is not None):
+            continue
+    
+        arc_issue = yacreader.get_comic_by_id(row['comicInfoId'], db=db)
+        if (arc_issue['fore_id'] is not None):
+            continue
+        previous_issue = None
+
+        i = 0
+        comics = yacreader.get_comics_by_volume(arc_issue['volume'])
+        for i in range(0, len(comics)):
+            if (arc_issue['id'] == comics[i]['id'] and i > 0):
+                row = cursor.execute('select id, storyArc, comicInfoId from comic_info_arc where comicInfoId=?', (comics[i-1]['id'],)).fetchone()
+                if (row is not None and row['storyArc'] == storyArc):
+                    previous_issue = comics[i-1]
+                break
+        if (previous_issue is not None):
+            break
+    
+    c1 = comic.comic(comic_dir + '/' + arc_issue['path'])
+    c2 = comic.comic(comic_dir + '/' + previous_issue['path'])
+    db.close()
+    return render_template('arclink.html',  story_arc = storyArc, issue = arc_issue, issue_page_count = c1.page_count(),  previous_issue = previous_issue, previous_issue_page_count = c2.page_count())
+    
+    
 @app.route('/beacons')
 def beacons():
     beacons = yacreader.get_beacons()
@@ -77,7 +149,7 @@ def bydate(year = None, month = None):
         for year in yacreader.get_years():
             items.append({ 'url':'/bydate/{}'.format(year), 'text':'{}'.format(year) })
         up = {'url':'/byvolume', 'text':'Volumes' }
-        nav = { 'back':None, 'up':up, 'forth':None, 'home':home, 'fixed':True }
+        nav = { 'back':None, 'up':up, 'forth':None, 'home':home, 'fixed':True, 'settings':True }
         return render_template('byyear.html', items = items, nav = nav)
 
     elif (year is not None and month is None):
@@ -93,7 +165,7 @@ def bydate(year = None, month = None):
             items.append({ 'url':'/bydate/{}/{}'.format(year, month), 'text':'{}/{}'.format(month, year) })
 
         up = { 'url':'/bydate', 'text':'Years' }
-        nav = { 'back':back, 'forth':forth, 'up': up,'home':home,  'fixed':True  }
+        nav = { 'back':back, 'forth':forth, 'up': up,'home':home,  'fixed':True, 'settings':True  }
         return render_template('bymonth.html', items = items, nav = nav)
 
     elif (year is not None and month is not None):
@@ -122,7 +194,7 @@ def bydate(year = None, month = None):
             beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'} 
         elif (len(yacreader.get_beacons()) > 1):
             beacon = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'} 
-        nav = {'back':back, 'forth':forth, 'up':up, 'beacon':beacon, 'home':home, 'fixed':True }
+        nav = {'back':back, 'forth':forth, 'up':up, 'beacon':beacon, 'home':home, 'fixed':True, 'settings':True }
         response = make_response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
         response.set_cookie('date', '/bydate/{}/{}|{}/{}'.format(year, month, month, year), max_age=60*60*24*365)
@@ -147,7 +219,7 @@ def byvolume(volume = None):
 
             items.append({ 'url':'/byvolume/{}'.format(urllib.parse.quote(volume)), 'text':volume, 'name':None })
         up = {'url':'/bydate', 'text':'Dates' }
-        nav = {'up':up, 'fixed':True, 'home':home }
+        nav = {'up':up, 'fixed':True, 'home':home, 'settings':True }
         return render_template('byvolume.html', items = items, nav = nav, index = index)
     else:
         volume = urllib.parse.unquote(volume)
@@ -158,7 +230,7 @@ def byvolume(volume = None):
         if (traversal_date):
             home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         up = { 'url':'/byvolume', 'text':'Volumes' }
-        nav = { 'up':up, 'home':home, 'fixed':True }
+        nav = { 'up':up, 'home':home, 'fixed':True, 'settings':True }
         response = make_response(render_template('comics.html', items = items, nav = nav))
         response.set_cookie('traversal', 'volume', max_age=60*60*24*365)
         response.set_cookie('volume', '/byvolume/{}|{}'.format(urllib.parse.quote(volume), volume), max_age=60*60*24*365)
@@ -216,10 +288,8 @@ def history(page = 1):
 
     for y in history[((page-1)*per_page):(page*per_page)]:
         items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/bydate/{}'.format(y['date'].strftime('%Y/%m')) })
-    nav = { 'up':None, 'back':None, 'forth':None, 'home':True, 'beacon':{'url':'/beacons', 'text':'Beacons' } }
+    nav = { 'up':None, 'back':None, 'forth':None, 'home':True, 'beacon':{'url':'/beacons', 'text':'Beacons', 'settings':True } }
     response = Response(render_template('history.html',  items = items, nav = nav, index = index))
-    response.set_cookie('traversal', 'history')
-    response.set_cookie('history', '/history/{}|History'.format(page))
     return response
 
 @app.route('/')

@@ -226,6 +226,7 @@ def connect():
         raise Exception("{} does not exist".format(db_file))
 
     db = sqlite3.connect(db_file)
+    db.row_factory = sqlite3.Row
     return db
     
 def init_db():
@@ -235,25 +236,20 @@ def init_db():
     cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     cursor.execute('CREATE TABLE IF NOT EXISTS beacon (id INTEGER PRIMARY KEY, name TEXT NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
     cursor.execute('CREATE TABLE IF NOT EXISTS link (id INTEGER PRIMARY KEY, name TEXT, foreComicId INTEGER NOT NULL, aftComicId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(foreComicId) REFERENCES comic_info(id) ON DELETE CASCADE, FOREIGN KEY(aftComicId) REFERENCES comic_info(id) ON DELETE CASCADE)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS arclinkskip (id INTEGER PRIMARY KEY, comicInfoId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     db.commit()
-    try:
-        cursor.execute('CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)')
-        db.commit()
-    except Exception as e:
-        if (re.search('^index (.+) already exists$', str(e)) is None):
-            raise e
-    try:
-        cursor.execute('CREATE UNIQUE INDEX beacon_idx on beacon(name)')
-        db.commit()
-    except Exception as e:
-        if (re.search('^index (.+) already exists$', str(e)) is None):
-            raise e
-    try:
-        cursor.execute('CREATE UNIQUE INDEX link_idx on link(foreComicId)')
-        db.commit()
-    except Exception as e:
-        if (re.search('^index (.+) already exists$', str(e)) is None):
-            raise e
+    indexes = [ 'CREATE UNIQUE INDEX comic_info_arc_idx on comic_info_arc(storyArc, comicInfoId)',
+                'CREATE UNIQUE INDEX beacon_idx on beacon(name)',
+                'CREATE UNIQUE INDEX link_idx on link(foreComicId)',
+                'CREATE UNIQUE INDEX arclinkskip_idx on arclinkskip(comicInfoId)',
+              ]
+    for index in indexes:
+        try:
+            cursor.execute(index)
+            db.commit()
+        except Exception as e:
+            if (re.search('^index (.+) already exists$', str(e)) is None):
+                raise e
     db.close()
 
 def convert_yacreader_date(yacreader_date):
@@ -660,16 +656,21 @@ def get_years():
     db.close()
     return sorted(years, key=lambda x: x)
 
-def link(foreid, aftid):
-    db = connect()
-    cursor = db.cursor()
+def link(foreid, aftid, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    cursor = local_db.cursor()
+
     try:
         cursor.execute('insert into link(foreComicId, aftComicId) values (?, ?)', (foreid, aftid))
-        db.commit()
+        local_db.commit()
     except Exception as e:
         if (re.search('^UNIQUE constraint failed:', str(e)) is None):
             raise e
-    db.close()
+    if (db is None):
+        local_db.close()
 
 def unlink(aftid):
     db = connect()
