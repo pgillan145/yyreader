@@ -56,20 +56,34 @@ def complementaryColor(my_hex):
     comp = ['%02X' % (255 - int(a, 16)) for a in rgb]
     return ''.join(comp)
 
-@app.route('/arcs')
-def arcs():
-    db = yacreader.connect()
-    cursor = db.cursor()
-    arcs = []
-    #TODO: Add an index.
-    #TODO: Fix navigation.
-    for row in cursor.execute('select distinct(storyArc) as arc from comic_info_arc order by arc').fetchall():
-        arcs.append({ 'url':'/arc/{}'.format(urllib.parse.quote(row['arc'])), 'text':row['arc'] })
+def get_filter(filter = None):
+    cookie_filter = request.cookies.get('filter')
+    if (cookie_filter):
+        f = pickle.loads(base64.urlsafe_b64decode(cookie_filter))
+        if (f is None):
+            return None
+        if (filter in f):
+            return f[filter]
+        return f
+    return None
 
-    db.close()
-    nav = { 'home':True }
-    return render_template('arcs.html',  items = arcs, nav = nav)
+def get_home_link(year = None, month = None):
+    # I can't decide if going back to the latest beacon or going back to the last date viewed is a better definition of 'home'
+    beacons = yacreader.get_beacons()
+    if (len(beacons) > 0):
+        if ( year is not None and month is not None and beacons[0]['name'] == '{}/{}'.format(year, month)):
+            return None
+        # TODO: Just change everything on the frontend over to 'year/month' so I can stop all these stupid translations.
+        return { 'url':'/dates/' + beacons[0]['name'], 'text': "{}/{}".format(beacons[0]['name'].split('/')[1], beacons[0]['name'].split('/')[0]) }
+    elif (request.cookies.get('date')):
+        traversal_date = request.cookies.get('date')
+        return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
 
+    year = yacreader.get_years()[0]
+    month = yacreader.get_months(year)[0]
+    home = '{}/{}'.format(year, month)
+    yacreader.add_beacon(home)
+    return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
 
 @app.route('/arc/<arc>')
 def arc(arc = None):
@@ -130,23 +144,19 @@ def arclink(aft_id = None, fore_id = None):
     nav = { 'home':home }
     return render_template('arclink.html',  story_arc = storyArc, issue = arc_issue, issue_page_count = c1.page_count(),  previous_issue = previous_issue, previous_issue_page_count = c2.page_count(), nav = nav)
 
-def get_home_link(year = None, month = None):
-    # I can't decide if going back to the latest beacon or going back to the last date viewed is a better definition of 'home'
-    beacons = yacreader.get_beacons()
-    if (len(beacons) > 0):
-        if ( year is not None and month is not None and beacons[0]['name'] == '{}/{}'.format(year, month)):
-            return None
-        # TODO: Just change everything on the frontend over to 'year/month' so I can stop all these stupid translations.
-        return { 'url':'/dates/' + beacons[0]['name'], 'text': "{}/{}".format(beacons[0]['name'].split('/')[1], beacons[0]['name'].split('/')[0]) }
-    elif (request.cookies.get('date')):
-        traversal_date = request.cookies.get('date')
-        return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+@app.route('/arcs')
+def arcs():
+    db = yacreader.connect()
+    cursor = db.cursor()
+    arcs = []
+    #TODO: Add an index.
+    #TODO: Fix navigation.
+    for row in cursor.execute('select distinct(storyArc) as arc from comic_info_arc order by arc').fetchall():
+        arcs.append({ 'url':'/arc/{}'.format(urllib.parse.quote(row['arc'])), 'text':row['arc'] })
 
-    year = yacreader.get_years()[0]
-    month = yacreader.get_months(year)[0]
-    home = '{}/{}'.format(year, month)
-    yacreader.add_beacon(home)
-    return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
+    db.close()
+    nav = { 'home':True }
+    return render_template('arcs.html',  items = arcs, nav = nav)
 
 @app.route('/beacons')
 def beacons():
@@ -211,44 +221,6 @@ def dates(year = None, month = None):
         response = make_response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
         response.set_cookie('date', '/dates/{}/{}|{}/{}'.format(year, month, month, year), max_age=60*60*24*365)
-        return response
-
-@app.route('/volumes')
-@app.route('/volumes/<volume>')
-def volumes(volume = None):
-    items = []
-    up = None
-    home = get_home_link()
-
-    filter = get_filter()
-    clean_cache()
-    if (volume is None):
-        last = None
-        index = []
-        for volume in yacreader.get_volumes(filter = filter):
-            if (volume[0:1] != last):
-                last = volume[0:1]
-                items.append({ 'name':last })
-                index.append({ 'url':'#{}'.format(last), 'text':last })
-
-            items.append({ 'url':'/volumes/{}'.format(urllib.parse.quote(volume)), 'text':volume, 'name':None })
-        nav = {'up':up, 'home':home }
-        return render_template('volumes.html', items = items, nav = nav, index = index)
-    else:
-        volume = urllib.parse.unquote(volume)
-        for y in yacreader.get_comics_by_volume(volume, filter = filter):
-            items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/dates/{}#{}'.format(y['date'].strftime('%Y/%m'), y['id']) })
-
-        traversal_method = request.cookies.get('traversal')
-        if (traversal_method == 'date'):
-            traversal_date = request.cookies.get('date')
-            if (traversal_date):
-                home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
-        up = { 'url':'/volumes', 'text':'Volumes' }
-        nav = { 'up':up, 'home':home }
-        response = make_response(render_template('comics.html', items = items, nav = nav))
-        response.set_cookie('traversal', 'volume', max_age=60*60*24*365)
-        response.set_cookie('volume', '/volumes/{}|{}'.format(urllib.parse.quote(volume), volume), max_age=60*60*24*365)
         return response
 
 @app.route('/cover/<int:id>')
@@ -323,17 +295,6 @@ def filter():
     response = make_response(render_template('filter.html', filter = filter, publishers = publishers, labels = labels, nav = nav))
     return response
 
-def get_filter(filter = None):
-    cookie_filter = request.cookies.get('filter')
-    if (cookie_filter):
-        f = pickle.loads(base64.urlsafe_b64decode(cookie_filter))
-        if (f is None):
-            return None
-        if (filter in f):
-            return f[filter]
-        return f
-    return None
-
 @app.route('/history')
 @app.route('/history/<int:page>')
 def history(page = 1):
@@ -368,6 +329,25 @@ def history(page = 1):
 @app.route('/home')
 def home():
     return redirect(get_home_link()['url'])
+
+@app.route('/label/<int:id>')
+def label(id):
+    labels = []
+    if (len(request.args) > 0):
+        for arg in request.args:
+            m = re.search('^l_(.+)$', arg)
+            if (m):
+                label = m.group(1)
+                if (request.args.get(arg) == 'on' and label not in labels):
+                    labels.append(label)
+    yacreader.set_labels(id, labels)
+    return redirect('/read/{}'.format(id))
+
+@app.route('/labels/<int:id>')
+def labels(id):
+    y = yacreader.get_comic_by_id(id)
+    nav = { 'home':get_home_link() }
+    return render_template('labels.html', yacreader = y, nav = nav, labels = yacreader.get_labels())
 
 @app.route('/link/<int:aft_id>')
 @app.route('/link/<int:aft_id>/<int:fore_id>')
@@ -590,4 +570,42 @@ def traverse(method, id):
     else:
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
     return response
+
+@app.route('/volumes')
+@app.route('/volumes/<volume>')
+def volumes(volume = None):
+    items = []
+    up = None
+    home = get_home_link()
+
+    filter = get_filter()
+    clean_cache()
+    if (volume is None):
+        last = None
+        index = []
+        for volume in yacreader.get_volumes(filter = filter):
+            if (volume[0:1] != last):
+                last = volume[0:1]
+                items.append({ 'name':last })
+                index.append({ 'url':'#{}'.format(last), 'text':last })
+
+            items.append({ 'url':'/volumes/{}'.format(urllib.parse.quote(volume)), 'text':volume, 'name':None })
+        nav = {'up':up, 'home':home }
+        return render_template('volumes.html', items = items, nav = nav, index = index)
+    else:
+        volume = urllib.parse.unquote(volume)
+        for y in yacreader.get_comics_by_volume(volume, filter = filter):
+            items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/dates/{}#{}'.format(y['date'].strftime('%Y/%m'), y['id']) })
+
+        traversal_method = request.cookies.get('traversal')
+        if (traversal_method == 'date'):
+            traversal_date = request.cookies.get('date')
+            if (traversal_date):
+                home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+        up = { 'url':'/volumes', 'text':'Volumes' }
+        nav = { 'up':up, 'home':home }
+        response = make_response(render_template('comics.html', items = items, nav = nav))
+        response.set_cookie('traversal', 'volume', max_age=60*60*24*365)
+        response.set_cookie('volume', '/volumes/{}|{}'.format(urllib.parse.quote(volume), volume), max_age=60*60*24*365)
+        return response
 

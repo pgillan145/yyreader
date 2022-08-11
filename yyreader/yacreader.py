@@ -413,7 +413,7 @@ def get_comic_by_id(id, db = None):
     else:
         local_db = db
     cursor = local_db.cursor()
-    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
+    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
     rows = cursor.fetchall()
     comic_data = None
     for row in rows:
@@ -425,21 +425,25 @@ def get_comic_by_id(id, db = None):
         read = row[5]
         current_page = row[6]
         hash = row[7]
+        comic_id = row['comic_id']
         fore_id = None
         aft_id = None
 
-        cursor.execute('select foreComicId from link where aftComicId=?', (id, ))
-        linkrow = cursor.fetchone()
+        linkrow = cursor.execute('select foreComicId from link where aftComicId=?', (id, )).fetchone()
         if (linkrow is not None):
             fore_id = linkrow[0]
-        cursor.execute('select aftComicId from link where foreComicId=?', (id, ))
-        linkrow = cursor.fetchone()
+        linkrow = cursor.execute('select aftComicId from link where foreComicId=?', (id, )).fetchone()
         if (linkrow is not None):
             aft_id = linkrow[0]
 
+        labelrows = cursor.execute('select label.name from label, comic_label where label.id = comic_label.label_id and comic_label.comic_id = ?', (comic_id,)).fetchall()
+        labels = []
+        for labelrow in labelrows:
+            labels.append(labelrow[0])
+
         if (current_page is None or current_page == 0):
             current_page = 1
-        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'fore_id':fore_id, 'aft_id': aft_id }
+        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels }
 
     if (db is None):
         local_db.close()
@@ -548,6 +552,19 @@ def get_history():
 
     db.close()
     return sorted(comics, key=lambda x:(x['end_date'] if (x['end_date'] is not None) else x['mod_date']), reverse = True)
+
+def get_labels():
+    local_db = connect()
+    cursor =  local_db.connect()
+
+    labels = []
+    cursor.execute('select distinct(label.name) as name from label order by name')
+    rows = cursor.fetchall()
+    for row in rows:
+        labels.append(row[0])
+
+    local_db.close()
+    return labels
 
 def get_months(year, db = None):
     if (db is None):
@@ -816,6 +833,20 @@ def link(foreid, aftid, db = None):
             raise e
     if (db is None):
         local_db.close()
+
+def set_labels(id, labels):
+    local_db = connect()
+    cursor =  local_db.cursor()
+
+    comic_id = cursor.execute('select id from comic where comicInfoId=?', (id, )).fetchone()[0]
+    cursor.execute('delete from comic_label where comic_id = ?', (comic_id, ))
+    for label in labels:
+        count = cursor.execute('select count(*) from label, comic_label where label.id=comic_label.label_id and label.name = ?', (label,)).fetchone()[0]
+        cursor.execute('insert into comic_label (label_id,comic_id, ordering) select label.id, ?, ? from label where label.name = ?', (comic_id, count+1, label))
+    
+    local_db.commit()
+    local_db.close()
+    return 
 
 def unlink(aftid):
     db = connect()
