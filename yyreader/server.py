@@ -343,11 +343,11 @@ def label(id):
     yacreader.set_labels(id, labels)
     return redirect('/read/{}'.format(id))
 
-@app.route('/labels/<int:id>')
-def labels(id):
+@app.route('/update/<int:id>')
+def update(id):
     y = yacreader.get_comic_by_id(id)
     nav = { 'home':get_home_link() }
-    return render_template('labels.html', yacreader = y, nav = nav, labels = yacreader.get_labels())
+    return render_template('update.html', yacreader = y, nav = nav, labels = yacreader.get_labels())
 
 @app.route('/link/<int:aft_id>')
 @app.route('/link/<int:aft_id>/<int:fore_id>')

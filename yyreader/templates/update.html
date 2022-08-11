@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% include "nav.html" %}
+        <div class='w3-center'>
+        <h2><a href='/read/{{yacreader.id}}'>{{yacreader.volume}} #{{yacreader.issue}}</a></h2>
+        Date: {{yacreader.date.strftime('%-m/%d/%Y')}}</br>
+        Publisher: {{yacreader.publisher}}</br>
+            <div>
+            {% if yacreader.issue > 1 %}
+                <a class='w3-button' href='/link/{{yacreader.id}}'>{% if linked is true %}Unlink from{% else %}Link to{% endif %} previous</a><br />
+            {% endif %}
+            <form action='/label/{{yacreader.id}}' method='GET'>
+                <h3>Labels:</h3>
+                {% for label in labels %}
+                    {{label}} <input type=checkbox name='l_{{label}}' {% if label in yacreader.labels %}checked{% endif %}></br>
+                {% endfor %}
+                <input type='submit' value='Update' name='update'>
+            </form>
+        </div>
+    </div>
+{% endblock %}

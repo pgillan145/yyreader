@@ -413,7 +413,7 @@ def get_comic_by_id(id, db = None):
     else:
         local_db = db
     cursor = local_db.cursor()
-    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
+    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
     rows = cursor.fetchall()
     comic_data = None
     for row in rows:
@@ -426,6 +426,7 @@ def get_comic_by_id(id, db = None):
         current_page = row[6]
         hash = row[7]
         comic_id = row['comic_id']
+        publisher = row['publisher']
         fore_id = None
         aft_id = None
 
@@ -443,7 +444,7 @@ def get_comic_by_id(id, db = None):
 
         if (current_page is None or current_page == 0):
             current_page = 1
-        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels }
+        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'publisher':publisher, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels }
 
     if (db is None):
         local_db.close()
