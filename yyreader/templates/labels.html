@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% include "nav.html" %}
+    <div class='w3-center'>
+        <form action='/label/{{yacreader.id}}' method='GET'>
+            <h3>Labels</h3>
+            {% for label in labels %}
+                {{label}} <input type=checkbox name='l_{{label}}' {% if label in yacreader.labels %}checked{% endif %}></br>
+            {% endfor %}
+            <input type='submit' value='Update Labels' name='update'>
+        </form>
+    </div>
+{% endblock %}

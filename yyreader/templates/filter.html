@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+    {% include "nav.html" %}
+    <div class='w3-center'>
+        <form action='/filter' method='GET'>
+            <h3>Publishers</h3>
+            {% for publisher in publishers %}
+                {{publisher}} <input type=checkbox name='p_{{publisher}}' {% if publisher in filter['publishers'] %}checked{% endif %}></br>
+            {% endfor %}
+            <h3>Labels</h3>
+            {% for label in labels %}
+                {{label}} <input type=checkbox name='l_{{label}}' {% if label in filter['labels'] %}checked{% endif %}></br>
+            {% endfor %}
+            <input type='submit' value='Update Filter' name='update'>
+        </form>
+    </div>
+{% endblock %}
