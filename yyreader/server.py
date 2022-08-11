@@ -93,7 +93,7 @@ def arclink(aft_id = None, fore_id = None):
     home = get_home_link()
     db = yacreader.connect()
     cursor = db.cursor()
-     
+
     if (aft_id is not None):
         if (fore_id is not None):
             yacreader.link(fore_id, aft_id, db = db)
@@ -107,7 +107,7 @@ def arclink(aft_id = None, fore_id = None):
         arclinkskip = cursor.execute('select id from arclinkskip where comicInfoId=?', (row['comicInfoId'],)).fetchone()
         if (arclinkskip is not None):
             continue
-    
+
         arc_issue = yacreader.get_comic_by_id(row['comicInfoId'], db=db)
         if (arc_issue['fore_id'] is not None):
             continue
@@ -123,13 +123,13 @@ def arclink(aft_id = None, fore_id = None):
                 break
         if (previous_issue is not None):
             break
-    
+
     c1 = comic.comic(comic_dir + '/' + arc_issue['path'])
     c2 = comic.comic(comic_dir + '/' + previous_issue['path'])
     db.close()
     nav = { 'home':home }
     return render_template('arclink.html',  story_arc = storyArc, issue = arc_issue, issue_page_count = c1.page_count(),  previous_issue = previous_issue, previous_issue_page_count = c2.page_count(), nav = nav)
-    
+
 def get_home_link(year = None, month = None):
     # I can't decide if going back to the latest beacon or going back to the last date viewed is a better definition of 'home'
     beacons = yacreader.get_beacons()
@@ -147,7 +147,7 @@ def get_home_link(year = None, month = None):
     home = '{}/{}'.format(year, month)
     yacreader.add_beacon(home)
     return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
-        
+
 @app.route('/beacons')
 def beacons():
     beacons = yacreader.get_beacons()
@@ -204,9 +204,9 @@ def dates(year = None, month = None):
         for y in yacreader.get_comics_by_date(year, month):
             items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'short_volume':y['volume'][0:25], 'datelink':'/dates/{}'.format(y['date'].strftime('%Y/%m')) })
         if (yacreader.get_beacon('{}/{}'.format(year, month)) is None):
-            beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'} 
+            beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
         elif (len(yacreader.get_beacons()) > 1):
-            beacon = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'} 
+            beacon = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'}
         nav = {'back':back, 'forth':forth, 'up':up, 'beacon':beacon, 'home':home }
         response = make_response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
@@ -220,11 +220,12 @@ def volumes(volume = None):
     up = None
     home = get_home_link()
 
+    filter = get_filter()
     clean_cache()
     if (volume is None):
         last = None
         index = []
-        for volume in yacreader.get_volumes():
+        for volume in yacreader.get_volumes(filter = filter):
             if (volume[0:1] != last):
                 last = volume[0:1]
                 items.append({ 'name':last })
@@ -235,7 +236,7 @@ def volumes(volume = None):
         return render_template('volumes.html', items = items, nav = nav, index = index)
     else:
         volume = urllib.parse.unquote(volume)
-        for y in yacreader.get_comics_by_volume(volume):
+        for y in yacreader.get_comics_by_volume(volume, filter = filter):
             items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/dates/{}#{}'.format(y['date'].strftime('%Y/%m'), y['id']) })
 
         traversal_method = request.cookies.get('traversal')
@@ -276,6 +277,62 @@ def drop(year, month):
     beacon = '{}/{}'.format(year, month)
     yacreader.add_beacon(beacon)
     return redirect('/dates/' + beacon)
+
+@app.route('/filter')
+def filter():
+    filter = {'publishers':[], 'labels':[]}
+    cookie_filter = request.cookies.get('filter')
+    if (cookie_filter):
+        filter = get_filter()
+        if (filter is not None):
+            if ('publishers' not in filter):
+                filter['publishers'] = []
+            if ('labels' not in filter):
+                filter['labels'] = []
+
+    if (len(request.args) > 0):
+        filter = {'publishers':[], 'labels':[]}
+        for arg in request.args:
+            m = re.search('^p_(.+)$', arg)
+            if (m):
+                publisher = m.group(1)
+                if (request.args.get(arg) == 'on' and publisher not in filter['publishers']):
+                    filter['publishers'].append(publisher)
+            m = re.search('^l_(.+)$', arg)
+            if (m):
+                label = m.group(1)
+                if (request.args.get(arg) == 'on' and label not in filter['labels']):
+                    filter['labels'].append(label)
+        #print(filter)
+        pickled = str(base64.urlsafe_b64encode(pickle.dumps(filter)), 'utf-8')
+        response = make_response(redirect('/volumes'))
+        response.set_cookie('filter', pickled)
+        return response
+
+    publishers = []
+    for publisher in yacreader.get_publishers():
+        publishers.append(publisher)
+
+    labels = []
+    for label in yacreader.get_labels():
+        labels.append(label)
+
+
+    home = get_home_link()
+    nav = nav = {'home':home }
+    response = make_response(render_template('filter.html', filter = filter, publishers = publishers, labels = labels, nav = nav))
+    return response
+
+def get_filter(filter = None):
+    cookie_filter = request.cookies.get('filter')
+    if (cookie_filter):
+        f = pickle.loads(base64.urlsafe_b64decode(cookie_filter))
+        if (f is None):
+            return None
+        if (filter in f):
+            return f[filter]
+        return f
+    return None
 
 @app.route('/history')
 @app.route('/history/<int:page>')
@@ -369,7 +426,7 @@ def read(id, page = None, half = None):
     crop = get_setting(request.cookies.get('settings'), 'crop') if request.cookies.get('settings') else True
     if (request.args.get('crop','')):
         crop = False if (request.args.get('crop','') == 'False') else True
-    
+
     (w, h) = c.page_size(page, crop = crop)
     image_height = h
     image_width = w
@@ -392,7 +449,7 @@ def read(id, page = None, half = None):
         # Tack on the id of the first book we look at to the last date we visited, so we can always snap back to this point.
         if (re.search(r'^/dates/\d+/\d+#\d+\|', traversal_date) is None):
             traversal_date = traversal_date.split('|')[0] + '#{}'.format(id) + '|' + traversal_date.split('|')[1]
-            
+
     home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
 
     if (traversal == 'volume'):
@@ -518,7 +575,7 @@ def get_setting(cookie_settings, setting = None):
         if (setting in settings):
             return settings[setting]
     return None
-    
+
 @app.route('/take/<int:year>/<int:month>')
 def take(year, month):
     beacon = '{}/{}'.format(year, month)
@@ -533,4 +590,4 @@ def traverse(method, id):
     else:
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
     return response
-    
+

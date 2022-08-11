@@ -36,7 +36,7 @@ def main():
 
     args = parser.parse_args()
     config = minorimpact.config.getConfig(script_name = 'yyreader')
-    
+
     if (args.once is True):
         args.verbose = True
         args.debug = True
@@ -206,7 +206,7 @@ def main():
                 #TODO: Identify duplicate issues.
                 print("Nein.")
                 pass
-            
+
         elif (args.update):
             #TODO: Settle on what 'done' means when it comes to what data should be in the yacreader database.  Technically all we need is issue number, date and volume to
             #   just read the books, but I also want arcs, publishers and some of the creatives in there for filtering and searching.
@@ -278,7 +278,7 @@ def connect():
 
     if (config is None):
         config = minorimpact.config.getConfig(script_name = 'yyreader')
-    
+
     db_file = config['default']['db']
     if (os.path.exists(db_file) is None):
         raise Exception("{} does not exist".format(db_file))
@@ -286,7 +286,7 @@ def connect():
     db = sqlite3.connect(db_file)
     db.row_factory = sqlite3.Row
     return db
-    
+
 def init_db():
     db = connect()
     cursor = db.cursor()
@@ -323,6 +323,51 @@ def add_beacon(name):
     except Exception as e:
         print(e)
     db.close()
+
+def add_filter(sql, filter):
+    if ('params' not in sql):
+        sql['params'] = []
+    for f in filter:
+        if (len(filter[f]) == 0):
+            continue
+
+        if ('where' not in sql):
+            sql['where'] = ''
+        if (sql['where'] != ''):
+            sql['where'] = sql['where'] + ' and '
+
+        if (f == 'labels'):
+            sql['from'] = sql['from'] + ', label, comic_label, comic'
+            sql['where'] = sql['where'] + 'label.id = comic_label.label_id and comic_label.comic_id=comic.id and comic.comicInfoId=comic_info.id and '
+            w = ''
+            for label in filter[f]:
+                w = w + 'label.name = ? or '
+                sql['params'].append(label)
+            w = re.sub(' or $', '', w)
+            sql['where'] = sql['where'] + '(' + w + ')'
+
+        if (f == 'publishers'):
+            w = ''
+            for publisher in filter[f]:
+                w = w + 'comic_info.publisher = ? or '
+                sql['params'].append(publisher)
+            w = re.sub(' or $', '', w)
+            sql['where'] = sql['where'] + '(' + w + ')'
+    print(sql)
+    return
+
+def build_sql(sql):
+    sql_string = ''
+    sql_string = 'select ' + sql['select']
+    sql_string = sql_string +  ' from '
+    sql_string = sql_string + sql['from']
+    if ('where' in sql and sql['where'] != ''):
+        sql_string = sql_string + ' where '
+        sql_string = sql_string + sql['where']
+    if ('order' in sql and sql['order'] != ''):
+        sql_string = sql_string + ' order by '
+        sql_string = sql_string + sql['order']
+    return sql_string
 
 def delete_beacon(name):
     db = connect()
@@ -382,7 +427,7 @@ def get_comic_by_id(id, db = None):
         hash = row[7]
         fore_id = None
         aft_id = None
-        
+
         cursor.execute('select foreComicId from link where aftComicId=?', (id, ))
         linkrow = cursor.fetchone()
         if (linkrow is not None):
@@ -446,7 +491,7 @@ def get_cover_file(id, hash = None):
 
     return cover_file
 
-def get_comics_by_volume(volume, db = None):
+def get_comics_by_volume(volume, db = None, filter = None):
     if (db is None):
         local_db = connect()
     else:
@@ -454,7 +499,17 @@ def get_comics_by_volume(volume, db = None):
     cursor = local_db.cursor()
 
     comics = []
-    cursor.execute('select volume, number, date, id, read, currentPage from comic_info where volume = "{}"'.format(volume))
+    sql = {}
+    sql['select'] = 'comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic_info.read, comic_info.currentPage'
+    sql['from'] = 'comic_info'
+    sql['where'] = 'comic_info.volume = ?'
+    sql['params'] = [volume]
+    if (filter):
+        add_filter(sql, filter)
+
+    #print(build_sql(sql), sql['params'])
+    cursor.execute(build_sql(sql), sql['params'])
+
     rows = cursor.fetchall()
     for row in rows:
         volume = row[0]
@@ -533,6 +588,20 @@ def get_head_comic(id, db = None):
     if (db is None):
         local_db.close()
     return y
+
+def get_labels():
+    db = connect()
+    cursor = db.cursor()
+    labels = []
+    sql = { 'select': 'distinct(label.name)', 'from':'label', 'where':'label.name is not NULL', 'params':[] }
+    cursor.execute(build_sql(sql), sql['params'])
+    rows = cursor.fetchall()
+    for row in rows:
+        if (row[0] is None):
+            continue
+        labels.append(row[0])
+    db.close()
+    return sorted(labels, key=lambda x: x)
 
 def get_next_comic(id, db = None):
     if (db is None):
@@ -673,7 +742,7 @@ def get_previous_date(year, month, db = None):
             if (years[i] == year and i > 0):
                 prev_year = years[i-1]
                 break
-            
+
         if (prev_year is not None):
             months = get_months(prev_year, db = local_db)
             prev_month = months[len(months)-1]
@@ -685,11 +754,29 @@ def get_previous_date(year, month, db = None):
         local_db.close()
     return (prev_year, prev_month)
 
-def get_volumes():
+def get_publishers():
+    db = connect()
+    cursor = db.cursor()
+    publishers = []
+    sql = { 'select': 'distinct(comic_info.publisher)', 'from':'comic_info', 'where':'comic_info.publisher is not NULL', 'params':[] }
+    cursor.execute(build_sql(sql), sql['params'])
+    rows = cursor.fetchall()
+    for row in rows:
+        if (row[0] is None):
+            continue
+        publishers.append(row[0])
+    db.close()
+    return sorted(publishers, key=lambda x: x)
+
+def get_volumes(filter = None):
     db = connect()
     cursor = db.cursor()
     volumes = []
-    cursor.execute('select distinct(volume) from comic_info')
+    sql = { 'select': 'distinct(comic_info.volume)', 'from':'comic_info', 'params':[]}
+    if (filter is not None):
+        add_filter(sql, filter)
+    #print(build_sql(sql), sql['params'])
+    cursor.execute(build_sql(sql), sql['params'])
     rows = cursor.fetchall()
     for row in rows:
         if (row[0] is None):
@@ -763,11 +850,11 @@ def update_read_log(id, page, page_count = None):
         # Never been read, start a new record
         cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
         db.commit()
-    elif (len(rows) > 0 and rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) < (datetime.now() - timedelta(hours = 24)) and page > 1): 
-        # Previously completed, but more than 24 hours have gone by, so start a new record. 
+    elif (len(rows) > 0 and rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) < (datetime.now() - timedelta(hours = 24)) and page > 1):
+        # Previously completed, but more than 24 hours have gone by, so start a new record.
         cursor.execute('insert into read_log (start_date, currentPage, comicInfoId) values (DATETIME("now","localtime"), ?, ?)', (page, id))
         db.commit()
-    elif (len(rows) > 0 and rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) > (datetime.now() - timedelta(hours = 24)) and page > 1): 
+    elif (len(rows) > 0 and rows[0][2] is not None and datetime.fromisoformat(rows[0][2]) > (datetime.now() - timedelta(hours = 24)) and page > 1):
         # Completed less than 24 hours ago, just update the currentPage.
         cursor.execute('update read_log set currentPage = ?, mod_date = DATETIME("now","localtime") where id = ?', (page, rows[0][0]))
         db.commit()
