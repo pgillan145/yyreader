@@ -23,7 +23,12 @@
         </div>
         <div>
             <a href='{{nav.up.url}}'>{{nav.up.text}}</a>
-            (page&nbsp;{{page}}&nbsp;of&nbsp;{{page_count}})
+            (page&nbsp;<select id='page_select' onchange='document.location="/read/{{yacreader.id}}/" + this.value;'>
+            {% for p in range(1, page_count+1) %}
+                <option {%if p == page %}selected{%endif%} value={{p}}>{{p}}</option>
+            {% endfor %}
+            </select>
+            of&nbsp;{{page_count}})
         </div>
         {# TODO: Pass the cropped and uncropped image sizes so I can indicate whether the image has been altered from the original.
               Sometimes it appears to have been cropped, but hasn't, and hitting the link and trying to eyeball the difference is
