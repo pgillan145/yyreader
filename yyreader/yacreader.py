@@ -19,7 +19,7 @@ def main():
     parser = argparse.ArgumentParser(description="Scan comic directory")
     parser.add_argument('-v', '--verbose', action='store_true')
     parser.add_argument('-y', '--yes', action='store_true')
-    parser.add_argument('-1', '--once', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
+    parser.add_argument('-1', '--one', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
     parser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
     parser.add_argument('--dupes', help = "With --scan, tries to identify duplicated records. (NOT IMPLEMENTED)", action='store_true')
     parser.add_argument('--filedate', help = "With --scan, finds all files with mismatches database date entries.", action='store_true')
@@ -37,7 +37,7 @@ def main():
     args = parser.parse_args()
     config = minorimpact.config.getConfig(script_name = 'yyreader')
 
-    if (args.once is True):
+    if (args.one is True):
         args.verbose = True
         args.debug = True
 
@@ -270,7 +270,7 @@ def main():
                 db.commit()
 
         #if (i > 10): break
-        if (args.once is True): break
+        if (args.one is True): break
     db.close()
 
 def connect():
