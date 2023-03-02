@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
     parser.add_argument('--target', metavar = 'TARGET',  help = "Move files to TARGET", default = config['default']['comic_dir'])
     parser.add_argument('--year', metavar = 'YEAR', help = "Assume YEAR for any file that doesn't include it")
-    parser.add_argument('--existing', metavar = 'EXIST', help = "Move any files that already exist to EXIST")
+    parser.add_argument('--existing', metavar = 'EXIST', help = "Move any files that already exist to EXIST", default = config['default']['existing_dir'])
     parser.add_argument('--debug', help = "extra extra loud output", action='store_true')
     parser.add_argument('-d', '--dryrun', help = "don't actually make any changes to anything", action='store_true')
     parser.add_argument('-v', '--verbose', help = "extra loud output", action='store_true')

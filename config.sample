@@ -11,8 +11,11 @@ rar = /usr/local/bin/rar
 # Location of the 'unzip' system utility.
 unzip = /usr/bin/unzip
 
-# Where the comics live
+# Where the comics ultimately want to live
 comic_dir = /Volumes/Media/Comics
+
+# Where to move files that already exist in comic_dir
+existing_dir = /tmp/existing
 
 # Publishers to skip when considering possible matches
 skip_publishers = [ 'Panini Comics' ]
@@ -23,5 +26,5 @@ api_key = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 [server]
 port = 8000
-# Turn enable debugging mode on the flask server
+# enable debugging mode on the flask server
 debug = False
