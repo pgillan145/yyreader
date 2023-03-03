@@ -1,4 +1,5 @@
 
+from dumper import dump
 from io import BytesIO
 from fuzzywuzzy import fuzz
 import magic
@@ -174,11 +175,13 @@ class comic():
             elif (c == 'n'):
                 return
             elif (c == 'y'):
-
-                self.data['volume'] = '{} ({})'.format(comicvine_data['volume_name'], comicvine_data['start_year'])
-                self.data['volume_name'] = comicvine_data['volume_name']
+                self.data['description'] = ''
+                self.data['name'] = ''
                 self.data['start_year'] = comicvine_data['start_year']
                 self.data['ver'] = parse_data['ver']
+                self.data['volume'] = '{} ({})'.format(comicvine_data['volume_name'], comicvine_data['start_year'])
+                self.data['volume_name'] = comicvine_data['volume_name']
+
                 issue = parser.massage_issue(comicvine_data['issue'])
                 self.data['issue'] = comicvine_data['issue']
                 extension = parse_data['extension']
@@ -198,8 +201,11 @@ class comic():
                 self.data['date'] = '{}-{}-{}'.format(year, month, day)
 
                 details = comicvine.get_issue_details(self.data['issue_id'], config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
-                self.data['description'] = details['description']
-                self.data['name'] = details['name']
+                if (details['description'] is not None):
+                    self.data['description'] = re.sub('<p><em>','', re.sub('</em></p>', '', details['description']))
+
+                if (details['name'] is not None):
+                    self.data['name'] = details['name']
 
                 self.data['story_arcs'] = []
                 if (details['story_arc_credits'] is not None):
@@ -219,18 +225,19 @@ class comic():
                 if (details['person_credits'] is not None):
                     #{'api_detail_url': 'https://comicvine.gamespot.com/api/person/4040-40982/', 'id': 40982, 'name': 'Joe Kelly', 'site_detail_url': 'https://comicvine.gamespot.com/joe-kelly/4040-40982/', 'role': 'writer'}
                     for person in details['person_credits']:
+                        person_name = re.sub(', ', ' ', person['name'])
                         if (person['role'] == 'colorist'):
-                            self.data['colorists'].append(person['name'])
+                            self.data['colorists'].append(person_name)
                         elif (person['role'] == 'inker'):
-                            self.data['inkers'].append(person['name'])
+                            self.data['inkers'].append(person_name)
                         elif (person['role'] == 'letterer'):
-                            self.data['letterers'].append(person['name'])
+                            self.data['letterers'].append(person_name)
                         elif (person['role'] == 'penciller'):
-                            self.data['pencillers'].append(person['name'])
+                            self.data['pencillers'].append(person_name)
                         elif (person['role'] == 'penciler'):
-                            self.data['pencillers'].append(person['name'])
+                            self.data['pencillers'].append(person_name)
                         elif (person['role'] == 'writer'):
-                            self.data['writers'].append(person['name'])
+                            self.data['writers'].append(person_name)
                 if (args.verbose): print("  adding ComicInfo.xml to file")
                 if (args.dryrun is False): self._add_xml()
 
@@ -306,7 +313,7 @@ class comic():
                 if (array): # or (type(self.data[data_field]) is list)):
                     if (len(self.data[data_field]) > 0):
                         element = ET.SubElement(comicinfo, x)
-                        element.text = '|'.join(self.data[data_field])
+                        element.text = '\n'.join(self.data[data_field])
                 else:
                     element = ET.SubElement(comicinfo, x)
                     element.text = self.data[data_field]

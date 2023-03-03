@@ -16,25 +16,25 @@ from . import comic, parser
 config = None
 
 def main():
-    parser = argparse.ArgumentParser(description="Scan comic directory")
-    parser.add_argument('-v', '--verbose', action='store_true')
-    parser.add_argument('-y', '--yes', action='store_true')
-    parser.add_argument('-1', '--one', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
-    parser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
-    parser.add_argument('--dupes', help = "With --scan, tries to identify duplicated records. (NOT IMPLEMENTED)", action='store_true')
-    parser.add_argument('--filedate', help = "With --scan, finds all files with mismatches database date entries.", action='store_true')
-    parser.add_argument('--filetype', help = "With --scan, finds all files with data that doesn't match their extension.", action='store_true')
-    parser.add_argument('--holes', help = "With --scan, finds volumes with missing issues. (NOT IMPLEMENTED)", action='store_true')
-    parser.add_argument('--verify', help = "With --scan, recheck database items against file and comicvine data. (NOT IMPLEMENTED)", action='store_true')
-    parser.add_argument('--deleted', help = "With --scan, looks for files that have been deleted but are still in the database.", action='store_true')
-    parser.add_argument('--xml', help = "With --scan, finds files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)", action='store_true')
-    parser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
-    #parser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
-    parser.add_argument('--volume', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
-    parser.add_argument('--debug', action='store_true')
-    parser.add_argument('--dryrun', action='store_true')
+    argparser = argparse.ArgumentParser(description="Scan comic directory")
+    argparser.add_argument('-v', '--verbose', action='store_true')
+    argparser.add_argument('-y', '--yes', action='store_true')
+    argparser.add_argument('-1', '--one', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
+    argparser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
+    argparser.add_argument('--dupes', help = "With --scan, tries to identify duplicated records. (NOT IMPLEMENTED)", action='store_true')
+    argparser.add_argument('--filedate', help = "With --scan, finds all files with mismatches database date entries.", action='store_true')
+    argparser.add_argument('--filetype', help = "With --scan, finds all files with data that doesn't match their extension.", action='store_true')
+    argparser.add_argument('--holes', help = "With --scan, finds volumes with missing issues. (NOT IMPLEMENTED)", action='store_true')
+    argparser.add_argument('--verify', help = "With --scan, recheck database items against file and comicvine data. (NOT IMPLEMENTED)", action='store_true')
+    argparser.add_argument('--deleted', help = "With --scan, looks for files that have been deleted but are still in the database.", action='store_true')
+    argparser.add_argument('--xml', help = "With --scan, finds files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)", action='store_true')
+    argparser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
+    #argparser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
+    argparser.add_argument('--volume', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
+    argparser.add_argument('--debug', action='store_true')
+    argparser.add_argument('--dryrun', action='store_true')
 
-    args = parser.parse_args()
+    args = argparser.parse_args()
     config = minorimpact.config.getConfig(script_name = 'yyreader')
 
     if (args.one is True):
@@ -144,11 +144,12 @@ def main():
                 parse_data = parser.parse(file_name, args = args)
                 if ('date' in parse_data):
                     file_date = parse_data['date']
-                    dbdate = convert_yacreader_date(date)
-                    if (file_date != dbdate.strftime('%Y-%m-%d')):
-                        print("{}: dbdate '{}' doesn't match file date '{}'".format(file_name, dbdate.strftime('%Y-%m-%d'), file_date))
-                        if (comicvine_id is not None):
-                            print("comicvine url: https://comicvine.gamespot.com/unknown/4000-{}".format(comicvine_id))
+                    if (re.search(r'^0\/', date) is None):
+                        dbdate = convert_yacreader_date(date)
+                        if (file_date != dbdate.strftime('%Y-%m-%d')):
+                            print("{}: dbdate '{}' doesn't match file date '{}'".format(file_name, dbdate.strftime('%Y-%m-%d'), file_date))
+                            if (comicvine_id is not None):
+                                print("comicvine url: https://comicvine.gamespot.com/unknown/4000-{}".format(comicvine_id))
             if (args.filetype):
                 magic_str = magic.from_file(file_name)
                 for ext in comic.ext_map:
@@ -212,7 +213,7 @@ def main():
             #   just read the books, but I also want arcs, publishers and some of the creatives in there for filtering and searching.
             #if (comicvine_id is not None and date is not None and title is not None and writer is not None and penciller is not None):
             #    continue
-            if (date is not None and issue is not None and volume is not None):
+            if (date is not None and issue is not None and volume is not None and re.search(r'^0\/', date) is None):
                 if (args.debug): print("--SKIP--")
                 if (args.debug): print("path: " + path)
                 if (args.debug): print("issue: " + str(issue))
@@ -311,6 +312,7 @@ def init_db():
     db.close()
 
 def convert_yacreader_date(yacreader_date):
+    print("yacreader_date:{}".format(yacreader_date))
     date = datetime.strptime(yacreader_date, '%d/%m/%Y')
     return date
 

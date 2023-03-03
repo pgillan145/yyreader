@@ -9,7 +9,7 @@ import requests
 import time
 
 date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
-                 '\((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)',
+                 '\(?(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)?',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)' ]
 
