@@ -312,7 +312,7 @@ def init_db():
     db.close()
 
 def convert_yacreader_date(yacreader_date):
-    print("yacreader_date:{}".format(yacreader_date))
+    #print("yacreader_date:{}".format(yacreader_date))
     date = datetime.strptime(yacreader_date, '%d/%m/%Y')
     return date
 

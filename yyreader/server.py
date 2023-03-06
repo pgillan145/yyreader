@@ -403,7 +403,7 @@ def read(id, page = None, half = None):
     if (page < 1): page = 1
     if (page > c.page_count()): page = c.page_count()
 
-    crop = get_setting(request.cookies.get('settings'), 'crop') if request.cookies.get('settings') else True
+    crop = parse_settings_cookie(request.cookies.get('settings'), 'crop') if request.cookies.get('settings') else True
     if (request.args.get('crop','')):
         crop = False if (request.args.get('crop','') == 'False') else True
 
@@ -482,7 +482,7 @@ def read(id, page = None, half = None):
     elif (page == c.page_count()):
         next_page_url =  forth['url']
 
-    if (get_setting(request.cookies.get('settings'), 'logging') is True):
+    if (parse_settings_cookie(request.cookies.get('settings'), 'logging') is True):
         yacreader.update_read_log(id, page, page_count = c.page_count())
 
     nav = { 'back':back, 'up': up, 'forth':forth, 'home':home, 'unfixed':True }
@@ -516,10 +516,7 @@ def page(id, page):
 @app.route('/settings/<setting>/<value>')
 @app.route('/settings/<setting>/<value>/<int:id>')
 def settings(setting = None, value = None, id = None):
-    cookie_settings = request.cookies.get('settings')
-    settings = {}
-    if (cookie_settings):
-        settings = get_setting(cookie_settings)
+    settings = parse_settings_cookie(request.cookies.get('settings'))
 
     if ('crop' not in settings): settings['crop'] = True
     if ('logging' not in settings): settings['logging'] = True
@@ -547,13 +544,15 @@ def settings(setting = None, value = None, id = None):
     response.set_cookie('settings', pickled)
     return response
 
-def get_setting(cookie_settings, setting = None):
+def parse_settings_cookie(cookie_settings, setting = None):
+    settings = {}
     if (cookie_settings):
         settings = pickle.loads(base64.urlsafe_b64decode(cookie_settings))
-        if (setting is None):
-            return settings
-        if (setting in settings):
-            return settings[setting]
+
+    if (setting is None):
+        return settings
+    if (setting in settings):
+        return settings[setting]
     return None
 
 @app.route('/take/<int:year>/<int:month>')
