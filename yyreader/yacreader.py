@@ -16,23 +16,25 @@ from . import comic, parser
 config = None
 
 def main():
-    argparser = argparse.ArgumentParser(description="Scan comic directory")
+    argparser = argparse.ArgumentParser(description="Scan comic directory", formatter_class=argparse.RawTextHelpFormatter)
+    argparser.add_argument('action', help = '''Specify one of the following:
+  'deleted'  look for files that have been deleted but are still in the database.
+  'filedate' find all files with mismatches database date entries.
+  'filetype' find all files with data that doesn't match their extension.
+  'xml'      files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)
+  'dupes'    try to identify duplicated records. (NOT IMPLEMENTED)
+  'holes'    find volumes with missing issues. (NOT IMPLEMENTED)
+  'verify'   recheck database items against file and comicvine data. (NOT IMPLEMENTED) ''')
+
     argparser.add_argument('-v', '--verbose', action='store_true')
     argparser.add_argument('-y', '--yes', action='store_true')
     argparser.add_argument('-1', '--one', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
-    argparser.add_argument('-s', '--scan', action='store_true', help = "Analyze the database, looking for anomalies.")
-    argparser.add_argument('--dupes', help = "With --scan, tries to identify duplicated records. (NOT IMPLEMENTED)", action='store_true')
-    argparser.add_argument('--filedate', help = "With --scan, finds all files with mismatches database date entries.", action='store_true')
-    argparser.add_argument('--filetype', help = "With --scan, finds all files with data that doesn't match their extension.", action='store_true')
-    argparser.add_argument('--holes', help = "With --scan, finds volumes with missing issues. (NOT IMPLEMENTED)", action='store_true')
-    argparser.add_argument('--verify', help = "With --scan, recheck database items against file and comicvine data. (NOT IMPLEMENTED)", action='store_true')
-    argparser.add_argument('--deleted', help = "With --scan, looks for files that have been deleted but are still in the database.", action='store_true')
-    argparser.add_argument('--xml', help = "With --scan, finds files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)", action='store_true')
     argparser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
     #argparser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
     argparser.add_argument('--volume', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
     argparser.add_argument('--debug', action='store_true')
     argparser.add_argument('--dryrun', action='store_true')
+
 
     args = argparser.parse_args()
     config = minorimpact.config.getConfig(script_name = 'yyreader')
@@ -45,78 +47,77 @@ def main():
     db = connect()
     cur = db.cursor()
 
-    if (args.scan and args.deleted):
-        if (args.deleted):
-            cur.execute("SELECT id, volume, number from comic_info")
-            rows = cur.fetchall()
-            i = 1
-            for row in rows:
-                id = row[0]
-                volume = row[1]
-                number = row[2]
-                print("scanning comic_info {} of {}".format(i, len(rows)), end='\r')
-                cur.execute("SELECT path, fileName from comic where comicInfoId=?", (id, ))
-                rows2 = cur.fetchall()
-                if (len(rows2) == 0):
-                    print("\ndeleting", id, volume, number, "from comic_info")
-                    cur.execute('delete from comic_info where id = ?', (id, ))
-                    db.commit()
-                i = i + 1
+    if (args.action == 'deleted'):
+        cur.execute("SELECT id, volume, number from comic_info")
+        rows = cur.fetchall()
+        i = 1
+        for row in rows:
+            id = row[0]
+            volume = row[1]
+            number = row[2]
+            print("scanning comic_info {} of {}".format(i, len(rows)), end='\r')
+            cur.execute("SELECT path, fileName from comic where comicInfoId=?", (id, ))
+            rows2 = cur.fetchall()
+            if (len(rows2) == 0):
+                print("\ndeleting", id, volume, number, "from comic_info")
+                cur.execute('delete from comic_info where id = ?', (id, ))
+                db.commit()
+            i = i + 1
 
-            cur.execute("SELECT id, comicInfoId from read_log")
-            rows = cur.fetchall()
-            i = 1
-            for row in rows:
-                id = row[0]
-                comic_info_id = row[1]
-                print("scanning read_log {} of {}".format(i, len(rows)), end='\r')
-                cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
-                rows2 = cur.fetchall()
-                if (len(rows2) == 0):
-                    print("\ndeleting", id, "from read_log")
-                    cur.execute('delete from comic_info where id = ?', (id, ))
-                    db.commit()
-                i = i + 1
-            print('')
+        cur.execute("SELECT id, comicInfoId from read_log")
+        rows = cur.fetchall()
+        i = 1
+        for row in rows:
+            id = row[0]
+            comic_info_id = row[1]
+            print("scanning read_log {} of {}".format(i, len(rows)), end='\r')
+            cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
+            rows2 = cur.fetchall()
+            if (len(rows2) == 0):
+                print("\ndeleting", id, "from read_log")
+                cur.execute('delete from comic_info where id = ?', (id, ))
+                db.commit()
+            i = i + 1
+        print('')
 
-            cur.execute("SELECT id, comicInfoId from comic_info_arc")
-            rows = cur.fetchall()
-            i = 1
-            for row in rows:
-                id = row[0]
-                comic_info_id = row[1]
-                print("scanning comic_info_arc {} of {}".format(i, len(rows)), end='\r')
-                cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
-                rows2 = cur.fetchall()
-                if (len(rows2) == 0):
-                    print("\ndeleting", id, "from comic_info_arc")
-                    cur.execute('delete from comic_info_arc where id = ?', (id, ))
-                    db.commit()
-                i = i + 1
-            print('')
+        cur.execute("SELECT id, comicInfoId from comic_info_arc")
+        rows = cur.fetchall()
+        i = 1
+        for row in rows:
+            id = row[0]
+            comic_info_id = row[1]
+            print("scanning comic_info_arc {} of {}".format(i, len(rows)), end='\r')
+            cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
+            rows2 = cur.fetchall()
+            if (len(rows2) == 0):
+                print("\ndeleting", id, "from comic_info_arc")
+                cur.execute('delete from comic_info_arc where id = ?', (id, ))
+                db.commit()
+            i = i + 1
+        print('')
 
-            cur.execute("SELECT id, foreComicId, aftComicId from link")
-            i = 1
-            rows = cur.fetchall()
-            for row in rows:
-                id = row[0]
-                fore_id = row[1]
-                aft_id = row[2]
-                print("scanning link {} of {}".format(i, len(rows)), end='\r')
-                cur.execute("SELECT id, volume, number from comic_info where id=?", (fore_id, ))
-                rows2 = cur.fetchall()
-                if (len(rows2) == 0):
-                    print("\ndeleting", id, "from link")
-                    cur.execute('delete from link where id = ?', (id, ))
-                    db.commit()
-                cur.execute("SELECT id, volume, number from comic_info where id=?", (aft_id, ))
-                rows2 = cur.fetchall()
-                if (len(rows2) == 0):
-                    print("\ndeleting", id, "from link")
-                    cur.execute('delete from link where id = ?', (id, ))
-                    db.commit()
-                i = i + 1
-            print('')
+        cur.execute("SELECT id, foreComicId, aftComicId from link")
+        i = 1
+        rows = cur.fetchall()
+        for row in rows:
+            id = row[0]
+            fore_id = row[1]
+            aft_id = row[2]
+            print("scanning link {} of {}".format(i, len(rows)), end='\r')
+            cur.execute("SELECT id, volume, number from comic_info where id=?", (fore_id, ))
+            rows2 = cur.fetchall()
+            if (len(rows2) == 0):
+                print("\ndeleting", id, "from link")
+                cur.execute('delete from link where id = ?', (id, ))
+                db.commit()
+            cur.execute("SELECT id, volume, number from comic_info where id=?", (aft_id, ))
+            rows2 = cur.fetchall()
+            if (len(rows2) == 0):
+                print("\ndeleting", id, "from link")
+                cur.execute('delete from link where id = ?', (id, ))
+                db.commit()
+            i = i + 1
+        print('')
 
     cur.execute('select comic.path, comic_info.volume, comic_info.number, comic_info.date, comic.id, comic_info.id, comic_info.comicVineID, comic_info.title, comic_info.storyArc, comic_info.writer, comic_info.penciller, comic.fileName from comic, comic_info where comic.comicInfoId=comic_info.id')
     rows = cur.fetchall()
@@ -137,9 +138,9 @@ def main():
             if (re.search(args.volume, volume) is None or re.search(args.volume, path) is None):
                 continue
 
-        if (args.scan):
+        if (args.action in ('filetype', 'filedate', 'xml', 'verify', 'dupes', 'holes')):
             #c = comic.comic(config['default']['comic_dir'] + path, args = args)
-            if (args.filedate):
+            if (args.action == 'filedate'):
                 file_name = config['default']['comic_dir'] + path
                 parse_data = parser.parse(file_name, args = args)
                 if ('date' in parse_data):
@@ -150,7 +151,7 @@ def main():
                             print("{}: dbdate '{}' doesn't match file date '{}'".format(file_name, dbdate.strftime('%Y-%m-%d'), file_date))
                             if (comicvine_id is not None):
                                 print("comicvine url: https://comicvine.gamespot.com/unknown/4000-{}".format(comicvine_id))
-            if (args.filetype):
+            if (args.action == 'filetype'):
                 magic_str = magic.from_file(file_name)
                 for ext in comic.ext_map:
                     if (re.search('\\.{}$'.format(ext), file_name) and re.search('^{}'.format(comic.ext_map[ext]), magic_str) is None):
@@ -186,24 +187,24 @@ def main():
                                     except Exception as e:
                                         print(e)
                         break
-            if (args.xml):
+            if (args.action ==  'xml'):
                 #TODO: scan files for valid, up-to-date ComicInfo.xml files.  The Notes field should contain "yyreader xml v1", at this point...
                 #TODO: Make the xml version a variable.
                 print("This isn't written yet, check back, like, later, and stuff.")
                 pass
-            if (args.holes):
+            if (args.action == 'holes'):
                 #TODO: Scan all the existing volumes for "holes" -- places where the numbers either don't start with 1, or skip some value.  (Check comicvine for "total
                 #   number of issues"?  I mean, that's a good idea, but for current titles the caching tends to make more difficult than it ought to be.)
                 print("This doesn't exist yet either.")
                 pass
-            if (args.verify):
+            if (args.action == 'verify'):
                 #TODO: Compare what's in the database to what's in the file and what's in comicvine, and then retrieve, rewrite and reupdate everything.
                 #TODO: Make an optional "subset" value (ie, a number of items or a percentage) that can be set, so that only a portion of the whole will be checked rather
                 #   than however many thousands of items exist?  Maybe add also add a "last_checked" field somewhere so we know not to check the same items more than
                 #   once every x days.
                 print("Nope.")
                 pass
-            if (args.dupes):
+            if (args.action == 'dupes'):
                 #TODO: Identify duplicate issues.
                 print("Nein.")
                 pass
@@ -415,7 +416,7 @@ def get_comic_by_id(id, db = None):
     else:
         local_db = db
     cursor = local_db.cursor()
-    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
+    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher, comic_info.series from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
     rows = cursor.fetchall()
     comic_data = None
     for row in rows:
@@ -429,6 +430,7 @@ def get_comic_by_id(id, db = None):
         hash = row[7]
         comic_id = row['comic_id']
         publisher = row['publisher']
+        series = row['series']
         fore_id = None
         aft_id = None
 
@@ -446,7 +448,7 @@ def get_comic_by_id(id, db = None):
 
         if (current_page is None or current_page == 0):
             current_page = 1
-        comic_data = { 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'publisher':publisher, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels }
+        comic_data = { 'id':id, 'series':series, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'publisher':publisher, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels }
 
     if (db is None):
         local_db.close()
@@ -466,7 +468,7 @@ def get_comics_by_date(year, month, db = None):
     cursor = local_db.cursor()
     if (month < 10): month = '0{}'.format(month)
     comics = []
-    sql = 'select volume, number, date, id, read, currentPage from comic_info where date like "%/{}/{}"'
+    sql = 'select volume, number, date, id, read, currentPage, series from comic_info where date like "%/{}/{}"'
     #print(sql.format(month, year))
     cursor.execute(sql.format(month, year))
     rows = cursor.fetchall()
@@ -477,11 +479,12 @@ def get_comics_by_date(year, month, db = None):
         id = row[3]
         read = row[4]
         current_page = row[5]
+        series = row[6]
 
         comics.append(get_comic_by_id(id, db = local_db))
     if (db is None):
         local_db.close()
-    return sorted(comics, key=lambda x:(x['date'], x['volume']) )
+    return sorted(comics, key=lambda x:(x['date'], x['series'], x['volume']) )
 
 def get_cover(id, hash = None):
     cover_data = None
