@@ -1,6 +1,9 @@
+dumper
 flask
 fuzzywuzzy
 minorimpact
 Pillow
 python-dateutil
+python-Levenshtein
 python-magic
+requests
