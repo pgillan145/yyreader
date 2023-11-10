@@ -195,7 +195,7 @@ def is_credit_page(filename):
 
 def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     """Analyze the file name and pull as much information about it as possible."""
-    if (args.verbose): print("Parsing {}".format(comic_file))
+    #if (args.verbose): print("Parsing {}".format(comic_file))
 
     data = { 'directors_cut': False }
 
@@ -206,7 +206,7 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     if (re.search('\.cb[rz]$', comic_file, re.I) is None):
         raise Exception("invalid file type")
 
-    if (args.debug is True): print(comic_file)
+    #if (args.debug is True): print(comic_file)
 
     day = None
     extension = None
@@ -230,7 +230,7 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     if (re.search(r" - [dD]irector'?s? [Cc]ut", basename) is not None):
         data['directors_cut'] = True
         basename = re.sub(" - [dD]irector'?s? [cC]ut", '', basename)
-    if (args.debug): print("basename:" + basename)
+    #if (args.debug): print("basename:" + basename)
 
     # Scan the parent directories for something that looks like a date.
     for f in date_formats:
@@ -243,10 +243,10 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
             break
 
     for f in formats:
-        if (args.debug): print(f"testing '{f}'")
+        #if (args.debug): print(f"testing '{f}'")
         m = re.search(f, basename)
         if (m is not None):
-            if (args.debug): print(f"matched format '{f}'")
+            #if (args.debug): print(f"matched format '{f}'")
             g = m.groupdict()
             if 'day' in g: day = g['day']
             if 'extension' in g: extension = g['extension']
@@ -272,7 +272,7 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
             count = c['c']
         volume = re.sub(c['m'], c['s'], volume, count = count)
 
-    if (args.debug): print(f"parsed volume:{volume},issue:{issue},year:{year},month:{month},day:{day}")
+    #if (args.debug): print(f"parsed volume:{volume},issue:{issue},year:{year},month:{month},day:{day}")
     data['extension'] = extension
     data['issue'] = issue
     data['start_year'] = start_year

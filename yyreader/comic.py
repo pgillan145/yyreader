@@ -55,11 +55,12 @@ class comic():
     _page_count = None
     files = []
 
-    def __init__(self, file, args = minorimpact.default_arg_flags):
+    def __init__(self, file, args = minorimpact.default_arg_flags, cache = {}):
         if (re.search('^/', file) is None):
             file = os.getcwd() + '/' + file
         self.file = file
         self._read_data()
+        self.cache = cache
         #print("_read_data()")
         #print(self.data)
 
@@ -71,6 +72,7 @@ class comic():
             self._unpack()
 
         xml_data = self._generate_xml_data()
+        #print(xml_data)
         cwd = os.getcwd()
         os.chdir(self.temp_dir.name)
 
@@ -121,7 +123,7 @@ class comic():
         if (parse_data['size'] < minimum_file_size):
             raise Exception("file too small")
 
-        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
+        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, args = args)
         if (comicvine_data is None):
             raise Exception("can't get comicvine data.")
         if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
@@ -159,7 +161,7 @@ class comic():
                 print("  'q': Quit")
                 print("  'y': Move the file")
             elif (c == 'c'):
-                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache_results = False,  cache_file = config['default']['cache_file'], args = args)
+                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True)
                 if (comicvine_data is None):
                     raise Exception("can't get comicvine data.")
                 if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
@@ -200,7 +202,7 @@ class comic():
                 self.data['year'] = year
                 self.data['date'] = '{}-{}-{}'.format(year, month, day)
 
-                details = comicvine.get_issue_details(self.data['issue_id'], config['comicvine']['api_key'], cache_file = config['default']['cache_file'], args = args)
+                details = comicvine.get_issue_details(self.data['issue_id'], config['comicvine']['api_key'], cache = self.cache, args = args)
                 if (details['description'] is not None):
                     self.data['description'] = re.sub('<p><em>','', re.sub('</em></p>', '', details['description']))
 
@@ -604,8 +606,8 @@ class comic():
         result = subprocess.run(command, capture_output = True)
         try:
             comicinfo = ET.fromstring(result.stdout)
-            #TODO: Find some way to ignore the garbage data in preexisting ComicInfo.xml files.  Leaning towards putting something in the Note
-            #   frield but I can't figure out how to get just one tag without having to iteratite through though the whole thing twice.  I fucking
+            # TODO: Find some way to ignore the garbage data in preexisting ComicInfo.xml files.  Leaning towards putting something in the Note
+            #   field but I can't figure out how to get just one tag without having to iterate through though the whole thing twice.  I fucking
             #   hate XML.
             for x in comicinfo:
                 if (x.tag in xml_map):

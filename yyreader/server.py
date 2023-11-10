@@ -212,7 +212,9 @@ def dates(year = None, month = None):
             forth = { 'url':'/dates/{}/{}'.format(next_year, next_month), 'text':'{}/{}'.format(next_month, next_year) }
 
         for y in yacreader.get_comics_by_date(year, month):
-            items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'short_volume':y['volume'][0:25], 'datelink':'/dates/{}'.format(y['date'].strftime('%Y/%m')) })
+            short_volume = '{} ({})'.format(y['series'][0:25], y['volume'])
+            items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'short_volume':short_volume, 'datelink':'/dates/{}'.format(y['date'].strftime('%Y/%m')) })
+
         if (yacreader.get_beacon('{}/{}'.format(year, month)) is None):
             beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
         elif (len(yacreader.get_beacons()) > 1):
@@ -483,6 +485,7 @@ def read(id, page = None, half = None):
         next_page_url =  forth['url']
 
     if (parse_settings_cookie(request.cookies.get('settings'), 'logging') is True):
+        # TODO: This doesn't get set until you go into settings and turn logging off and on again.
         yacreader.update_read_log(id, page, page_count = c.page_count())
 
     nav = { 'back':back, 'up': up, 'forth':forth, 'home':home, 'unfixed':True }

@@ -18,23 +18,22 @@ import xml.etree.ElementTree as ET
 from . import parser
 
 base_url = 'https://comicvine.gamespot.com/api'
-cache = { 'results': {}, 'volumes': {} }
-cache_setup = False
 headers = {'User-Agent': 'yyreader'}
 params = {}
 
 config = minorimpact.config.getConfig(script_name = 'yyreader')
 
-def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
+def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
+    setup_cache(cache)
     url = base_url + f'/volume/4050-{volume_id}/?api_key=' + api_key + f'&format=json&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-    #if (args.debug is True): print(url)
-    volume_results = get_results(url, cache_results = cache_results, cache_file = cache_file)
+    if (args.debug): print(url)
+    volume_results = get_results(url, cache = cache, clear_cache = clear_cache)
     
     volume_name = '{} ({}) - {}'.format(volume_results[0]['name'], volume_results[0]['start_year'], volume_results[0]['publisher']['name'])
 
     url = base_url + '/issues/?api_key=' + api_key + f'&format=json&sort=name:asc&filter=volume:{volume_id}&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
     #if (args.debug is True): print(url)
-    results = get_results(url, max = None, cache_results = cache_results, cache_file = cache_file)
+    results = get_results(url, max = None, cache = cache, clear_cache = clear_cache)
     i = len(results) - 1
     while i >= 0:
         if ('store_date' not in results[i] or results[i]['store_date'] is None) and ('cover_date' not in results[i] or results[i]['cover_date'] is None):
@@ -49,24 +48,24 @@ def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, c
             return i
     return None
 
-def get_issue_details(issue_id, api_key, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
+def get_issue_details(issue_id, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
     url = f'{base_url}/issue/4000-{issue_id}/?api_key={api_key}&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits,description,character_credits'
     #if (args.debug is True): print(url)
-    results = get_results(url, cache_file = cache_file, cache_results = cache_results)
+    results = get_results(url, cache = cache, clear_cache = clear_cache)
     #if (args.debug): print(results[0])
     return results[0]
 
 last_result = datetime.now()
-def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cache_file = '/tmp/yyreader.cache'):
-    global cache
+def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache = False):
+    setup_cache(cache)
     global last_result
     seconds_between_requests = 3
 
     offset_url = url + f'&limit={limit}&offset={offset}'
 
     text = None
-    if (cache_results is True and offset_url in cache['results'] and cache['results'][offset_url]['mod_date'] > (datetime.now() - timedelta(weeks = 4))):
-        text = cache['results'][offset_url]['text']
+    if (offset_url in cache['comicvine']['results'] and cache['comicvine']['results'][offset_url]['mod_date'] > (datetime.now() - timedelta(weeks = 4)) and clear_cache is False):
+        text = cache['comicvine']['results'][offset_url]['text']
     else:
         while(last_result > datetime.now() - timedelta(seconds=seconds_between_requests)):
             time.sleep(1)
@@ -76,21 +75,7 @@ def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cac
         text = r.text
         data = json.loads(text)
         if (data['error'] == 'OK'):
-            cache['results'][offset_url] = { 'text': r.text, 'mod_date': datetime.now() }
-            pickle_data = pickle.dumps(cache)
-            done = False
-            interrupted = False
-            while done is False:
-                try:
-                    with open(cache_file, 'wb') as f:
-                        f.write(pickle_data)
-                    done = True
-                except KeyboardInterrupt:
-                    print("cache dump interrupted - retrying")
-                    interrupted = True
-                    continue
-            if (interrupted is True):
-                sys.exit()
+            cache['comicvine']['results'][offset_url] = { 'text': r.text, 'mod_date': datetime.now() }
     
     if (text is None):
         raise Exception(f"Unable to request '{offset_url}'")
@@ -112,25 +97,21 @@ def get_results(url, offset=0, limit = 100, max = 100, cache_results = True, cac
         results = results + [data['results']]
     
     if (data['number_of_total_results'] > (limit + offset) and (limit + offset) < max):
-        results = results + get_results(url, limit = limit, offset = offset + limit, max = max, cache_results = cache_results, cache_file = cache_file)
+        results = results + get_results(url, limit = limit, offset = offset + limit, max = max, cache = cache, clear_cache = clear_cache)
 
     return results
 
-def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
-    global cache 
+def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
+    setup_cache(cache)
     if (args.yes is True):
         if ('year' in data and re.search(' Annual$', data['volume'])):
             pass
         elif (('date' not in data or data['date'] is None) and args.yes is True):
             raise Exception("Can't auto confirm without strict file date, skipping.")
 
-    use_cache = cache_results
-    if (cache_setup is False):
-        setup_cache(cache_file)
-
     test_volume = data['volume']
-    if (test_volume in cache['volumes'] and use_cache):
-        test_volume = cache['volumes'][test_volume]['volume']
+    if (test_volume in cache['comicvine']['volumes']):
+        test_volume = cache['comicvine']['volumes'][test_volume]['volume']
 
     test_volume = parser.massage_volume(test_volume, reverse = True)
 
@@ -144,7 +125,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
             start_year = data['est_start_year']
 
         # Get an initial list of volumes from the site that we can start to check.
-        results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], args = args, cache_file = cache_file, cache_results = use_cache)
+        results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], args = args, cache = cache, clear_cache = clear_cache)
 
         for r in results:
             if ('ratio' not in r):
@@ -170,7 +151,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
             for r in results:
                 ratio = r['ratio']
                 if (ratio >= 80 and result is None and match_issue is None):
-                    i = get_issue(r['id'], data['issue'], api_key, args = args, cache_results = use_cache, cache_file = cache_file)
+                    i = get_issue(r['id'], data['issue'], api_key, args = args, cache = cache, clear_cache = clear_cache)
                     if (i is not None):
                         store_date = ''
                         cover_date = ''
@@ -210,15 +191,15 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
             input_string = f"{input_string} [{default}]"
         input_string = f"{input_string}: "
         pick = input(input_string).rstrip()
+        clear_cache = False
 
         if (pick == '' and default > 0):
             pick = f'{default}'
 
-        use_cache = True
         if (pick == '0' or pick == '-' or pick == '_' or pick == ''):
             raise Exception('user cancelled')
         elif (pick == 'c'):
-            use_cache = False
+            clear_cache = True
             continue
         elif (pick == '?'):
             print("enter one of the following options:")
@@ -250,7 +231,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
             if (type_id == '4000'):
                 url = f'{base_url}/issue/4000-{id}/?api_key={api_key}&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits,description,character_credits,volume'
                 #if (args.debug): print(url)
-                results = get_results(url, cache_file = cache_file, cache_results = False)
+                results = get_results(url)
                 match_issue = results[0]
                 data['issue'] = match_issue['issue_number']
                 test_volume = match_issue['volume']['name']
@@ -261,7 +242,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
             if (type_id == '4050'):
                 url = base_url + f'/volume/4050-{id}/?api_key={api_key}&format=json&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
                 #if (args.debug): print(url)
-                results = get_results(url, cache_file = cache_file, cache_results = False)
+                results = get_results(url)
                 result = results[0]
                 result['ratio'] = 100
                 test_volume = result['name']
@@ -283,7 +264,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
 
     i = match_issue
     if i is None:
-        i = get_issue(volume_id, data['issue'], api_key, args = args, cache_file = cache_file)
+        i = get_issue(volume_id, data['issue'], api_key, args = args, cache = cache, clear_cache = clear_cache)
 
     if (i is None):
         raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['volume_name']}")
@@ -309,11 +290,12 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache_results = 
         if ('date' not in comicvine_data):
             comicvine_data['date'] = comicvine_data['cover_date'] 
 
-    cache['volumes'][data['volume']] = { 'volume': comicvine_data['volume_name'], 'mod_date': datetime.now() }
+    cache['comicvine']['volumes'][data['volume']] = { 'volume': comicvine_data['volume_name'], 'mod_date': datetime.now() }
 
     return comicvine_data
 
-def search_volumes(volume, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache_results = True, cache_file = '/tmp/yyreader.cache'):
+def search_volumes(volume, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
+    setup_cache(cache)
     volume = parser.massage_volume(volume, reverse = True)
     if (args.debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
@@ -321,7 +303,7 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
     url = base_url + '/search/?api_key=' + api_key + f'&format=json&query={volume}&resources=volume&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
     #if (args.debug): print(url)
     try:
-        results = get_results(url, max = 100, cache_results = cache_results, cache_file = cache_file)
+        results = get_results(url, max = 100, cache = cache, clear_cache = clear_cache)
     except Exception as e:
         pass
     
@@ -359,26 +341,21 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
         #results = sorted(results, key = lambda x:int(x['start_year']))
     return results
 
-def setup_cache(cache_file):
-    global cache
-    global cache_setup
+def setup_cache(cache):
+    if ('comicvine' not in cache):
+        cache['comicvine'] = {}
+    if ('results' not in cache['comicvine']):
+        cache['comicvine']['results'] = {}
+    if ('volumes' not in cache['comicvine']):
+        cache['comicvine']['volumes'] = {}
 
-    if (os.path.exists(cache_file) is True):
-        with open(cache_file, 'rb') as f:
-            cache = pickle.load(f)
-        if ('results' not in cache):
-            cache['results'] = {}
-        if ('volumes' not in cache):
-            cache['volumes'] = {}
-
-    urls = [key for key in cache['results']]
+    urls = [key for key in cache['comicvine']['results']]
     for url in urls:
-        if cache['results'][url]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
-            del cache['results'][url]
+        if cache['comicvine']['results'][url]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
+            del cache['comicvine']['results'][url]
 
-    volumes = [key for key in cache['volumes']]
+    volumes = [key for key in cache['comicvine']['volumes']]
     for volume in volumes:
-        if cache['volumes'][volume]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
-            del cache['volumes'][volume]
+        if cache['comicvine']['volumes'][volume]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
+            del cache['comicvine']['volumes'][volume]
 
-    cache_setup = True
