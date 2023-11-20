@@ -2,6 +2,7 @@
 
 import argparse
 from datetime import datetime, timedelta
+from dumper import dump
 import magic
 import minorimpact.config
 import os
@@ -23,7 +24,7 @@ def main():
   'filetype' find all files with data that doesn't match their extension.
   'xml'      files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)
   'dupes'    try to identify duplicated records. (NOT IMPLEMENTED)
-  'holes'    find volumes with missing issues. (NOT IMPLEMENTED)
+  'holes'    find series with missing issues. (NOT IMPLEMENTED)
   'verify'   recheck database items against file and comicvine data. (NOT IMPLEMENTED) ''')
 
     argparser.add_argument('-v', '--verbose', action='store_true')
@@ -31,7 +32,7 @@ def main():
     argparser.add_argument('-1', '--one', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
     argparser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
     #argparser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
-    argparser.add_argument('--volume', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
+    argparser.add_argument('--series', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
     argparser.add_argument('--debug', action='store_true')
     argparser.add_argument('--dryrun', action='store_true')
 
@@ -48,18 +49,18 @@ def main():
     cur = db.cursor()
 
     if (args.action == 'deleted'):
-        cur.execute("SELECT id, volume, number from comic_info")
+        cur.execute("SELECT id, series, number from comic_info")
         rows = cur.fetchall()
         i = 1
         for row in rows:
             id = row[0]
-            volume = row[1]
+            series = row[1]
             number = row[2]
             print("scanning comic_info {} of {}".format(i, len(rows)), end='\r')
             cur.execute("SELECT path, fileName from comic where comicInfoId=?", (id, ))
             rows2 = cur.fetchall()
             if (len(rows2) == 0):
-                print("\ndeleting", id, volume, number, "from comic_info")
+                print("\ndeleting", id, series, number, "from comic_info")
                 cur.execute('delete from comic_info where id = ?', (id, ))
                 db.commit()
             i = i + 1
@@ -71,7 +72,7 @@ def main():
             id = row[0]
             comic_info_id = row[1]
             print("scanning read_log {} of {}".format(i, len(rows)), end='\r')
-            cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
+            cur.execute("SELECT id, series, number from comic_info where id=?", (comic_info_id, ))
             rows2 = cur.fetchall()
             if (len(rows2) == 0):
                 print("\ndeleting", id, "from read_log")
@@ -87,7 +88,7 @@ def main():
             id = row[0]
             comic_info_id = row[1]
             print("scanning comic_info_arc {} of {}".format(i, len(rows)), end='\r')
-            cur.execute("SELECT id, volume, number from comic_info where id=?", (comic_info_id, ))
+            cur.execute("SELECT id, series, number from comic_info where id=?", (comic_info_id, ))
             rows2 = cur.fetchall()
             if (len(rows2) == 0):
                 print("\ndeleting", id, "from comic_info_arc")
@@ -104,13 +105,13 @@ def main():
             fore_id = row[1]
             aft_id = row[2]
             print("scanning link {} of {}".format(i, len(rows)), end='\r')
-            cur.execute("SELECT id, volume, number from comic_info where id=?", (fore_id, ))
+            cur.execute("SELECT id, series, number from comic_info where id=?", (fore_id, ))
             rows2 = cur.fetchall()
             if (len(rows2) == 0):
                 print("\ndeleting", id, "from link")
                 cur.execute('delete from link where id = ?', (id, ))
                 db.commit()
-            cur.execute("SELECT id, volume, number from comic_info where id=?", (aft_id, ))
+            cur.execute("SELECT id, series, number from comic_info where id=?", (aft_id, ))
             rows2 = cur.fetchall()
             if (len(rows2) == 0):
                 print("\ndeleting", id, "from link")
@@ -119,12 +120,12 @@ def main():
             i = i + 1
         print('')
 
-    cur.execute('select comic.path, comic_info.volume, comic_info.number, comic_info.date, comic.id, comic_info.id, comic_info.comicVineID, comic_info.title, comic_info.storyArc, comic_info.writer, comic_info.penciller, comic.fileName from comic, comic_info where comic.comicInfoId=comic_info.id')
+    cur.execute('select comic.path, comic_info.series, comic_info.number, comic_info.date, comic.id, comic_info.id, comic_info.comicVineID, comic_info.title, comic_info.storyArc, comic_info.writer, comic_info.penciller, comic.fileName from comic, comic_info where comic.comicInfoId=comic_info.id')
     rows = cur.fetchall()
     i = 0
     for row in rows:
         path = row[0]
-        volume = row[1]
+        series = row[1]
         issue = row[2]
         date = row[3]
         comic_info_id = row[5]
@@ -134,8 +135,8 @@ def main():
         penciller = row[10]
         fileName = row[11]
 
-        if (args.volume is not None):
-            if (re.search(args.volume, volume) is None or re.search(args.volume, path) is None):
+        if (args.series is not None):
+            if (re.search(args.series, series) is None or re.search(args.series, path) is None):
                 continue
 
         if (args.action in ('filetype', 'filedate', 'xml', 'verify', 'dupes', 'holes')):
@@ -214,7 +215,7 @@ def main():
             #   just read the books, but I also want arcs, publishers and some of the creatives in there for filtering and searching.
             #if (comicvine_id is not None and date is not None and title is not None and writer is not None and penciller is not None):
             #    continue
-            if (date is not None and issue is not None and volume is not None and re.search(r'^0\/', date) is None):
+            if (date is not None and issue is not None and series is not None and re.search(r'^0\/', date) is None):
                 if (args.debug): print("--SKIP--")
                 if (args.debug): print("path: " + path)
                 if (args.debug): print("issue: " + str(issue))
@@ -246,16 +247,16 @@ def main():
                 date = c.get('date')
                 penciller = '\n'.join(c.get('pencillers')) if (c.get('pencillers')) else None
                 publisher = c.get('publisher')
-                volume = c.get('volume')
+                series = c.get('series')
                 writer = '\n'.join(c.get('writers')) if (c.get('writers')) else None
 
                 i = i + 1
                 m = re.search('^(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)$', date)
                 dbdate = m.group('day') + '/' + m.group('month') + '/' + m.group('year')
-                if (args.debug): print("update comic_info set edited = TRUE, date = {}, volume = {}, number = {}, title = {}, comicVineID = {}, storyArc = {}, publisher = {}, writer = {}, penciller = {}, synopsis = {}, letterer = {}, inker = {}, colorist = {}, characters = {} where id = {}".format(dbdate, volume, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
+                if (args.debug): print("update comic_info set edited = TRUE, date = {}, series = {}, number = {}, title = {}, comicVineID = {}, storyArc = {}, publisher = {}, writer = {}, penciller = {}, synopsis = {}, letterer = {}, inker = {}, colorist = {}, characters = {} where id = {}".format(dbdate, series, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
                 try:
                     if (args.dryrun is False):
-                        cur.execute('update comic_info set edited = TRUE, date = ?, volume = ?, number = ?, title = ?, comicVineID = ?, storyArc = ?, publisher = ?, writer = ?, penciller = ?, synopsis = ?, letterer = ?, inker = ?, colorist = ?, characters = ? where id = ?', (dbdate, volume, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
+                        cur.execute('update comic_info set edited = TRUE, date = ?, series = ?, number = ?, title = ?, comicVineID = ?, storyArc = ?, publisher = ?, writer = ?, penciller = ?, synopsis = ?, letterer = ?, inker = ?, colorist = ?, characters = ? where id = ?', (dbdate, series, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
                 except Exception as e:
                     print(e)
                     break
@@ -356,7 +357,7 @@ def add_filter(sql, filter):
                 sql['params'].append(publisher)
             w = re.sub(' or $', '', w)
             sql['where'] = sql['where'] + '(' + w + ')'
-    print(sql)
+    #print(sql)
     return
 
 def build_sql(sql):
@@ -517,19 +518,24 @@ def get_cover_file(id, hash = None):
 
     return cover_file
 
-def get_comics_by_volume(volume, db = None, filter = None):
+def get_comics_by_series(series, db = None, filter = None):
+    volume = ''
     if (db is None):
         local_db = connect()
     else:
         local_db = db
     cursor = local_db.cursor()
+    m = re.search('^(.+) \((\d\d\d\d)\)$', series)
+    if (m is not None):
+        series = m[1]
+        volume = m[2]
 
     comics = []
     sql = {}
-    sql['select'] = 'comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic_info.read, comic_info.currentPage'
+    sql['select'] = 'comic_info.series, comic_info.number, comic_info.date, comic_info.id, comic_info.read, comic_info.currentPage, comic_info.volume'
     sql['from'] = 'comic_info'
-    sql['where'] = 'comic_info.volume = ?'
-    sql['params'] = [volume]
+    sql['where'] = 'comic_info.series = ? and comic_info.volume = ?'
+    sql['params'] = [series, volume]
     if (filter):
         add_filter(sql, filter)
 
@@ -538,27 +544,28 @@ def get_comics_by_volume(volume, db = None, filter = None):
 
     rows = cursor.fetchall()
     for row in rows:
-        volume = row[0]
+        series = row[0]
         issue = row[1]
         date = convert_yacreader_date(row[2])
         id = row[3]
         read = row[4]
         current_page = row[5]
+        volume = row[6]
 
         comics.append(get_comic_by_id(id, db = local_db))
 
     if (db is None):
         local_db.close()
-    return sorted(comics, key=lambda x:(x['date'], x['volume']) )
+    return sorted(comics, key=lambda x:(x['date'], x['series'], x['volume']) )
 
 def get_history():
     db = connect()
     cursor = db.cursor()
     comics = []
-    cursor.execute('select ci.volume, ci.number, ci.date, ci.id, ci.read, ci.currentPage, read_log.end_date, read_log.mod_date from comic_info ci, read_log where ci.id=read_log.comicInfoID')
+    cursor.execute('select ci.series, ci.number, ci.date, ci.id, ci.read, ci.currentPage, read_log.end_date, read_log.mod_date from comic_info ci, read_log where ci.id=read_log.comicInfoID')
     rows = cursor.fetchall()
     for row in rows:
-        volume = row[0]
+        series = row[0]
         issue = row[1]
         date = convert_yacreader_date(row[2])
         id = row[3]
@@ -570,7 +577,7 @@ def get_history():
         if (current_page is None or current_page == 0):
             current_page = 1
 
-        comics.append({ 'id':id, 'volume':volume, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page, 'end_date':end_date, 'mod_date':mod_date })
+        comics.append({ 'id':id, 'series':series, 'issue':issue, 'date':date, 'read':read, 'current_page':current_page, 'end_date':end_date, 'mod_date':mod_date })
 
     db.close()
     return sorted(comics, key=lambda x:(x['end_date'] if (x['end_date'] is not None) else x['mod_date']), reverse = True)
@@ -650,7 +657,6 @@ def get_next_comic(id, db = None):
     cursor = local_db.cursor()
 
     comic_data = None
-    y = get_comic_by_id(id, local_db)
 
     if (y['aft_id'] is not None):
         comic_data = get_comic_by_id(y['aft_id'], db = local_db)
@@ -807,22 +813,50 @@ def get_publishers():
     db.close()
     return sorted(publishers, key=lambda x: x)
 
-def get_volumes(filter = None):
+def get_serieses(filter = None):
     db = connect()
     cursor = db.cursor()
-    volumes = []
-    sql = { 'select': 'distinct(comic_info.volume)', 'from':'comic_info', 'params':[]}
+
+    sql = { 'select': 'comic_info.id, comic_info.volume, comic_info.series, comic.path', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id', 'params': []}
     if (filter is not None):
         add_filter(sql, filter)
     #print(build_sql(sql), sql['params'])
     cursor.execute(build_sql(sql), sql['params'])
     rows = cursor.fetchall()
+    serieses = {}
+    updates = {}
     for row in rows:
-        if (row[0] is None):
-            continue
-        volumes.append(row[0])
+        id = row['id']
+        series = row['series']
+        volume = row['volume']
+        path = row['path']
+
+        # Reset the series field based on the path if series is NULL; not sure which stupid thing I did made
+        #   this happen.
+        if ((series is None or series == 'None') and re.search('^\d\d\d\d$', volume)):
+            #print("{} ({}): {}".format(series, volume, path))
+            new_series = re.search('^(.+) \(\d\d\d\d\)$', path.split('/')[2])[1]
+            new_series = parser.massage_series(new_series, reverse=True)
+            #print("series missing from {}, setting to {}".format(path, new_series))
+            cursor.execute("update comic_info set series=? where id=? and volume = ?", (new_series, id, volume, ))
+            db.commit()
+            series = new_series
+            
+        # This was fix a database issue where everything used to be in volume instead of series.
+        m = re.search('^(.+) \((\d\d\d\d)\)$', volume)
+        if (m is not None):
+            series = m[1]
+            new_volume = m[2]
+            if (series + new_volume not in updates):
+                cursor.execute("update comic_info set series=?, volume=? where series is NULL and volume=?", (series, new_volume, volume,))
+                db.commit()
+                updates[series+new_volume] = 1
+            volume = new_volume
+        serieses['{} ({})'.format(series, volume)] = 1
     db.close()
-    return sorted(volumes, key=lambda x: x)
+    #dump(serieses)
+    return  sorted(serieses.keys())
+     #, key=lambda x: x)
 
 def get_years():
     db = connect()

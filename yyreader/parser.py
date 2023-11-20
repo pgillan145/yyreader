@@ -159,6 +159,7 @@ def massage_issue(issue, directors_cut = False):
     return issue
 
 def massage_series(series, reverse = False):
+    """Turn the series name into something appropriate for a filename (or the opposite if reverse is True)."""
     if (reverse is True):
         series = re.sub('^(.+), A$', r'A \1', series)
         series = re.sub('^(.+), An$', r'An \1', series)

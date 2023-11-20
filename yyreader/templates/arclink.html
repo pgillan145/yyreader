@@ -7,13 +7,13 @@
             {#TODO: I'm not sure how I'd do it, but it would be nice if I could see additional pages without leaving this area.  Maybe
                 two additional arclink parameters (/arclink/<aft_page>/<fore_page>) that will override the defaults of "1" and "pagecount-1",
                 respectively. #}
-            <p><a href='/read/{{previous_issue.id}}/{{previous_issue_page_count - 2}}'>{{previous_issue.volume}} #{{previous_issue.issue}}</a></p>
+            <p><a href='/read/{{previous_issue.id}}/{{previous_issue_page_count - 2}}'>{{previous_issue.series}} #{{previous_issue.issue}}</a></p>
             <img src='/page/{{previous_issue.id}}/{{previous_issue_page_count - 1}}' height=600>
             <img src='/page/{{previous_issue.id}}/{{previous_issue_page_count}}' height=600>
         </div>
         <div>
             <p>
-                <a href='/read/{{issue.id}}/3'>{{issue.volume}} #{{issue.issue}}</a>
+                <a href='/read/{{issue.id}}/3'>{{issue.series}} #{{issue.issue}}</a>
                 <a href='/arclink/{{issue.id}}/{{previous_issue.id}}'>Link</a>
                 <a href='/arclink/{{issue.id}}'>Skip</a>
             </p>

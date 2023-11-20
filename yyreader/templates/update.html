@@ -2,7 +2,7 @@
 {% block content %}
     {% include "nav.html" %}
         <div class='w3-center'>
-        <h2><a href='/read/{{yacreader.id}}'>{{yacreader.volume}} #{{yacreader.issue}}</a></h2>
+        <h2><a href='/read/{{yacreader.id}}'>{{yacreader.series}} #{{yacreader.issue}}</a></h2>
         Date: {{yacreader.date.strftime('%-m/%d/%Y')}}</br>
         Publisher: {{yacreader.publisher}}</br>
             <div>

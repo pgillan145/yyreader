@@ -38,7 +38,7 @@
         <div>
             <select id=traversal onchange="document.location='/traverse/' + document.getElementById('traversal').value + '/{{yacreader.id}}'">
                 <option value='date' {% if traversal == 'date' %}selected{% endif %}>By Date</option>
-                <option value='volume' {% if traversal == 'volume' %}selected{% endif %}>By Volume</option>
+                <option value='series' {% if traversal == 'series' %}selected{% endif %}>By Volume</option>
             </select>
             <a class='w3-button' href='/settings/crop/{{crop}}/{{yacreader.id}}'>Crop {% if crop is true %}On{% else %}Off{% endif %}</a>
             <a class='w3-button' href='/link/{{yacreader.id}}'>{% if linked is true %}Unlink{% else %}Link{% endif %}</a>
