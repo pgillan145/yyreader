@@ -19,7 +19,7 @@ from . import comicvine
 from . import parser
 
 ext_map = { 'cbr': 'RAR archive data', 'cbz': 'Zip archive data' }
-xml_map = { 'Characters':'a_characters', 'Publisher':'publisher', 'Number':'issue', 'Summary':'description', 'Series':'volume_name', 'Volume':'start_year', 'Day':'day', 'Month':'month', 'Year':'year', 'StoryArc':'a_story_arcs', 'Writer':'a_writers', 'Penciller':'a_pencillers', 'Inker':'a_inkers', 'Letterer':'a_letterers', 'Colorist':'a_colorists', 'Title':'name' }
+xml_map = { 'Characters':'a_characters', 'Publisher':'publisher', 'Number':'issue', 'Summary':'description', 'Series':'series', 'Volume':'volume', 'Day':'day', 'Month':'month', 'Year':'year', 'StoryArc':'a_story_arcs', 'Writer':'a_writers', 'Penciller':'a_pencillers', 'Inker':'a_inkers', 'Letterer':'a_letterers', 'Colorist':'a_colorists', 'Title':'name' }
 
 config = minorimpact.config.getConfig(script_name = 'yyreader')
 
@@ -123,22 +123,21 @@ class comic():
         if (parse_data['size'] < minimum_file_size):
             raise Exception("file too small")
 
-        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, args = args)
+        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, args = args, headless = args.yes)
         if (comicvine_data is None):
             raise Exception("can't get comicvine data.")
         if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
             os.mkdir(target_dir + '/' + comicvine_data['publisher'])
 
-        new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
-        volume_name = parser.massage_volume(comicvine_data['volume_name'])
-        name_dir = f'{target_dir}/{comicvine_data["publisher"]}/{volume_name} ({comicvine_data["start_year"]})'
+        new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'])
+        name_dir = target_dir + '/' + parser.make_dir(comicvine_data)
 
         while (self.file != name_dir + '/' + new_comic):
             # Figure out how 'close' the filename is to what we got back from comicvine.
             ratio = comicvine_data['ratio']
 
             c = ''
-            if (ratio >= 93 and ('date' in parse_data and (('store_date' in comicvine_data and comicvine_data['store_date'] == parse_data['date']) or ('cover_date' in comicvine_data and comicvine_data['cover_date'] == parse_data['date']))) or (re.search(r' Annual$', comicvine_data['volume_name']) and ('cover_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['cover_date']) or 'store_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['store_date'])))):
+            if (ratio >= 93 and ('date' in parse_data and (('store_date' in comicvine_data and comicvine_data['store_date'] == parse_data['date']) or ('cover_date' in comicvine_data and comicvine_data['cover_date'] == parse_data['date']))) or (re.search(r' Annual$', comicvine_data['series']) and ('cover_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['cover_date']) or 'store_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['store_date'])))):
                 default_c = 'y'
                 default_text = 'Y/n'
             else:
@@ -156,20 +155,19 @@ class comic():
 
             if (c == '?'):
                 print("  'c': Clear cache and search comicvine again")
-                print("  'd': Dump the data for this issue")
+                print("  'i': Dump the data collected for this issue")
                 print("  'n': Don't move the file")
                 print("  'q': Quit")
                 print("  'y': Move the file")
             elif (c == 'c'):
-                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True)
+                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True, headless = args.yes)
                 if (comicvine_data is None):
                     raise Exception("can't get comicvine data.")
                 if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
                     os.mkdir(target_dir + '/' + comicvine_data['publisher'])
-                new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
-                volume_name = parser.massage_volume(comicvine_data['volume_name'])
-                name_dir = f'{target_dir}/{comicvine_data["publisher"]}/{volume_name} ({comicvine_data["start_year"]})'
-            elif (c == 'd'):
+                new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'])
+                name_dir = target_dir + '/' + parser.make_dir(comicvine_data)
+            elif (c == 'i'):
                 print("Data parsed from filename:", parse_data)
                 print("Data collected online:", comicvine_data)
             elif (c == 'q'):
@@ -180,9 +178,11 @@ class comic():
                 self.data['description'] = ''
                 self.data['name'] = ''
                 self.data['start_year'] = comicvine_data['start_year']
-                self.data['ver'] = parse_data['ver']
-                self.data['volume'] = '{} ({})'.format(comicvine_data['volume_name'], comicvine_data['start_year'])
-                self.data['volume_name'] = comicvine_data['volume_name']
+                self.data['volume'] = comicvine_data['start_year']
+                if ('ver' in parse_data):
+                    self.data['ver'] = parse_data['ver']
+                    self.data['volume'] = "{}-{}".format(comicvine_data['start_year'], parse_data['ver'])
+                self.data['series'] = comicvine_data['series']
 
                 issue = parser.massage_issue(comicvine_data['issue'])
                 self.data['issue'] = comicvine_data['issue']
@@ -267,6 +267,54 @@ class comic():
 
     def collect_info(self):
         pass
+
+    def comicvine_search(self, headless = True, args = minorimpact.default_arg_flags):
+        comicvine_data = comicvine.search(self.parse_data, config['comicvine']['api_key'], cache = self.cache, args = args, headless = headless)
+        if (comicvine_data is None):
+            raise Exception("can't get comicvine data.")
+
+        parse_data = self.parse_data
+        # Figure out how 'close' the filename is to what we got back from comicvine.
+        ratio = comicvine_data['ratio']
+        if (ratio >= 93 and ('date' in parse_data and (
+                                    ('store_date' in comicvine_data and comicvine_data['store_date'] == parse_data['date']) or ('cover_date' in comicvine_data and comicvine_data['cover_date'] == parse_data['date'])
+                                )
+                            ) 
+                    or (re.search(r' Annual$', comicvine_data['series']) and ('cover_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['cover_date']) or 'store_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['store_date'])))):
+            # TODO: check to see if I need to combine parse_data and comicvine_data.
+            return comicvine_data
+
+        if (headless is False):
+            print(parse_data)
+            print(comicvine_data)
+            c = minorimpact.getChar(default=default_c, end='\n', prompt=f"move to {new_comic} (ratio:{ratio})? ({default_text}/?) ", echo=True).lower()
+
+            if (c == '?'):
+                print("  'c': Clear cache and search comicvine again")
+                print("  'i': Dump the data collected for this issue")
+                print("  'n': Don't move the file")
+                print("  'q': Quit")
+                print("  'y': Move the file")
+            elif (c == 'c'):
+                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True, headless=args.yes)
+                if (comicvine_data is None):
+                    raise Exception("can't get comicvine data.")
+                if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
+                    os.mkdir(target_dir + '/' + comicvine_data['publisher'])
+                new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'], ver = parse_data['ver'])
+                name_dir = target_dir + '/' + parser.make_dir(comicvine_data)
+            elif (c == 'i'):
+                print("Data parsed from filename:", parse_data)
+                print("Data collected online:", comicvine_data)
+            elif (c == 'q'):
+                sys.exit()
+            elif (c == 'n'):
+                return
+            elif (c == 'y'):
+                print("USE THIS")
+                pass
+
+        return comicvine_data
 
     def _files(self):
         if (len(self.files) > 0):
@@ -579,12 +627,12 @@ class comic():
                 self.data['month'] = self.parse_data['month']
             if ('start_year' in self.parse_data):
                 self.data['start_year'] = self.parse_data['start_year']
-            if ('volume_name' in self.parse_data):
-                self.data['volume_name'] = self.parse_data['volume_name']
+            if ('series' in self.parse_data):
+                self.data['series'] = self.parse_data['series']
+            if ('ver' in self.parse_data):
+                self.data['ver'] = self.parse_data['ver']
             if ('year' in self.parse_data):
                 self.data['year'] = self.parse_data['year']
-            if ('start_year' in self.data and 'volume_name' in self.data):
-                self.data['volume'] = "{} ({})".format(self.data['volume_name'], self.data['start_year'])
 
         command = None
         if (self.is_cbr()):

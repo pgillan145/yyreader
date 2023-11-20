@@ -101,19 +101,24 @@ def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache =
 
     return results
 
-def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
+def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False, headless = True):
     setup_cache(cache)
     if (args.yes is True):
-        if ('year' in data and re.search(' Annual$', data['volume'])):
+        headless = True
+    else:
+        headless = False
+
+    if (headless):
+        if ('year' in data and re.search(' Annual$', data['series'])):
             pass
-        elif (('date' not in data or data['date'] is None) and args.yes is True):
+        elif (('date' not in data or data['date'] is None) and headless is True):
             raise Exception("Can't auto confirm without strict file date, skipping.")
 
-    test_volume = data['volume']
+    test_volume = data['series']
     if (test_volume in cache['comicvine']['volumes']):
         test_volume = cache['comicvine']['volumes'][test_volume]['volume']
 
-    test_volume = parser.massage_volume(test_volume, reverse = True)
+    test_volume = parser.massage_series(test_volume, reverse = True)
 
     result = None
     match_issue = None
@@ -173,7 +178,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
                                     result = r
                                     match_issue = i
 
-        if (result is not None or args.yes is True):
+        if (result is not None or headless is True):
             break
 
         # We didn't find a date match, and we're not in auto-mode, so ask a grown-up for help.
@@ -186,7 +191,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
             if (r['id'] in issue_date):
                 menu_item = f"{menu_item} - {issue_date[r['id']]}"
             print(menu_item)
-        input_string = "Choose a volume"
+        input_string = "Choose a series"
         if (default > 0):
             input_string = f"{input_string} [{default}]"
         input_string = f"{input_string}: "
@@ -205,7 +210,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
             print("enter one of the following options:")
             print("  '0'/'-': Skip this item")
             if (len(results) > 0):
-                print(f"  '1' - '{len(results)}': select one of the volumes above")
+                print(f"  '1' - '{len(results)}': select one of the series above")
             print("  'c': clear previous searches from cache")
             print("  '####-#####': a comicvine volume or issue id")
             print("  'https://XXXXX/####-#####': a url containing a comicvine volume or issue id")
@@ -258,7 +263,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
 
     comicvine_data = {}
     comicvine_data['volume_id'] = volume_id
-    comicvine_data['volume_name'] = result['name']
+    comicvine_data['series'] = result['name']
     comicvine_data['start_year'] = result['start_year']
     comicvine_data['publisher'] = result['publisher']['name']
 
@@ -267,7 +272,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
         i = get_issue(volume_id, data['issue'], api_key, args = args, cache = cache, clear_cache = clear_cache)
 
     if (i is None):
-        raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['volume_name']}")
+        raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['series']}")
 
     comicvine_data['issue'] = i['issue_number']
     comicvine_data['issue_id'] = i['id']
@@ -290,18 +295,19 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
         if ('date' not in comicvine_data):
             comicvine_data['date'] = comicvine_data['cover_date'] 
 
-    cache['comicvine']['volumes'][data['volume']] = { 'volume': comicvine_data['volume_name'], 'mod_date': datetime.now() }
+    # Cache the old series with the new name so we can avoid all this if we see it again.
+    cache['comicvine']['volumes'][data['series']] = { 'volume': comicvine_data['series'], 'mod_date': datetime.now() }
 
     return comicvine_data
 
 def search_volumes(volume, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
     setup_cache(cache)
-    volume = parser.massage_volume(volume, reverse = True)
+    volume = parser.massage_series(volume, reverse = True)
     if (args.debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
     results = []
     url = base_url + '/search/?api_key=' + api_key + f'&format=json&query={volume}&resources=volume&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-    #if (args.debug): print(url)
+    if (args.debug): print(url)
     try:
         results = get_results(url, max = 100, cache = cache, clear_cache = clear_cache)
     except Exception as e:

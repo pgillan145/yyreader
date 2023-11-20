@@ -13,26 +13,29 @@ date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)' ]
 
-formats = [ '^(?P<year>\d\d\d\d)00 (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
-            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<volume>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+formats = [ '^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # Damage Control (1989v2) 001 (1989-12-01).cbr
-            '^(?P<volume>.+) \((?P<start_year>\d\d\d\d)-(?P<ver>\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)v(?P<ver>\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            # Damage Control (1989-2) 001 (1989-12-01).cbr
+            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)-(?P<ver>\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             # Alien Legion (1984) 001 (1984-06-01).cbr
-            '^(?P<volume>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             # Earth X (1999)/Earth X (1999) ½ (2000-01-01).cbz
-            '^(?P<volume>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>[^ ]+) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>[^ ]+) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            # Daredevil (1964) 359 (1996-12-01).cbz
+            '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Hulk - Grand Design 001 - Monster (2022).cbr
-            '^(?P<volume>.+) (?P<issue>\d\d\d) - .+ \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+) (?P<issue>\d+)\.(?P<extension>cb[rz])$',
-            '^(?P<year>\d\d\d\d)00 (?P<volume>.+)\.(?P<extension>cb[rz])$',
-            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<volume>.+)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<volume>.+)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) (?P<issue>\d\d\d) - .+ \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) (?P<issue>\d+)\.(?P<extension>cb[rz])$',
+            '^(?P<year>\d\d\d\d)00 (?P<series>.+)\.(?P<extension>cb[rz])$',
+            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+)\.(?P<extension>cb[rz])$',
           ]
 
 credit_pages = [ 'Scanned By Gird.jpg',
@@ -84,7 +87,7 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':' Part Four', 's':' 004' },
                ]
 
-volume_subs = [ 
+series_subs = [ 
                 { 'm': '(.+) starring .*', 's': r'\1' },
                 { 'm': '(Marvel Action Hour) featuring (.*)', 's': r'\1 - \2' },
                 { 'm': '(.+) featuring .*', 's': r'\1' },
@@ -100,39 +103,34 @@ volume_subs = [
                 { 'm': 'US1', 's':'U.S. 1' },
              ]
 
-def make_date(data, extension, ver = None, directors_cut = False):
+def make_dir(data):
+    series = massage_series(data['series'])
+    volume = data['start_year']
+    if ('ver' in data):
+        ver = data['ver']
+        if (ver is not None):
+            volume = volume + "-" + ver
+    return f'{data["publisher"]}/{series} ({volume})'
+
+def make_name(data, extension, directors_cut = False):
     if ('issue' not in data):
         raise Exception("'issue' not found in comic data")
 
     if ('date' not in data or data['date'] is None):
         raise Exception(f"'date' not in data")
 
-    if ('volume_name' not in data or data['volume_name'] is None):
-        raise Exception(f"'volume_name' not in data")
+    if ('series' not in data or data['series'] is None):
+        raise Exception(f"'series' not in data")
 
     issue = massage_issue(data['issue'], directors_cut = directors_cut)
-    volume_name = massage_volume(data['volume_name'])
-    start_year = data['start_year']
-    if (ver is not None):
-        start_year = start_year + "-" + ver
-    return f"{data['date']} {volume_name} ({start_year}) {issue}.{extension}"
-
-def make_name(data, extension, ver = None, directors_cut = False):
-    if ('issue' not in data):
-        raise Exception("'issue' not found in comic data")
-
-    if ('date' not in data or data['date'] is None):
-        raise Exception(f"'date' not in data")
-
-    if ('volume_name' not in data or data['volume_name'] is None):
-        raise Exception(f"'volume_name' not in data")
-
-    issue = massage_issue(data['issue'], directors_cut = directors_cut)
-    volume_name = massage_volume(data['volume_name'])
-    start_year = data['start_year']
-    if (ver is not None):
-        start_year = start_year + "-" + ver
-    return f"{volume_name} ({start_year}) {issue} ({data['date']}).{extension}"
+    series = massage_series(data['series'])
+    volume = data['start_year']
+    if ('ver' in data):
+        ver = data['ver']
+        if (ver is not None):
+            volume = volume + "-" + ver
+    
+    return f"{series} ({volume}) {issue} ({data['date']}).{extension}"
 
 def massage_issue(issue, directors_cut = False):
     issue = re.sub('^0+','', issue)
@@ -160,32 +158,32 @@ def massage_issue(issue, directors_cut = False):
 
     return issue
 
-def massage_volume(volume, reverse = False):
+def massage_series(series, reverse = False):
     if (reverse is True):
-        volume = re.sub('^(.+), A$', r'A \1', volume)
-        volume = re.sub('^(.+), An$', r'An \1', volume)
-        volume = re.sub('^(.+), The$', r'The \1', volume)
-        volume = re.sub('__SLASH__', '/', volume)
+        series = re.sub('^(.+), A$', r'A \1', series)
+        series = re.sub('^(.+), An$', r'An \1', series)
+        series = re.sub('^(.+), The$', r'The \1', series)
+        series = re.sub('__SLASH__', '/', series)
     else:
-        volume = re.sub('^A (.+)$', r'\1, A', volume)
-        volume = re.sub('^An (.+)$', r'\1, An', volume)
-        volume = re.sub('^The (.+)$', r'\1, The', volume)
-        volume = re.sub('/','__SLASH__', volume)
-        volume = volume.strip()
-    return volume
+        series = re.sub('^A (.+)$', r'\1, A', series)
+        series = re.sub('^An (.+)$', r'\1, An', series)
+        series = re.sub('^The (.+)$', r'\1, The', series)
+        series = re.sub('/','__SLASH__', series)
+        series = series.strip()
+    return series
 
 def convert_name_to_date(comic):
     m = re.search('([^/]+) \((\d\d\d\d)\) (\d+[^ ]+) \((\d\d\d\d)-(\d\d)-(\d\d)\)\.(cb[rz])$', comic)
     if (m is None):
         return None
-    volume_name = m.group(1)
+    series = m.group(1)
     start_year = m.group(2)
     issue = m.group(3)
     year = m.group(4)
     month = m.group(5)
     day = m.group(6)
     extension = m.group(7)
-    return f'{year}/{month}/{year}-{month}-{day} {volume_name} ({start_year}) {issue}.{extension}'
+    return f'{year}/{month}/{year}-{month}-{day} {series} ({start_year}) {issue}.{extension}'
 
 def is_credit_page(filename):
     for credit_page in credit_pages:
@@ -214,7 +212,7 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     month = None
     start_year = None
     date = None
-    volume = None
+    series = None
     ver = None
 
     (dirname, basename) = os.path.split(comic_file)
@@ -253,31 +251,30 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
             if 'issue' in g: issue = g['issue']
             if 'month' in g: month = g['month']
             if 'start_year' in g: start_year = g['start_year']
-            if 'volume' in g: volume = g['volume']
+            if 'series' in g: series = g['series']
             if 'ver' in g: ver = g['ver']
             if 'year' in g and year is None: year = g['year']
             break
 
     if (issue is None): issue = '001'
-    if (volume is None or extension is None):
+    if (series is None or extension is None):
         raise Exception("invalid filename")
 
-    if (re.search('amazing spider-man', volume) and year is not None):
+    if (re.search('amazing spider-man', series) and year is not None):
         if (int(year) >= 1999 and int(year) < 2014 and (int(issue) <= 58)):
             issue = int(issue) + 441
 
-    for c in volume_subs:
+    for c in series_subs:
         count = 0
         if 'c' in c:
             count = c['c']
-        volume = re.sub(c['m'], c['s'], volume, count = count)
+        series = re.sub(c['m'], c['s'], series, count = count)
 
-    #if (args.debug): print(f"parsed volume:{volume},issue:{issue},year:{year},month:{month},day:{day}")
+    #if (args.debug): print(f"parsed series:{series},stat_year:{start_year},issue:{issue},year:{year},month:{month},day:{day}")
     data['extension'] = extension
     data['issue'] = issue
     data['start_year'] = start_year
-    data['volume'] = volume
-    data['volume_name'] = volume
+    data['series'] = series
     data['ver'] = ver
     
 
@@ -294,7 +291,7 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
         data['year'] = year
         if (re.search('^\d+$', year) and issue is not None and re.search('^\d+$', issue) and month is not None and month != '00' and re.search('^\d+$', month)):
             months = int(issue) - 1
-            if (re.search(' annual',volume.lower())):
+            if (re.search(' annual',series.lower())):
                 months = (int(issue) - 1) * 12
             est_start_date = datetime(int(year), int(month), 1) - relativedelta(months = months)
             data['est_start_year'] = est_start_date.year

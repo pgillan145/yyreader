@@ -6,6 +6,7 @@ from time import time
 
 import argparse
 from . import comic
+from . import comicvine
 import magic
 import minorimpact
 import minorimpact.config
@@ -19,14 +20,14 @@ import sys
 cache = {}
 
 def main():
+    global cache
+
     config = minorimpact.config.getConfig(script_name = 'yyreader')
 
-    read_cache(config['default']['cache_file'])
 
     parser = argparse.ArgumentParser(description = "yyreader", formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('action', nargs='?', default='process', help = '''Specify one of the following:
   'process'  Move files in DIR to TARGET (default)
-  'missing'  Scan TARGET for missing runs.
   'verify'   scan files in TARGET for incomplete meta data.''')
     parser.add_argument('--file', metavar = 'FILE',  help = "process FILE")
     parser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
@@ -51,28 +52,35 @@ def main():
             args.dir = c_file
             args.file = None
 
-    if (args.dir is not None):
-        if (os.path.exists(args.dir) is False):
-            raise Exception(f"{args.dir} does not exist")
-        if (os.path.isdir(args.dir) is False):
-            raise Exception(f"{args.dir} is not a directory")
+    read_cache(config['default']['cache_file'], args = args)
 
-        c_files = minorimpact.readdir(args.dir)
-    elif (args.file is not None):
-        c_files = [ args.file ]
+    if (args.action == 'process'):
+        if (args.dir is not None):
+            if (os.path.exists(args.dir) is False):
+                raise Exception(f"{args.dir} does not exist")
+            if (os.path.isdir(args.dir) is False):
+                raise Exception(f"{args.dir} is not a directory")
 
-    for c_file in c_files:
-        if (args.action == 'process'):
+            c_files = minorimpact.readdir(args.dir)
+        elif (args.file is not None):
+            c_files = [ args.file ]
+
+        for c_file in c_files:
             box(c_file, args.target, args = args)
-        elif (args.action == 'verify'):
-            verify(args.target, args = args)
-        elif (args.action == 'missing'):
-            # TODO: missing stuff.
-            print("do missing stuff")
+            write_cache(config['default']['cache_file'], args = args)
 
-        write_cache(config['default']['cache_file'])
+    elif (args.action == 'verify'):
+        c_files = minorimpact.readdir(args.target)
+        i = 0
+        for c_file in c_files:
+            i = i + 1
+            if (i > 2): break
+            verify(c_file, args = args)
+            write_cache(config['default']['cache_file'])
 
 def box(comic_file, target, args = minorimpact.default_arg_flags):
+    global cache
+
     if (os.path.exists(comic_file) is False):
         print(f"{comic_file} does not exist")
         return
@@ -116,16 +124,6 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
     except Exception as e:
         print(e)
 
-def verify (target, args = minorimpact.default_arg_flags):
-    print("do verify stuff ")
-    # TODO: verify stuff.
-    # for each file in TARGET
-    #   read file
-    #   check cache for last time we verified this file
-    #   verify the data in the file
-    #   if bad, fix it
-    #   update verify date in cache
-
 def change_extension(file_name, new_extension):
     if (re.search(r'^\.', new_extension)):
         new_extension = re.sub(r'^\.', '', new_extension)
@@ -135,22 +133,39 @@ def change_extension(file_name, new_extension):
     shutil.move(file_name, new_file)
     return new_file
 
-def read_cache(cache_file):
+def read_cache(cache_file, args = minorimpact.default_arg_flags):
     global cache
 
     if (cache_file is None):
+        if (args.debug): print("no cache file defined")
         return
 
     if (os.path.exists(cache_file) is True):
+        if (args.debug): print("reading cache from {}".format(cache_file))
         with open(cache_file, 'rb') as f:
             cache = pickle.load(f)
+    else:
+        if (args.debug): print("{} does not exist".format(cache_file))
 
-def write_cache(cache_file):
+def verify (comic_file, args = minorimpact.default_arg_flags):
+    global cache
+    print("verifying {}".format(comic_file))
+
+    c = comic.comic(comic_file, cache = cache)
+    comicvine_data = c.comicvine_search(args = args, headless = args.yes)
+    parse_data = c.parse_data
+    print(parse_data)
+    print(comicvine_data)
+    # write the data the file.  take this code from comic.box() and break it out into a function.
+
+def write_cache(cache_file, args = minorimpact.default_arg_flags):
     global cache
 
     if (cache_file is None):
+        if (args.debug): print("no cache file defined")
         return
 
+    if (args.debug): print("writing cache to {}".format(cache_file))
     pickle_data = pickle.dumps(cache)
     done = False
     interrupted = False

@@ -416,23 +416,33 @@ def get_comic_by_id(id, db = None):
     else:
         local_db = db
     cursor = local_db.cursor()
-    cursor.execute('select comic_info.volume, comic_info.number, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher, comic_info.series from comic_info, comic where comic.comicInfoId=comic_info.id and comic_info.id = ?', (id,))
+    sql = { 'select': 'comic_info.volume, comic_info.number as issue, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher, comic_info.series', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id and comic_info.id = ?', 'params':[id]}
+    #print(build_sql(sql), sql['params'])
+    cursor.execute(build_sql(sql), sql['params'])
     rows = cursor.fetchall()
     comic_data = None
     for row in rows:
-        volume = row[0]
-        issue = row[1]
+        issue = row['issue']
+        volume = row['volume']
+        series = row['series']
+        m = re.search('^(.+) \((\d\d\d\d)\)$', volume)
+        if (m is not None):
+            if (series is None):
+                series = m[1]
+            volume = m[2]
+
         date = convert_yacreader_date(row[2])
-        id = row[3]
-        path = row[4]
-        read = row[5]
-        current_page = row[6]
-        hash = row[7]
+        id = row['id']
+        path = row['path']
+        read = row['read']
+        current_page = row['currentPage']
+        hash = row['hash']
         comic_id = row['comic_id']
         publisher = row['publisher']
-        series = row['series']
         fore_id = None
         aft_id = None
+        #print("date:{}, series:{}, volume:{}".format(date, series, volume))
+        
 
         linkrow = cursor.execute('select foreComicId from link where aftComicId=?', (id, )).fetchone()
         if (linkrow is not None):
@@ -468,18 +478,24 @@ def get_comics_by_date(year, month, db = None):
     cursor = local_db.cursor()
     if (month < 10): month = '0{}'.format(month)
     comics = []
-    sql = 'select volume, number, date, id, read, currentPage, series from comic_info where date like "%/{}/{}"'
-    #print(sql.format(month, year))
-    cursor.execute(sql.format(month, year))
+    sql = { 'select': 'volume, number, date, id, read, currentPage, series', 'from':'comic_info', 'where':'date like "%/{}/{}"'.format(month, year), 'params':[]}
+    #print(build_sql(sql), sql['params'])
+    cursor.execute(build_sql(sql), sql['params'])
     rows = cursor.fetchall()
     for row in rows:
-        volume = row[0]
-        issue = row[1]
-        date = convert_yacreader_date(row[2])
-        id = row[3]
-        read = row[4]
-        current_page = row[5]
-        series = row[6]
+        series = row['series']
+        volume = row['volume']
+        m = re.search('^(.+) \((\d\d\d\d)\)$',volume)
+        if (m is not None):
+            if (series is None):
+                series = m[1]
+            volume = m[2]
+        issue = row['number']
+        date = convert_yacreader_date(row['date'])
+        id = row['id']
+        read = row['read']
+        current_page = row['currentPage']
+        #print("date:{}, series:{}, volume:{}".format(date, series, volume))
 
         comics.append(get_comic_by_id(id, db = local_db))
     if (db is None):
