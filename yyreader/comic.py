@@ -179,7 +179,7 @@ class comic():
                 self.data['name'] = ''
                 self.data['start_year'] = comicvine_data['start_year']
                 self.data['volume'] = comicvine_data['start_year']
-                if ('ver' in parse_data):
+                if ('ver' in parse_data and parse_data['ver'] is not None and parse_data['ver'] != ''):
                     self.data['ver'] = parse_data['ver']
                     self.data['volume'] = "{}-{}".format(comicvine_data['start_year'], parse_data['ver'])
                 self.data['series'] = comicvine_data['series']

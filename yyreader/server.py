@@ -456,17 +456,21 @@ def read(id, page = None, half = None):
     elif (traversal == 'strict'):
         #TODO: Add a traversal method that goes by date but ignores linking.
         pass
-    else:
+    elif (traversal == 'date'):
         #back = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         #forth = back
-        n = yacreader.get_next_comic(y['id'])
         p = yacreader.get_previous_comic(y['id'])
+        n = yacreader.get_next_comic(y['id'])
         #TODO: Figure out how to display long ass titles in what are supposed to be small buttons.  Just the first few
         #   characters?  Maybe tiny cover thumbnails?
         if (p['aft_id'] == y['id']):
             linked = True
-        back = {'url': '/read/{}'.format(p['id']), 'text':'{} #{}'.format(p['series'], p['issue'])}
-        forth = {'url': '/read/{}'.format(n['id']), 'text':'{} #{}'.format(n['series'], n['issue'])}
+        if (p):
+            back = {'url': '/read/{}'.format(p['id']), 'text':'{} #{}'.format(p['series'], p['issue'])}
+        if (n):
+            forth = {'url': '/read/{}'.format(n['id']), 'text':'{} #{}'.format(n['series'], n['issue'])}
+    else:
+        print("unknown traversal:", traversal)
 
     if (page == 1):
         previous_page_url =  back['url']

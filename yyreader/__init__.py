@@ -26,8 +26,8 @@ def main():
 
 
     parser = argparse.ArgumentParser(description = "yyreader", formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('action', nargs='?', default='process', help = '''Specify one of the following:
-  'process'  Move files in DIR to TARGET (default)
+    parser.add_argument('action', nargs='?', default='box', help = '''Specify one of the following:
+  'box'  Move files in DIR to TARGET (default)
   'verify'   scan files in TARGET for incomplete meta data.''')
     parser.add_argument('--file', metavar = 'FILE',  help = "process FILE")
     parser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
@@ -54,7 +54,7 @@ def main():
 
     read_cache(config['default']['cache_file'], args = args)
 
-    if (args.action == 'process'):
+    if (args.action == 'box'):
         if (args.dir is not None):
             if (os.path.exists(args.dir) is False):
                 raise Exception(f"{args.dir} does not exist")
@@ -84,7 +84,7 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
     if (os.path.exists(comic_file) is False):
         print(f"{comic_file} does not exist")
         return
-    print("processing {}".format(comic_file))
+    print("boxing {}".format(comic_file))
 
     (root, ext) = os.path.splitext(comic_file)
     if (root + ext.lower() != comic_file):

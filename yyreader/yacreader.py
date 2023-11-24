@@ -627,9 +627,9 @@ def get_head_comic(id, db = None):
         local_db = db
     cursor = local_db.cursor()
 
-    y = get_comic_by_id(id, local_db)
+    y = get_comic_by_id(id, db = local_db)
     while (y['fore_id'] is not None):
-        y = get_comic_by_id(y['fore_id'], local_db)
+        y = get_comic_by_id(y['fore_id'], db = local_db)
 
     if (db is None):
         local_db.close()
@@ -658,8 +658,9 @@ def get_next_comic(id, db = None):
 
     comic_data = None
 
+    y = get_comic_by_id(id, db = local_db)
     if (y['aft_id'] is not None):
-        comic_data = get_comic_by_id(y['aft_id'], db = local_db)
+        comic_data = get_comic_by_id(y['iaft_id'], db = local_db)
     else:
         head = get_head_comic(id, db = local_db)
 
@@ -708,9 +709,9 @@ def get_next_date(year, month, db = None):
     next_month = None
     months = get_months(year, db = local_db)
     if (month == months[len(months)-1]):
-        years = get_years()
+        years = get_years(db = local_db)
         for i in range(0, len(years)):
-            if (years[i] == year and i < len(years)):
+            if (years[i] == year and i < (len(years) - 1)):
                 next_year = years[i+1]
                 break
         if (next_year is not None):
@@ -858,9 +859,12 @@ def get_serieses(filter = None):
     return  sorted(serieses.keys())
      #, key=lambda x: x)
 
-def get_years():
-    db = connect()
-    cursor = db.cursor()
+def get_years(db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    cursor = local_db.cursor()
     years = []
     cursor.execute('select distinct(date) from comic_info')
     rows = cursor.fetchall()
@@ -871,7 +875,10 @@ def get_years():
         year = date.year
         if (year not in years):
             years.append(year)
-    db.close()
+
+    if (db is None):
+        local_db.close()
+
     return sorted(years, key=lambda x: x)
 
 def link(foreid, aftid, db = None):
