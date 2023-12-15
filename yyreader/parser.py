@@ -8,24 +8,20 @@ import re
 import requests
 import time
 
-date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
-                 '\(?(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)?',
-                 '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
-                 '(?P<year>\d\d\d\d)(?P<month>\d\d)' ]
-
-formats = [ '^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+formats = [
+            # 198900 Damage Control 001.cbr
+            '^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            # 198912 Damage Control 001.cbr
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
-            # Damage Control (1989v2) 001 (1989-12-01).cbr
-            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)v(?P<ver>\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            # Damage Control (1989) 001 (1989-12-01).cbr
+            '^(?P<series>.+) \((?P<volume>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             # Damage Control (1989-2) 001 (1989-12-01).cbr
-            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)-(?P<ver>\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-            # Alien Legion (1984) 001 (1984-06-01).cbr
-            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<volume>\d\d\d\d-\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             # Earth X (1999)/Earth X (1999) ½ (2000-01-01).cbz
-            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>[^ ]+) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+) \((?P<start_year>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-            # Daredevil (1964) 359 (1996-12-01).cbz
+            '^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>[^ ]+) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
+            '^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            # Daredevil 359 (1996-12-01).cbz
             '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
             '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
@@ -37,6 +33,37 @@ formats = [ '^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<exten
             '^(?P<series>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             '^(?P<series>.+)\.(?P<extension>cb[rz])$',
           ]
+
+date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
+                 '\(?(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)?',
+                 '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
+                 '(?P<year>\d\d\d\d)(?P<month>\d\d)', 
+               ]
+
+description_formats = [
+                        '^<p><em>(?P<description>.+<\/em><\/p><p><em>.+?)<\/em><\/p>.*$',
+                        '^<p><em>(?P<description>.+?)<\/em><\/p>.*$',
+                        '^<p><i>(?P<description>[^<]+)<\/i><\/p>$',
+                        '^<p>(?P<description>[^<]+)<\/p>.+$',
+                        '^<h3>(?P<description>.+?)<\/h3><p>(?P<description2>.+?)</p>.*$',
+                        '^(?P<description>.+?)<\/em><\/p>.+$',
+                    ]
+
+description_subs = [
+                    { 'm':'<\/em><\/p><p><em>', 's':r' ' },
+                    { 'm':'<h2> ?(.+)<\/h2><br\/>', 's':r'\1' },
+                    { 'm':'<h2> ?(.+)<\/h2>', 's':r'\1' },
+                    { 'm':'<u><b>(.+)<\/b><\/u><br\/>', 's':r'\1' },
+                    { 'm':'<u><b>(.+)<\/b><\/u>', 's':r'\1' },
+                    { 'm':'<br\/>', 's':r', ' },
+                    { 'm':'<br \/>', 's':r', ' },
+                    { 'm':', $', 's':r'' },
+                 ]
+
+
+volume_formats = [ '^(?P<start_year>\d\d\d\d)$',
+                   '^(?P<start_year>\d\d\d\d)[v\-](?P<ver>\d+)$',
+                 ]
 
 credit_pages = [ 'Scanned By Gird.jpg',
                  'z.jpg',
@@ -103,16 +130,13 @@ series_subs = [
                 { 'm': 'US1', 's':'U.S. 1' },
              ]
 
-def make_dir(data):
-    series = massage_series(data['series'])
-    volume = data['start_year']
-    if ('ver' in data):
-        ver = data['ver']
-        if (ver is not None):
-            volume = volume + "-" + ver
-    return f'{data["publisher"]}/{series} ({volume})'
+def make_dir(data, args = minorimpact.default_arg_flags):
+    publisher = data["publisher"]
+    series = series_filename(data['series'])
+    volume = data['volume']
+    return f'{publisher}/{series} ({volume})'
 
-def make_name(data, extension, directors_cut = False):
+def make_name(data, extension, directors_cut = False, args = minorimpact.default_arg_flags):
     if ('issue' not in data):
         raise Exception("'issue' not found in comic data")
 
@@ -122,15 +146,35 @@ def make_name(data, extension, directors_cut = False):
     if ('series' not in data or data['series'] is None):
         raise Exception(f"'series' not in data")
 
-    issue = massage_issue(data['issue'], directors_cut = directors_cut)
-    series = massage_series(data['series'])
-    volume = data['start_year']
-    if ('ver' in data):
-        ver = data['ver']
-        if (ver is not None):
-            volume = volume + "-" + ver
-    
+    issue = series_filename(data['issue'])
+    series = series_filename(data['series'])
+    volume = data['volume']
     return f"{series} ({volume}) {issue} ({data['date']}).{extension}"
+
+def massage_description(description, args = minorimpact.default_arg_flags, debug = False):
+    if (args.debug): debug = True
+
+    if (debug): print("original description:", description)
+    for f in description_formats:
+        m = re.search(f, description)
+        if (m is not None):
+            if (debug): print("matched description {}".format(f))
+            g = m.groupdict()
+            if 'description' in g: description = g['description']
+            if 'description2' in g: description = description + ':' + g['description2']
+            break
+            #print("FOUND",description)
+    
+    #if (debug): print("description2:", description)
+    for c in description_subs:
+        count = 0
+        if 'c' in c:
+            count = c['c']
+        description = re.sub(c['m'], c['s'], description, count = count)
+        #if (debug): print("'{}' -> '{}'".format(c['m'], c['s'])
+
+    if (debug): print("final description:", description)
+    return description
 
 def massage_issue(issue, directors_cut = False):
     issue = re.sub('^0+','', issue)
@@ -158,21 +202,6 @@ def massage_issue(issue, directors_cut = False):
 
     return issue
 
-def massage_series(series, reverse = False):
-    """Turn the series name into something appropriate for a filename (or the opposite if reverse is True)."""
-    if (reverse is True):
-        series = re.sub('^(.+), A$', r'A \1', series)
-        series = re.sub('^(.+), An$', r'An \1', series)
-        series = re.sub('^(.+), The$', r'The \1', series)
-        series = re.sub('__SLASH__', '/', series)
-    else:
-        series = re.sub('^A (.+)$', r'\1, A', series)
-        series = re.sub('^An (.+)$', r'\1, An', series)
-        series = re.sub('^The (.+)$', r'\1, The', series)
-        series = re.sub('/','__SLASH__', series)
-        series = series.strip()
-    return series
-
 def convert_name_to_date(comic):
     m = re.search('([^/]+) \((\d\d\d\d)\) (\d+[^ ]+) \((\d\d\d\d)-(\d\d)-(\d\d)\)\.(cb[rz])$', comic)
     if (m is None):
@@ -192,9 +221,9 @@ def is_credit_page(filename):
             return True
     return False
 
-def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
+def parse(comic_file, year = None, verbose = False, debug = False):
     """Analyze the file name and pull as much information about it as possible."""
-    #if (args.verbose): print("Parsing {}".format(comic_file))
+    #if (verbose): print("parsing {}".format(comic_file))
 
     data = { 'directors_cut': False }
 
@@ -205,16 +234,17 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     if (re.search('\.cb[rz]$', comic_file, re.I) is None):
         raise Exception("invalid file type")
 
-    #if (args.debug is True): print(comic_file)
+    #if (debug is True): print(comic_file)
 
     day = None
     extension = None
     issue = None
     month = None
-    start_year = None
+    start_year = ''
     date = None
     series = None
-    ver = None
+    ver = ''
+    volume = ''
 
     (dirname, basename) = os.path.split(comic_file)
     if (re.search('fc only', basename) is not None or re.search('cover ONLY', basename) is not None or re.search('cover only', basename) is not None):
@@ -229,7 +259,6 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
     if (re.search(r" - [dD]irector'?s? [Cc]ut", basename) is not None):
         data['directors_cut'] = True
         basename = re.sub(" - [dD]irector'?s? [cC]ut", '', basename)
-    #if (args.debug): print("basename:" + basename)
 
     # Scan the parent directories for something that looks like a date.
     for f in date_formats:
@@ -242,20 +271,30 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
             break
 
     for f in formats:
-        #if (args.debug): print(f"testing '{f}'")
+        #if (debug): print(f"testing '{f}' ({basename})")
         m = re.search(f, basename)
         if (m is not None):
-            #if (args.debug): print(f"matched format '{f}'")
+            if (debug): print(f"matched format '{f}'")
             g = m.groupdict()
             if 'day' in g: day = g['day']
             if 'extension' in g: extension = g['extension']
             if 'issue' in g: issue = g['issue']
             if 'month' in g: month = g['month']
-            if 'start_year' in g: start_year = g['start_year']
             if 'series' in g: series = g['series']
-            if 'ver' in g: ver = g['ver']
+            if 'volume' in g: volume = g['volume']
             if 'year' in g and year is None: year = g['year']
             break
+
+    if (volume is not None):
+        for f in volume_formats:
+            #if (debug): print(f"testing volume format '{f}' ({volume})")
+            m = re.search(f, volume)
+            if (m is not None):
+                if (debug): print(f"matched volume format '{f}'")
+                g = m.groupdict()
+                if 'start_year' in g: start_year = g['start_year']
+                if 'ver' in g: ver = g['ver']
+                break
 
     if (issue is None): issue = '001'
     if (series is None or extension is None):
@@ -271,13 +310,18 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
             count = c['c']
         series = re.sub(c['m'], c['s'], series, count = count)
 
-    #if (args.debug): print(f"parsed series:{series},stat_year:{start_year},issue:{issue},year:{year},month:{month},day:{day}")
+    #while (len(issue) > 1 and re.search('^0', issue)):
+    #    issue = re.sub('^0','', issue)
+
+    if (ver is None): ver = ''
+
+    #if (debug): print(f"parsed series:{series},stat_year:{start_year},issue:{issue},year:{year},month:{month},day:{day}")
     data['extension'] = extension
     data['issue'] = issue
     data['start_year'] = start_year
-    data['series'] = series
+    data['series'] = series_filename(series, reverse = True)
     data['ver'] = ver
-    
+    data['volume'] = volume
 
     if (year is not None and month is not None and day is not None and day != '00'):
         data['date'] = f'{year}-{month}-{day}'
@@ -298,3 +342,19 @@ def parse(comic_file, year = None, args = minorimpact.default_arg_flags):
             data['est_start_year'] = est_start_date.year
             
     return data
+
+def series_filename(series, reverse = False):
+    """Turn the series name into something appropriate for a filename (or the opposite if reverse is True)."""
+    if (reverse is True):
+        series = re.sub('^(.+), A$', r'A \1', series)
+        series = re.sub('^(.+), An$', r'An \1', series)
+        series = re.sub('^(.+), The$', r'The \1', series)
+        series = re.sub('__SLASH__', '/', series)
+    else:
+        series = re.sub('^A (.+)$', r'\1, A', series)
+        series = re.sub('^An (.+)$', r'\1, An', series)
+        series = re.sub('^The (.+)$', r'\1, The', series)
+        series = re.sub('/','__SLASH__', series)
+        series = series.strip()
+    return series
+

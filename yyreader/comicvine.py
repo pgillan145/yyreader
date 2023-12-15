@@ -23,17 +23,18 @@ params = {}
 
 config = minorimpact.config.getConfig(script_name = 'yyreader')
 
-def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
+def get_issue(volume_id, issue, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
+
     setup_cache(cache)
     url = base_url + f'/volume/4050-{volume_id}/?api_key=' + api_key + f'&format=json&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-    if (args.debug): print(url)
-    volume_results = get_results(url, cache = cache, clear_cache = clear_cache)
+    #if (debug): print(url)
+    volume_results = get_results(url, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     
     volume_name = '{} ({}) - {}'.format(volume_results[0]['name'], volume_results[0]['start_year'], volume_results[0]['publisher']['name'])
 
     url = base_url + '/issues/?api_key=' + api_key + f'&format=json&sort=name:asc&filter=volume:{volume_id}&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
-    #if (args.debug is True): print(url)
-    results = get_results(url, max = None, cache = cache, clear_cache = clear_cache)
+    #if (debug): print(url)
+    results = get_results(url, max = None, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     i = len(results) - 1
     while i >= 0:
         if ('store_date' not in results[i] or results[i]['store_date'] is None) and ('cover_date' not in results[i] or results[i]['cover_date'] is None):
@@ -41,22 +42,24 @@ def get_issue(volume_id, issue, api_key, args = minorimpact.default_arg_flags, c
         i = i - 1
 
     issue = parser.massage_issue(issue)
-    if (args.debug): print(f"  searching for issue #{issue} of {volume_name}")
+    if (debug): print(f"  searching for issue #{issue} of {volume_name}")
     for i in results:
-        #if (args.debug): print(i)
-        if (parser.massage_issue(i['issue_number']) == issue):
+        #if (debug): print(i)
+        if ('issue_number' in i and (issue == i['issue_number'] or parser.massage_issue(i['issue_number']) == issue)):
+            i['details'] = get_issue_details(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
             return i
     return None
 
-def get_issue_details(issue_id, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
+def get_issue_details(issue_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
+
     url = f'{base_url}/issue/4000-{issue_id}/?api_key={api_key}&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits,description,character_credits'
-    #if (args.debug is True): print(url)
+    #if (debug): print(url)
     results = get_results(url, cache = cache, clear_cache = clear_cache)
-    #if (args.debug): print(results[0])
+    #if (debug): print(results[0])
     return results[0]
 
 last_result = datetime.now()
-def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache = False):
+def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache = False, verbose = False, debug = False):
     setup_cache(cache)
     global last_result
     seconds_between_requests = 3
@@ -101,12 +104,16 @@ def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache =
 
     return results
 
-def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False, headless = True):
+def get_volume_id(volume, cache = {}, clear_cache = False, debug = False, headless = False, verbose = False):
     setup_cache(cache)
-    if (args.yes is True):
-        headless = True
-    else:
-        headless = False
+
+    results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, headless = headless)
+
+    return id
+
+#TODO: Make this take a limited set of fields for search, rather than just passing it 'data'.
+def search(data, api_key, cache = {}, clear_cache = False, headless = False, verbose = False, debug = True):
+    setup_cache(cache)
 
     if (headless):
         if ('year' in data and re.search(' Annual$', data['series'])):
@@ -118,8 +125,6 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
     if (test_volume in cache['comicvine']['volumes']):
         test_volume = cache['comicvine']['volumes'][test_volume]['volume']
 
-    test_volume = parser.massage_series(test_volume, reverse = True)
-
     result = None
     match_issue = None
     while (result is None):
@@ -130,7 +135,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
             start_year = data['est_start_year']
 
         # Get an initial list of volumes from the site that we can start to check.
-        results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], args = args, cache = cache, clear_cache = clear_cache)
+        results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], cache = cache, clear_cache = clear_cache, headless = headless, verbose = verbose, debug = debug)
 
         for r in results:
             if ('ratio' not in r):
@@ -140,7 +145,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
                 r['ratio'] = ratio
         results = sorted(results, key = lambda x:x['ratio'], reverse = True)
 
-        if (args.verbose): print(f"  {len(results)} result(s) for '{test_volume}'")
+        if (verbose): print(f"  {len(results)} result(s) for '{test_volume}'")
         item = 0
         default = 0
         max_ratio = 0
@@ -148,7 +153,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
         # If we have a date for the issue, then we can look through each volume for the given issue number to see if it has the
         #   same date.  If so, then then this is *probably* the correct volume.
         if (('date' in data and data['date'] is not None) or (re.search(r' Annual$', test_volume) and 'year' in data and data['year'] is not None and re.search(r'^\d\d\d\d$', data['year']))):
-            if (args.verbose):
+            if (verbose):
                 if ('date' in data):
                     print(f"  looking for an issue #{data['issue']} released on {data['date']}")
                 else:
@@ -156,7 +161,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
             for r in results:
                 ratio = r['ratio']
                 if (ratio >= 80 and result is None and match_issue is None):
-                    i = get_issue(r['id'], data['issue'], api_key, args = args, cache = cache, clear_cache = clear_cache)
+                    i = get_issue(r['id'], data['issue'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
                     if (i is not None):
                         store_date = ''
                         cover_date = ''
@@ -171,7 +176,7 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
                             issue_date[r['id']] = f'{store_date}/{cover_date}'
                             if (ratio >= 93):
                                 if ('date' in data and (data['date'] == cover_date or data['date'] == store_date)):
-                                    if (args.verbose): print(f"  found {r['name']} #{i['issue_number']} released on {store_date}/{cover_date}")
+                                    if (verbose): print(f"  found {r['name']} #{i['issue_number']} released on {store_date}/{cover_date}")
                                     result = r
                                     match_issue = i
                                 elif (re.search(r' Annual$', test_volume) and (re.search(f'^{data["year"]}-', cover_date) or re.search(f'^{data["year"]}-', store_date))):
@@ -235,23 +240,26 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
             id = m.group(2)
             if (type_id == '4000'):
                 url = f'{base_url}/issue/4000-{id}/?api_key={api_key}&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits,description,character_credits,volume'
-                #if (args.debug): print(url)
+                #if (debug): print(url)
                 results = get_results(url)
                 match_issue = results[0]
                 data['issue'] = match_issue['issue_number']
+                match_issue['details'] = get_issue_details(id, api_key, args = args, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
                 test_volume = match_issue['volume']['name']
+                # We did this in the opposite order -- usually we get the mathing series and then go looking for the matching issue. Set up
+                #   the id and type variables to trigure collecting the appropriate volume information for this issue.
                 id = match_issue['volume']['id']
                 type_id = '4050'
-                if (args.verbose): print("found volume {} #{}".format(test_volume, data['issue']))
+                if (verbose): print("found issue {} #{} ({})".format(test_volume, data['issue'], data['date']))
 
             if (type_id == '4050'):
                 url = base_url + f'/volume/4050-{id}/?api_key={api_key}&format=json&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-                #if (args.debug): print(url)
+                #if (debug): print(url)
                 results = get_results(url)
                 result = results[0]
                 result['ratio'] = 100
                 test_volume = result['name']
-                if (args.verbose and match_issue is None): print("found volume:{}".format(test_volume))
+                if (verbose and match_issue is None): print("found volume:{}".format(test_volume))
         else:
             test_volume = pick
 
@@ -259,26 +267,76 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
         raise Exception("can't find a volume for " + test_volume)
 
     volume_id = result['id']
-    #if (args.debug): print("comicvine data:", result)
+    #if (debug): print("comicvine data:", result)
 
     comicvine_data = {}
     comicvine_data['volume_id'] = volume_id
     comicvine_data['series'] = result['name']
     comicvine_data['start_year'] = result['start_year']
+    comicvine_data['volume'] = result['start_year']
     comicvine_data['publisher'] = result['publisher']['name']
+    #TODO: Figure out if comicvine has any way to distinguish between volumes that were released in the same year. If not, maybe
+    #   search for any volumes with the same name and same start_year and manually figure out the version based on the release date
+    #   of the first issue?  That seems like a lot of work for the three series to which this actually applies.
+    comicvine_data['ver'] = ''
 
     i = match_issue
     if i is None:
-        i = get_issue(volume_id, data['issue'], api_key, args = args, cache = cache, clear_cache = clear_cache)
+        i = get_issue(volume_id, data['issue'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
 
     if (i is None):
         raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['series']}")
 
-    comicvine_data['issue'] = i['issue_number']
+    comicvine_data['issue'] = parser.massage_issue(i['issue_number'])
     comicvine_data['issue_id'] = i['id']
-    comicvine_data['issue_name'] = None
+    comicvine_data['issue_name'] = ''
+    comicvine_data['issue_details'] = i['details']
+    comicvine_data['description'] = ''
     comicvine_data['ratio'] = result['ratio']
-    comicvine_data['url'] = 'http://www.comicvine.com/placeholder/4000-{}'.format(i['id'])
+    comicvine_data['url'] = 'http://www.comicvine.com/issue/4000-{}'.format(i['id'])
+    comicvine_data['characters'] = []
+    comicvine_data['colorists'] = []
+    comicvine_data['inkers'] = []
+    comicvine_data['letterers'] = []
+    comicvine_data['pencillers'] = []
+    comicvine_data['story_arcs'] = []
+    comicvine_data['writers'] = []
+
+    details = comicvine_data['issue_details']
+    if (details['description'] is not None):
+        comicvine_data['description'] = parser.massage_description(details['description'], debug = True)
+
+    for person in details['person_credits']:
+        person_name = re.sub(', ', ' ', person['name'])
+        if (person['role'] == 'colorist'):
+            comicvine_data['colorists'].append(person_name)
+        elif (person['role'] == 'inker'):
+            comicvine_data['inkers'].append(person_name)
+        elif (person['role'] == 'letterer'):
+            comicvine_data['letterers'].append(person_name)
+        elif (person['role'] == 'penciller'):
+            comicvine_data['pencillers'].append(person_name)
+        elif (person['role'] == 'penciler'):
+            comicvine_data['pencillers'].append(person_name)
+        elif (person['role'] == 'writer'):
+            comicvine_data['writers'].append(person_name)
+
+
+    if (details['story_arc_credits'] is not None):
+        for arc in details['story_arc_credits']:
+            comicvine_data['story_arcs'].append(arc['name'])
+
+    if (details['character_credits'] is not None):
+        for character in details['character_credits']:
+            comicvine_data['characters'].append(character['name'])
+
+    comicvine_data['characters'].sort()
+    comicvine_data['colorists'].sort()
+    comicvine_data['inkers'].sort()
+    comicvine_data['letterers'].sort()
+    comicvine_data['pencillers'].sort()
+    comicvine_data['story_arcs'].sort()
+    comicvine_data['writers'].sort()
 
     if ('name' in i and i['name'] is not None):
         comicvine_data['issue_name'] = i['name']
@@ -295,21 +353,24 @@ def search(data, api_key, args = minorimpact.default_arg_flags, cache = {}, clea
         if ('date' not in comicvine_data):
             comicvine_data['date'] = comicvine_data['cover_date'] 
 
+    #details = get_issue_details(i['id'], cache = cache, args = args, clear_cache = clear_cache)
+    #self.data['description'] = re.sub('<p><em>','', re.sub('</em></p>', '', details['description']))
+
     # Cache the old series with the new name so we can avoid all this if we see it again.
     cache['comicvine']['volumes'][data['series']] = { 'volume': comicvine_data['series'], 'mod_date': datetime.now() }
 
     return comicvine_data
 
-def search_volumes(volume, api_key, start_year = None, year = None, args = minorimpact.default_arg_flags, cache = {}, clear_cache = False):
+def search_volumes(volume, api_key, start_year = None, year = None, cache = {}, clear_cache = False, debug = False, headless = False, verbose = False):
     setup_cache(cache)
-    volume = parser.massage_series(volume, reverse = True)
-    if (args.debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
+
+    if (debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
     results = []
     url = base_url + '/search/?api_key=' + api_key + f'&format=json&query={volume}&resources=volume&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-    if (args.debug): print(url)
+    #if (debug): print(url)
     try:
-        results = get_results(url, max = 100, cache = cache, clear_cache = clear_cache)
+        results = get_results(url, max = 100, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     except Exception as e:
         pass
     
@@ -333,6 +394,7 @@ def search_volumes(volume, api_key, start_year = None, year = None, args = minor
                 pass
             i = i - 1
 
+        # TODO: This could potentially solve my 'ver' problem! Instead of throwing away all the older volumes, just increment their 'ver' values.
         # If there are multiple volumes with identical volumes, only keep the 'latest' one.
         results = sorted(results, key = lambda x:int(x['start_year']), reverse = True)
         i = len(results) - 1
@@ -364,4 +426,8 @@ def setup_cache(cache):
     for volume in volumes:
         if cache['comicvine']['volumes'][volume]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
             del cache['comicvine']['volumes'][volume]
+
+def volume_total(volume, debug = False, cache = {}, clear_cache = False, verbose = False, headless = False):
+    #results = search_volumes(test_volume, api_key, start_year = start_year, year = data['year'], cache = cache, clear_cache = clear_cache, debug = debug, headless = headless)
+    return 1
 

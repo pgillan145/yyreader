@@ -7,6 +7,8 @@ from time import time
 import argparse
 from . import comic
 from . import comicvine
+from datetime import datetime, timedelta
+from hashlib import md5
 import magic
 import minorimpact
 import minorimpact.config
@@ -16,6 +18,7 @@ import pickle
 import re
 import shutil
 import sys
+import traceback
 
 cache = {}
 
@@ -29,7 +32,9 @@ def main():
     parser.add_argument('action', nargs='?', default='box', help = '''Specify one of the following:
   'box'  Move files in DIR to TARGET (default)
   'verify'   scan files in TARGET for incomplete meta data.''')
+    parser.add_argument('--clear_cache', help = "Clear the cache.", action='store_true')
     parser.add_argument('--file', metavar = 'FILE',  help = "process FILE")
+    parser.add_argument('--filter', metavar = 'FILTER',  help = "Only verify series that match FILTER")
     parser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
     parser.add_argument('--target', metavar = 'TARGET',  help = "Move files to TARGET", default = config['default']['comic_dir'])
     parser.add_argument('--year', metavar = 'YEAR', help = "Assume YEAR for any file that doesn't include it")
@@ -53,7 +58,10 @@ def main():
             args.file = None
 
     read_cache(config['default']['cache_file'], args = args)
-
+    # TODO: 'verify' is essentially just running 'box' on everything that's in the target directory.  The main difference is that it will
+    #   maintain a log of everything it's already verified so as not to have to run through again unless it's changed.  'verify' will also
+    #   check 'runs' whenever it comes across a new title to determine if anything is missing.  But under the hood they are both running the 
+    #   'box' method, which renames, moves and updates the comicinfo.xml file based on informatin it pulls from comicvine.
     if (args.action == 'box'):
         if (args.dir is not None):
             if (os.path.exists(args.dir) is False):
@@ -70,12 +78,38 @@ def main():
             write_cache(config['default']['cache_file'], args = args)
 
     elif (args.action == 'verify'):
-        c_files = minorimpact.readdir(args.target)
+        if ('verify' not in cache or args.clear_cache is True):
+            cache['verify'] = {}
+
+        c_files = sorted(minorimpact.readdir(args.target))
         i = 0
+        series_count = 0
+        last_series = None
         for c_file in c_files:
+            if (args.filter and re.search(args.filter, c_file) is None):
+                continue
+
             i = i + 1
-            if (i > 2): break
-            verify(c_file, args = args)
+            if (i > 10 and args.yes): break
+            comic = verify(c_file, args.target, args = args)
+
+            series = '/'.join(list(reversed(list(reversed(os.path.dirname(comic.file).split('/')))[0:2])))
+            # How many issues are in this series?
+            # Do I have all of them?
+            # If not, which ones am I missing?
+            # What info do I need to keep to know if I've already checked this?
+            if (series != last_series and last_series is not None):
+                if (args.debug): print("{}:{}".format(last_series, series_count))
+                series_total = comicvine.volume_total(last_series, debug = args.debug)
+                if (series_count == series_total):
+                    cache['verify'][last_series] = { 'date':datetime.now(), 'version':__version__ }
+                else:
+                    print("{} missing issues".format(last_series))
+                series_count = 0
+
+            series_count += 1
+            last_series = series
+            
             write_cache(config['default']['cache_file'])
 
 def box(comic_file, target, args = minorimpact.default_arg_flags):
@@ -91,8 +125,8 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
         comic_file = change_extension(comic_file, ext.lower())
 
     try:
-        c = comic.comic(comic_file, cache = cache)
-        c.box(args.target, args = args)
+        c = comic.comic(comic_file, cache = cache, args = args)
+        c.box(args = args, target_dir = args.target, headless = args.yes)
     except comic.ExtensionMismatchException as e:
         print(e)
         magic_str = magic.from_file(comic_file)
@@ -105,15 +139,15 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
             new_comic_file = change_extension(comic_file, new_ext)
             if (new_comic_file != comic_file and new_comic_file is not None):
                 try:
-                    c = comic.comic(new_comic_file)
-                    c.box(args.target, args = args)
+                    c = comic.comic(new_comic_file, args = args)
+                    c.box(args = args, target_dir = args.target, headless = args.yes)
                 except comic.FileExistsException as e:
                     print(e)
                     if (args.existing is not None):
                         print(f"  moving {c.file} to {args.existing}")
                         if (args.dryrun is False): shutil.move(c.file, args.existing)
                 except Exception as e:
-                    print(e)
+                    print(traceback.format_exc())
         else:
             print("{} has unknown data: '{}'".format(comic_file, magic_str))
     except comic.FileExistsException as e:
@@ -122,7 +156,7 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
             print(f"  moving {c.file} to {args.existing}")
             if (args.dryrun is False): shutil.move(c.file, args.existing)
     except Exception as e:
-        print(e)
+        print(traceback.format_exc())
 
 def change_extension(file_name, new_extension):
     if (re.search(r'^\.', new_extension)):
@@ -147,16 +181,31 @@ def read_cache(cache_file, args = minorimpact.default_arg_flags):
     else:
         if (args.debug): print("{} does not exist".format(cache_file))
 
-def verify (comic_file, args = minorimpact.default_arg_flags):
+def verify (comic_file, target_dir, args = minorimpact.default_arg_flags):
     global cache
     print("verifying {}".format(comic_file))
 
-    c = comic.comic(comic_file, cache = cache)
-    comicvine_data = c.comicvine_search(args = args, headless = args.yes)
-    parse_data = c.parse_data
-    print(parse_data)
-    print(comicvine_data)
-    # write the data the file.  take this code from comic.box() and break it out into a function.
+    c = comic.comic(comic_file, cache = cache, args = args)
+
+    if (c.file in cache['verify'] and 
+        cache['verify'][c.file]['md5'] == c.md5() and 
+        cache['verify'][c.file]['date'] > (datetime.now() - timedelta(days = 10)) and
+        cache['verify'][c.file]['version'] == __version__):
+        return c
+
+    verified = c.box(args = args, target_dir = target_dir, headless = args.yes)
+    if (verified == 100):
+        print("  verified (score: {})".format(verified))
+        cache['verify'][c.file] = { 'date':datetime.now(), 'md5':c.md5(), 'version':__version__ }
+    else:
+        print("  failed (score: {})".format(verified))
+        if (c.file in cache['verify']):
+            del cache['verify'][c.file]
+
+    if (comic_file != c.file and comic_file in cache['verify']):
+        del cache['verify'][comic_file]
+
+    return c
 
 def write_cache(cache_file, args = minorimpact.default_arg_flags):
     global cache
