@@ -324,6 +324,9 @@ class comic():
             print(output)
         return score
 
+    def issue(self):
+        return self.data['issue']
+
     def merge_data(self, comicvine_data):
         merge_data = self.data.copy()
         merge_data['ver'] = self.parse_data['ver']
@@ -374,14 +377,16 @@ class comic():
         comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, headless = headless, debug = debug, verbose = verbose)
         if (comicvine_data is None):
             raise Exception("can't get comicvine data.")
-        minimum_file_size = 1
-        if ('minimum_file_size' in config['default']):
-            minimum_file_size = int(config['default']['minimum_file_size'])
-        minimum_file_size = minimum_file_size * 1024 * 1024
 
         parse_data = self.parse_data
         if (parse_data is None or parse_data == {}):
             raise Exception("No info parsed from filename")
+
+        # TODO: Make minimum file size something we can override?
+        minimum_file_size = 1
+        if ('minimum_file_size' in config['default']):
+            minimum_file_size = int(config['default']['minimum_file_size'])
+        minimum_file_size = minimum_file_size * 1024 * 1024
         if (parse_data['size'] < minimum_file_size):
             raise Exception("file too small")
 
@@ -406,23 +411,22 @@ class comic():
                         print("  'q': Quit")
                         print("  'y': Update the file")
                     elif (c == 'c'):
-                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True, headless=headless)
+                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], verbose =  verbose, debug = debug, clear_cache = True, headless=headless)
                         if (comicvine_data is None):
                             raise Exception("can't get comicvine data.")
                     elif (c == 'i'):
                         print("Data parsed from filename:", parse_data)
                         print("Data parsed from file:", data)
-                        print("Data collected online:", 'http://www.comicvine.com/issue/4000-{}'.format(comicvine_data['issue_id']), comicvine_data)
+                        print("Data collected online:", '{}'.format(comicvine_data['url']), comicvine_data)
                     elif (c == 'q'):
                         sys.exit()
                     elif (c == 'n'):
-                        return score
+                        done = True
                     elif (c == 'y'):
                         self._update(comicvine_data, target_dir = target_dir, args = args)
                         score = self.compare(comicvine_data = comicvine_data, verbose = False)
                         done = True
             else:
-                
                 if (go_for_it is True):
                     print("Auto updating {}".format(self.file))
                     self._update(comicvine_data, target_dir = target_dir, args = args)

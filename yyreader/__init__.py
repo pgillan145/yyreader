@@ -8,6 +8,7 @@ import argparse
 from . import comic
 from . import comicvine
 from datetime import datetime, timedelta
+from dumper import dump
 from hashlib import md5
 import magic
 import minorimpact
@@ -83,34 +84,70 @@ def main():
 
         c_files = sorted(minorimpact.readdir(args.target))
         i = 0
-        series_count = 0
-        last_series = None
         for c_file in c_files:
             if (args.filter and re.search(args.filter, c_file) is None):
                 continue
 
             i = i + 1
             if (i > 10 and args.yes): break
-            comic = verify(c_file, args.target, args = args)
+            c = verify(c_file, args.target, args = args)
 
-            series = '/'.join(list(reversed(list(reversed(os.path.dirname(comic.file).split('/')))[0:2])))
+            write_cache(config['default']['cache_file'])
+    elif (args.action == 'scan'):
+        api_key = config['comicvine']['api_key']
+        if (api_key is None):
+            raise(Exception("No comicvine api key defined"))
+
+        if ('scan' not in cache or args.clear_cache is True):
+            cache['scan'] = {}
+        pubseries_issues = {}
+        pubseries_count = 0
+        last_pubseries = None
+        last_series = None
+        c_files = sorted(minorimpact.readdir(args.target))
+        i = 0
+        for c_file in c_files:
+            c = comic.comic(c_file, cache = cache, args = args)
+            publisher, series = list(reversed(list(reversed(os.path.dirname(c.file).split('/')))[0:2]))
+            pubseries = publisher + '/' + series
+            if (pubseries in cache['scan'] and
+                cache['scan'][pubseries]['date'] > (datetime.now() - timedelta(days = 10)) and
+                cache['scan'][pubseries]['version'] == __version__):
+                continue
+
+            if (pubseries not in pubseries_issues): pubseries_issues[pubseries] = {}
+            pubseries_issues[pubseries][c.issue()] = True
             # How many issues are in this series?
             # Do I have all of them?
             # If not, which ones am I missing?
             # What info do I need to keep to know if I've already checked this?
-            if (series != last_series and last_series is not None):
-                if (args.debug): print("{}:{}".format(last_series, series_count))
-                series_total = comicvine.volume_total(last_series, debug = args.debug)
-                if (series_count == series_total):
-                    cache['verify'][last_series] = { 'date':datetime.now(), 'version':__version__ }
-                else:
-                    print("{} missing issues".format(last_series))
-                series_count = 0
+            if (pubseries != last_pubseries and last_pubseries is not None):
+                print("scanning {}".format(last_pubseries))
+                result = comicvine.search_volumes(last_series, api_key, verbose = args.verbose, debug = args.debug, headless = args.yes)
+                #dump(result)
 
-            series_count += 1
+                if (result is None):
+                    print("  Can't find comicvine volume for {}".format(last_series))
+                else:
+                    series_total = result['count_of_issues']
+
+                    series_count = len(pubseries_issues[pubseries])
+                    print(" ... {}/{}".format(series_count, series_total))
+                    if (series_count == series_total):
+                        cache['scan'][last_pubseries] = { 'date':datetime.now(), 'version':__version__ }
+                    else:
+                        print("  missing issues")
+
+                #dump(cache['scan'])
+                write_cache(config['default']['cache_file'])
+                #i = i + 1
+                #if (i > 1): break
+
+            last_pubseries = pubseries
             last_series = series
-            
-            write_cache(config['default']['cache_file'])
+    else:
+        print("Unknown action: {}".format(args.action))
+
 
 def box(comic_file, target, args = minorimpact.default_arg_flags):
     global cache
@@ -181,24 +218,27 @@ def read_cache(cache_file, args = minorimpact.default_arg_flags):
     else:
         if (args.debug): print("{} does not exist".format(cache_file))
 
-def verify (comic_file, target_dir, args = minorimpact.default_arg_flags):
+def verify (comic_file, target_dir, args = minorimpact.default_arg_flags, verbose = False):
     global cache
-    print("verifying {}".format(comic_file))
+    if (args.verbose): verbose = True
+    if (verbose): print("verifying {}".format(comic_file))
 
     c = comic.comic(comic_file, cache = cache, args = args)
 
-    if (c.file in cache['verify'] and 
-        cache['verify'][c.file]['md5'] == c.md5() and 
+    if (c.file in cache['verify'] and
+        cache['verify'][c.file]['md5'] == c.md5() and
+        args.clear_cache is False and
         cache['verify'][c.file]['date'] > (datetime.now() - timedelta(days = 10)) and
         cache['verify'][c.file]['version'] == __version__):
+        if (verbose): print("  previously verified {}".format(cache['verify'][c.file]['date']))
         return c
 
     verified = c.box(args = args, target_dir = target_dir, headless = args.yes)
     if (verified == 100):
-        print("  verified (score: {})".format(verified))
+        if (verbose): print("  verified (score: {})".format(verified))
         cache['verify'][c.file] = { 'date':datetime.now(), 'md5':c.md5(), 'version':__version__ }
     else:
-        print("  failed (score: {})".format(verified))
+        if (verbose): print("  failed (score: {})".format(verified))
         if (c.file in cache['verify']):
             del cache['verify'][c.file]
 

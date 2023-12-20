@@ -41,16 +41,16 @@ date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
                ]
 
 description_formats = [
-                        '^<p><em>(?P<description>.+<\/em><\/p><p><em>.+?)<\/em><\/p>.*$',
+                        '^<p><em>(?P<description>.+?)<\/em><\/p><p><em>(?P<description2>.+?)<\/em><\/p>.*$',
                         '^<p><em>(?P<description>.+?)<\/em><\/p>.*$',
-                        '^<p><i>(?P<description>[^<]+)<\/i><\/p>$',
-                        '^<p>(?P<description>[^<]+)<\/p>.+$',
-                        '^<h3>(?P<description>.+?)<\/h3><p>(?P<description2>.+?)</p>.*$',
-                        '^(?P<description>.+?)<\/em><\/p>.+$',
+                        '^<p><i>(?P<description>.+?)<\/i><\/p><p>(?P<description2>.+?)<\/p>.*$',
+                        '^<p><i>(?P<description>.+?)<\/i><\/p>.*$',
+                        '^<i>(?P<description>.+?)<\/i>.*$',
+                        '^<p>(?P<description>.+?)<\/p>.*$',
+                        '^<h3>(?P<description>.+?)<\/h3><p>(?P<description2>.+?)<\/p>.*$',
                     ]
 
 description_subs = [
-                    { 'm':'<\/em><\/p><p><em>', 's':r' ' },
                     { 'm':'<h2> ?(.+)<\/h2><br\/>', 's':r'\1' },
                     { 'm':'<h2> ?(.+)<\/h2>', 's':r'\1' },
                     { 'm':'<u><b>(.+)<\/b><\/u><br\/>', 's':r'\1' },
