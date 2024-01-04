@@ -17,6 +17,9 @@ comic_dir = /Volumes/Media/Comics
 # Where to move files that already exist in comic_dir
 existing_dir = /tmp/existing
 
+# Year before which to no longer flag issues as 'missing' during scan.
+oldest_year = 1901
+
 # Publishers to skip when considering possible matches
 skip_publishers = [ 'Panini Comics' ]
 

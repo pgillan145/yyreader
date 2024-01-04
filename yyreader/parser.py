@@ -37,7 +37,7 @@ formats = [
 date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
                  '\(?(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)?',
                  '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
-                 '(?P<year>\d\d\d\d)(?P<month>\d\d)', 
+                 '(?P<year>\d\d\d\d)(?P<month>\d\d)',
                ]
 
 description_formats = [
@@ -60,6 +60,10 @@ description_subs = [
                     { 'm':', $', 's':r'' },
                  ]
 
+
+series_formats = [ '^(?P<series>.+) \((?P<volume>.+)\)$',
+                   '^(?P<series>.+)$'
+                 ]
 
 volume_formats = [ '^(?P<start_year>\d\d\d\d)$',
                    '^(?P<start_year>\d\d\d\d)[v\-](?P<ver>\d+)$',
@@ -112,9 +116,12 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':' Part Two', 's':' 002' },
                  { 'm':' Part Three', 's':' 003' },
                  { 'm':' Part Four', 's':' 004' },
+                 { 'm':' -001', 's':' -1' },
+                 { 'm':'001 1:2', 's':'1½' },
+                 { 'm':'1:2', 's':'½' },
                ]
 
-series_subs = [ 
+series_subs = [
                 { 'm': '(.+) starring .*', 's': r'\1' },
                 { 'm': '(Marvel Action Hour) featuring (.*)', 's': r'\1 - \2' },
                 { 'm': '(.+) featuring .*', 's': r'\1' },
@@ -129,6 +136,9 @@ series_subs = [
                 { 'm': 'Peter Parker the Spectacular Spider-Man', 's':'The Spectacular Spider-Man' },
                 { 'm': 'US1', 's':'U.S. 1' },
              ]
+
+def FileNameException(Exception):
+    pass
 
 def make_dir(data, args = minorimpact.default_arg_flags):
     publisher = data["publisher"]
@@ -151,6 +161,12 @@ def make_name(data, extension, directors_cut = False, args = minorimpact.default
     volume = data['volume']
     return f"{series} ({volume}) {issue} ({data['date']}).{extension}"
 
+def make_volume(start_year, ver = None, debug = False):
+    volume = start_year
+    if (ver is not None):
+        volume = volume + '-' + ver
+    return volume
+
 def massage_description(description, args = minorimpact.default_arg_flags, debug = False):
     if (args.debug): debug = True
 
@@ -164,7 +180,7 @@ def massage_description(description, args = minorimpact.default_arg_flags, debug
             if 'description2' in g: description = description + ':' + g['description2']
             break
             #print("FOUND",description)
-    
+
     #if (debug): print("description2:", description)
     for c in description_subs:
         count = 0
@@ -261,14 +277,10 @@ def parse(comic_file, year = None, verbose = False, debug = False):
         basename = re.sub(" - [dD]irector'?s? [cC]ut", '', basename)
 
     # Scan the parent directories for something that looks like a date.
-    for f in date_formats:
-        m = re.search(f, dirname)
-        if (m is not None):
-            g = m.groupdict()
-            if 'day' in g: day = g['day']
-            if 'month' in g: month = g['month']
-            if 'year' in g: year = g['year']
-            break
+    date = parse_date(dirname)
+    if 'day' in date and date['day'] is not None: day = date['day']
+    if 'month' in date and date['month'] is not None: month = date['month']
+    if 'year' in date and date['year'] is not None: year = date['year']
 
     for f in formats:
         #if (debug): print(f"testing '{f}' ({basename})")
@@ -286,19 +298,14 @@ def parse(comic_file, year = None, verbose = False, debug = False):
             break
 
     if (volume is not None):
-        for f in volume_formats:
-            #if (debug): print(f"testing volume format '{f}' ({volume})")
-            m = re.search(f, volume)
-            if (m is not None):
-                if (debug): print(f"matched volume format '{f}'")
-                g = m.groupdict()
-                if 'start_year' in g: start_year = g['start_year']
-                if 'ver' in g: ver = g['ver']
-                break
+        parsed_volume = parse_volume(volume)
+        if parsed_volume is not None:
+            start_year = parsed_volume['start_year']
+            ver = parsed_volume['ver']
 
     if (issue is None): issue = '001'
     if (series is None or extension is None):
-        raise Exception("invalid filename")
+        raise FileNameException("invalid filename")
 
     if (re.search('amazing spider-man', series) and year is not None):
         if (int(year) >= 1999 and int(year) < 2014 and (int(issue) <= 58)):
@@ -322,29 +329,86 @@ def parse(comic_file, year = None, verbose = False, debug = False):
     data['series'] = series_filename(series, reverse = True)
     data['ver'] = ver
     data['volume'] = volume
-
-    if (year is not None and month is not None and day is not None and day != '00'):
-        data['date'] = f'{year}-{month}-{day}'
-        data['day'] = day
-        data['month'] = month
-    elif (year is not None and month is not None and month != '00'):
-        data['date'] = f'{year}-{month}-01'
-        data['day'] = '01'
-        data['month'] = month
+    data['date'] = ''
 
     if (year is not None):
         data['year'] = year
+        if (month is not None and day is not None and day != '00'):
+            data['date'] = f'{year}-{month}-{day}'
+            data['day'] = day
+            data['month'] = month
+        elif (month is not None and month != '00'):
+            data['date'] = f'{year}-{month}-01'
+            data['day'] = '01'
+            data['month'] = month
         if (re.search('^\d+$', year) and issue is not None and re.search('^\d+$', issue) and month is not None and month != '00' and re.search('^\d+$', month)):
             months = int(issue) - 1
             if (re.search(' annual',series.lower())):
                 months = (int(issue) - 1) * 12
             est_start_date = datetime(int(year), int(month), 1) - relativedelta(months = months)
             data['est_start_year'] = est_start_date.year
-            
+
     return data
 
-def series_filename(series, reverse = False):
+def parse_date(search_date, debug = False):
+    date = {}
+    for f in date_formats:
+        m = re.search(f, search_date)
+        if (m is not None):
+            print("'{}' matched '{}'".format(search_date, f))
+            g = m.groupdict()
+            if 'day' in g: date['day'] = g['day']
+            if 'month' in g: date['month'] = g['month']
+            if 'year' in g: date['year'] = g['year']
+            break
+
+    return date
+
+def parse_series(search_series, debug = False):
+    series = None
+    volume = None
+
+    for f in series_formats:
+        m = re.search(f, search_series)
+        if (m is not None):
+            if (debug): print(f"'{search_series}' matched series format '{f}'")
+            g = m.groupdict()
+            if 'series' in g: series = g['series']
+            if 'volume' in g: volume = parse_volume(g['volume'], debug = debug)
+            if (debug): print("series:'{}', volume:'{}'".format(series, volume))
+            break
+
+    if (series is not None):
+        return {'series':series, 'volume':volume}
+    return None
+
+def parse_volume(volume, debug = False):
+    start_year = None
+    ver = None
+    for f in volume_formats:
+        m = re.search(f, volume)
+        if (m is not None):
+            if (debug): print(f"matched volume format '{f}'")
+            g = m.groupdict()
+            if 'start_year' in g: start_year = g['start_year']
+            if 'ver' in g: ver = g['ver']
+            if (debug): print("start_year:'{}', ver:'{}'".format(start_year, ver))
+            break
+    if (start_year is not None):
+        return {'start_year':start_year, 'ver':ver}
+    return None
+
+def series_filename(series, reverse = False, debug = False):
     """Turn the series name into something appropriate for a filename (or the opposite if reverse is True)."""
+
+    parsed_series = parse_series(series, debug = debug)
+    series = parsed_series['series']
+    start_year = None
+    ver = None
+    if (parsed_series['volume'] is not None):
+        start_year = parsed_series['volume']['start_year']
+        ver = parsed_series['volume']['ver']
+
     if (reverse is True):
         series = re.sub('^(.+), A$', r'A \1', series)
         series = re.sub('^(.+), An$', r'An \1', series)
@@ -356,5 +420,6 @@ def series_filename(series, reverse = False):
         series = re.sub('^The (.+)$', r'\1, The', series)
         series = re.sub('/','__SLASH__', series)
         series = series.strip()
+
     return series
 

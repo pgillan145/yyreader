@@ -91,7 +91,7 @@ class comic():
         self.data['url'] = ''
         self.data['writers'] = []
 
-        self._read_data(verbose = args.verbose, debug = args.debug)
+        self._read_data(verbose = args.verbose, debug = False)
         self.cache = cache
         #print("_read_data()")
         #print(self.data)
@@ -122,6 +122,75 @@ class comic():
         if (command is None): raise Exception("can't add xml files, unknown file type")
         result = subprocess.run(command)
         os.chdir(cwd)
+
+    def box(self, target_dir = None, headless = True, args = minorimpact.default_arg_flags, debug = False, verbose = False, verify = False):
+        if (args.debug is True): debug = True
+        if (args.verbose is True): verbose = True
+        if (args.yes is True): headless = True
+
+        data = self.data
+        parse_data = self.parse_data
+        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, headless = headless, debug = debug, verbose = verbose)
+        if (comicvine_data is None):
+            raise Exception("can't get comicvine data.")
+
+        parse_data = self.parse_data
+        if (parse_data is None or parse_data == {}):
+            raise Exception("No info parsed from filename")
+
+        # TODO: Make minimum file size something we can override?
+        minimum_file_size = 1
+        if ('minimum_file_size' in config['default']):
+            minimum_file_size = int(config['default']['minimum_file_size'])
+        minimum_file_size = minimum_file_size * 1024 * 1024
+        if (parse_data['size'] < minimum_file_size):
+            raise Exception("file too small")
+
+        go_for_it = False
+        score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
+        if (score < 100):
+            if (score >= 95):
+                go_for_it = True
+
+            if (headless is False):
+                done = False
+                while (done is False):
+                    score = self.compare(comicvine_data = comicvine_data, verbose = True, verify = verify)
+
+                    default = 'n' if go_for_it is False else 'y'
+                    c = minorimpact.getChar(default=default, end='\n', prompt=f"Score:{score} update? (y/n/q/c/i/?) [default={default}] ", echo=True).lower()
+
+                    if (c == '?'):
+                        print("  'c': Clear cache and search comicvine again")
+                        print("  'i': Dump the data collected for this issue")
+                        print("  'n': Don't update the file")
+                        print("  'q': Quit")
+                        print("  'y': Update the file")
+                    elif (c == 'c'):
+                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], verbose =  verbose, debug = debug, clear_cache = True, headless=headless)
+                        if (comicvine_data is None):
+                            raise Exception("can't get comicvine data.")
+                    elif (c == 'i'):
+                        print("Data parsed from filename:", parse_data)
+                        print("Data parsed from file:", data)
+                        print("Data collected online:", '{}'.format(comicvine_data['url']), comicvine_data)
+                    elif (c == 'q'):
+                        sys.exit()
+                    elif (c == 'n'):
+                        done = True
+                    elif (c == 'y'):
+                        self._update(comicvine_data, target_dir = target_dir, args = args)
+                        score = self.compare(comicvine_data = comicvine_data, verbose = False)
+                        done = True
+            else:
+                if (go_for_it is True):
+                    print("  Auto updating {}".format(self.file))
+                    self._update(comicvine_data, target_dir = target_dir, args = args)
+                    score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
+                else:
+                    print("  score:{} too low to auto update {} -- skipping".format(score, self.file))
+
+        return score
 
     def box_old(self, target_dir, data = None, args = minorimpact.default_arg_flags):
         if (target_dir is None):
@@ -212,7 +281,7 @@ class comic():
     def collect_info(self):
         pass
 
-    def compare(self, comicvine_data = None, verbose = False, debug = False, args = minorimpact.default_arg_flags):
+    def compare(self, comicvine_data = None, verbose = False, debug = False, args = minorimpact.default_arg_flags, verify = False):
         if (verbose is False and args.verbose is True):
             verbose = args.verbose
         if (debug is False and args.debug is True):
@@ -229,7 +298,7 @@ class comic():
         score = fuzz.ratio(data['series'].lower(),comicvine_data['series'].lower())
         if ("The " + data['series'] == comicvine_data['series'] or "An " + data['series'] == comicvine_data['series'] or "A " + data['series'] == comicvine_data['series']):
             score = 100
-        
+
         width = 28
         output = ""
         if (score < 100):
@@ -240,54 +309,54 @@ class comic():
             else:
                 score -= 10
         output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('issue', parse_data['issue'], data['issue'], comicvine_data['issue'], width = width)
-        if (data['start_year'] != comicvine_data['start_year'] or parse_data['start_year'] != comicvine_data['start_year']): 
+        if (data['start_year'] != comicvine_data['start_year'] or parse_data['start_year'] != comicvine_data['start_year']):
             score -= 1
         output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('start year', parse_data['start_year'], data['start_year'], comicvine_data['start_year'], width = width )
         if (data['date'] != comicvine_data['date'] or parse_data['date'] != comicvine_data['date']):
             score -= 1
         output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('date', parse_data['date'], data['date'], comicvine_data['date'], width = width )
-        if (data['ver'] != parse_data['ver']): 
+        if (data['ver'] != parse_data['ver']):
             score -= 1
             output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('ver', parse_data['ver'], data['ver'], '---', width = width)
-        if (data['volume'] != comicvine_data['volume'] or parse_data['volume'] != comicvine_data['volume']): 
+        if (data['volume'] != comicvine_data['volume'] or parse_data['volume'] != comicvine_data['volume']):
             score -= 1
         output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('volume', parse_data['volume'], data['volume'], comicvine_data['volume'], width = width)
-        if (data['description'] != comicvine_data['description']): 
+        if (data['description'] != comicvine_data['description']):
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('description', '---', len(data['description']), len(comicvine_data['description']), width = width)
-            score -= 1
-        if (data['characters'] != comicvine_data['characters']): 
-            score -= 1
+            if (verify): score -= 1
+        if (data['characters'] != comicvine_data['characters']):
+            if (verify): score -= 1
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('characters', '---', len(data['characters']), len(comicvine_data['characters']), width = width)
             #output += compare_lists(data['characters'], comicvine_data['characters'])
-        if (data['colorists'] != comicvine_data['colorists']): 
-            score -= 1
+        if (data['colorists'] != comicvine_data['colorists']):
+            if (verify): score -= 1
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('colorists', '---', len(data['colorists']), len(comicvine_data['colorists']), width = width)
             #output += compare_lists(data['colorists'], comicvine_data['colorists'])
-        if (data['inkers'] != comicvine_data['inkers']): 
-            score -= 1
+        if (data['inkers'] != comicvine_data['inkers']):
+            if (verify):score -= 1
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('inkers', '---', len(data['inkers']), len(comicvine_data['inkers']), width = width)
             #output += compare_lists(data['inkers'], comicvine_data['inkers'])
-        if (data['letterers'] != comicvine_data['letterers']): 
-            score -= 1
+        if (data['letterers'] != comicvine_data['letterers']):
+            if (verify): score -= 1
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('letterers', '---', len(data['letterers']), len(comicvine_data['letterers']), width = width)
             #output += compare_lists(data['letterers'], comicvine_data['letterers'])
-        if (data['pencillers'] != comicvine_data['pencillers']): 
-            score -= 1
+        if (data['pencillers'] != comicvine_data['pencillers']):
+            if (verify): score -= 1
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('pencillers', '---', len(data['pencillers']), len(comicvine_data['pencillers']), width = width)
             #output += compare_lists(data['pencillers'], comicvine_data['pencillers'])
-        if (data['story_arcs'] != comicvine_data['story_arcs']): 
-            score -= 1
+        if (data['story_arcs'] != comicvine_data['story_arcs']):
+            if (verify): score -= 1
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('story_arcs', '---', len(data['story_arcs']), len(comicvine_data['story_arcs']), width = width)
             #output += compare_lists(data['story_arcs'], comicvine_data['story_arcs'])
-        if (data['writers'] != comicvine_data['writers']): 
-            score -= 1
+        if (data['writers'] != comicvine_data['writers']):
+            if (verify): score -= 1
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('writers', '---', len(data['writers']), len(comicvine_data['writers']), width = width)
             #output += compare_lists(data['writers'], comicvine_data['writers'])
         if (output != ''):
             output = "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('', 'File Name','Internal', 'Remote', width = width) + output
 
         if (data['description'] != comicvine_data['description']):
-            score -= 1
+            if (verify): score -= 1
             output += "Internal Description:\n  "
             # TODO: Update minorimpact.splitstringlen() to try to split text on spaces.
             s1 = minorimpact.splitstringlen(data['description'], width*4)
@@ -304,25 +373,26 @@ class comic():
         merged_dir = parser.make_dir(merge_data)
         output += "Current Filename: {}/{}\n".format(dirname, basename)
         if (merged_name != basename or merged_dir != dirname):
-            score -= 1
+            if (verify): score -= 1
             output += " Proper filename: {}/{}\n".format(merged_dir, merged_name)
 
         old_url = data['url']
         old_url_fixed = re.sub('placeholder', 'issue', old_url)
         new_url = comicvine_data['url']
         if (old_url != new_url and old_url_fixed == new_url):
-            # I want this to register as "not identical" (because it still needs to be fixed), but I never want it to take us below the
-            #   "auto update" threshold -- so only knock the score if we're otherwise perfect up to this point.
-            if (score == 100): score -= 1
+            if (verify): score -= 1
             output += "old_url: " + old_url + "\n"
         elif ( old_url != new_url):
-            score -= 1
+            if (verify): score -= 1
             output += "old_url: " + old_url + "\n"
         output += "    url: " + new_url + "\n"
 
         if (verbose):
             print(output)
         return score
+
+    def date(self):
+        return self.data['date']
 
     def issue(self):
         return self.data['issue']
@@ -365,76 +435,6 @@ class comic():
         merge_data['date'] = '{}-{}-{}'.format(year, month, day)
 
         return merge_data
-
-        
-    def box(self, target_dir = None, headless = True, args = minorimpact.default_arg_flags, debug = False, verbose = False):
-        if (args.debug is True): debug = True
-        if (args.verbose is True): verbose = True
-        if (args.yes is True): headless = True
-
-        data = self.data
-        parse_data = self.parse_data
-        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, headless = headless, debug = debug, verbose = verbose)
-        if (comicvine_data is None):
-            raise Exception("can't get comicvine data.")
-
-        parse_data = self.parse_data
-        if (parse_data is None or parse_data == {}):
-            raise Exception("No info parsed from filename")
-
-        # TODO: Make minimum file size something we can override?
-        minimum_file_size = 1
-        if ('minimum_file_size' in config['default']):
-            minimum_file_size = int(config['default']['minimum_file_size'])
-        minimum_file_size = minimum_file_size * 1024 * 1024
-        if (parse_data['size'] < minimum_file_size):
-            raise Exception("file too small")
-
-        go_for_it = False
-        score = self.compare(comicvine_data = comicvine_data, verbose = False)
-        if (score < 100):
-            if (score >= 90):
-                go_for_it = True
-
-            if (headless is False):
-                done = False
-                while (done is False):
-                    score = self.compare(comicvine_data = comicvine_data, verbose = True)
-                    
-                    default = 'n' if go_for_it is False else 'y'
-                    c = minorimpact.getChar(default=default, end='\n', prompt=f"Score:{score} update? (y/n/q/c/i/?) [default={default}] ", echo=True).lower()
-
-                    if (c == '?'):
-                        print("  'c': Clear cache and search comicvine again")
-                        print("  'i': Dump the data collected for this issue")
-                        print("  'n': Don't update the file")
-                        print("  'q': Quit")
-                        print("  'y': Update the file")
-                    elif (c == 'c'):
-                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], verbose =  verbose, debug = debug, clear_cache = True, headless=headless)
-                        if (comicvine_data is None):
-                            raise Exception("can't get comicvine data.")
-                    elif (c == 'i'):
-                        print("Data parsed from filename:", parse_data)
-                        print("Data parsed from file:", data)
-                        print("Data collected online:", '{}'.format(comicvine_data['url']), comicvine_data)
-                    elif (c == 'q'):
-                        sys.exit()
-                    elif (c == 'n'):
-                        done = True
-                    elif (c == 'y'):
-                        self._update(comicvine_data, target_dir = target_dir, args = args)
-                        score = self.compare(comicvine_data = comicvine_data, verbose = False)
-                        done = True
-            else:
-                if (go_for_it is True):
-                    print("Auto updating {}".format(self.file))
-                    self._update(comicvine_data, target_dir = target_dir, args = args)
-                    score = self.compare(comicvine_data = comicvine_data, verbose = True)
-                else:
-                    print("score:{} too low to auto update {} -- skipping".format(score, self.file))
-                    
-        return score
 
     def _files(self):
         if (len(self.files) > 0):
@@ -671,7 +671,7 @@ class comic():
     def page(self, number, crop = True):
         #test = img.crop((0, 0, 200, 200))
         #tmp = "/Users/pgillan/tmp/crop.jpg"
-        #return test.tobytes() 
+        #return test.tobytes()
         #f = open(tmp, 'bw')
         #f.write(data)
         #f.close()
@@ -681,7 +681,7 @@ class comic():
         out = BytesIO()
         img.save(out, format='JPEG')
         return out.getvalue()
-        
+
         # Return raw file
         with (open(self.page_file(number), 'rb') as f):
             data = f.read()
@@ -810,9 +810,10 @@ class comic():
         except:
             pass
 
+        self.data['date'] = None
         if ('year' in self.data and 'month' in self.data and 'day' in self.data):
-            if (int(self.data['month']) < 10 and re.search('^0', self.data['month']) is None): self.data['month'] = '0{}'.format(self.data['month'])
-            if (int(self.data['day']) < 10 and re.search('^0', self.data['day']) is None): self.data['day'] = '0{}'.format(self.data['day'])
+            if (self.data['month'] is not None and int(self.data['month']) < 10 and re.search('^0', self.data['month']) is None): self.data['month'] = '0{}'.format(self.data['month'])
+            if (self.data['day'] is not None and int(self.data['day']) < 10 and re.search('^0', self.data['day']) is None): self.data['day'] = '0{}'.format(self.data['day'])
             self.data['date'] = '{}-{}-{}'.format(self.data['year'], self.data['month'], self.data['day'])
 
         #print(result)

@@ -7,6 +7,7 @@ from time import time
 import argparse
 from . import comic
 from . import comicvine
+from . import parser
 from datetime import datetime, timedelta
 from dumper import dump
 from hashlib import md5
@@ -29,22 +30,23 @@ def main():
     config = minorimpact.config.getConfig(script_name = 'yyreader')
 
 
-    parser = argparse.ArgumentParser(description = "yyreader", formatter_class=argparse.RawTextHelpFormatter)
-    parser.add_argument('action', nargs='?', default='box', help = '''Specify one of the following:
+    argparser = argparse.ArgumentParser(description = "yyreader", formatter_class=argparse.RawTextHelpFormatter)
+    argparser.add_argument('action', nargs='?', default='box', help = '''Specify one of the following:
   'box'  Move files in DIR to TARGET (default)
   'verify'   scan files in TARGET for incomplete meta data.''')
-    parser.add_argument('--clear_cache', help = "Clear the cache.", action='store_true')
-    parser.add_argument('--file', metavar = 'FILE',  help = "process FILE")
-    parser.add_argument('--filter', metavar = 'FILTER',  help = "Only verify series that match FILTER")
-    parser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
-    parser.add_argument('--target', metavar = 'TARGET',  help = "Move files to TARGET", default = config['default']['comic_dir'])
-    parser.add_argument('--year', metavar = 'YEAR', help = "Assume YEAR for any file that doesn't include it")
-    parser.add_argument('--existing', metavar = 'EXIST', help = "Move any files that already exist to EXIST", default = config['default']['existing_dir'])
-    parser.add_argument('--debug', help = "extra extra loud output", action='store_true')
-    parser.add_argument('-d', '--dryrun', help = "don't actually make any changes to anything", action='store_true')
-    parser.add_argument('-v', '--verbose', help = "extra loud output", action='store_true')
-    parser.add_argument('-y', '--yes', help = "Always say yes", action='store_true')
-    args = parser.parse_args()
+    argparser.add_argument('--clear_cache', help = "Clear the cache.", action='store_true')
+    argparser.add_argument('--file', metavar = 'FILE',  help = "process FILE")
+    argparser.add_argument('--filter', metavar = 'FILTER',  help = "Only verify series that match FILTER")
+    argparser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
+    argparser.add_argument('--publisher', metavar = 'PUBLISHER',  help = "limit scan to PUBLISHER")
+    argparser.add_argument('--target', metavar = 'TARGET',  help = "Move files to TARGET", default = config['default']['comic_dir'])
+    argparser.add_argument('--year', metavar = 'YEAR', help = "When adding new items, assume YEAR for any file that doesn't include it.  While scanning, limit results to YEAR.")
+    argparser.add_argument('--existing', metavar = 'EXIST', help = "Move any files that already exist to EXIST", default = config['default']['existing_dir'])
+    argparser.add_argument('--debug', help = "extra extra loud output", action='store_true')
+    argparser.add_argument('-d', '--dryrun', help = "don't actually make any changes to anything", action='store_true')
+    argparser.add_argument('-v', '--verbose', help = "extra loud output", action='store_true')
+    argparser.add_argument('-y', '--yes', help = "Always say yes", action='store_true')
+    args = argparser.parse_args()
     if (args.debug): args.verbose = True
 
     if (args.existing is not None):
@@ -59,10 +61,10 @@ def main():
             args.file = None
 
     read_cache(config['default']['cache_file'], args = args)
-    # TODO: 'verify' is essentially just running 'box' on everything that's in the target directory.  The main difference is that it will
-    #   maintain a log of everything it's already verified so as not to have to run through again unless it's changed.  'verify' will also
-    #   check 'runs' whenever it comes across a new title to determine if anything is missing.  But under the hood they are both running the 
-    #   'box' method, which renames, moves and updates the comicinfo.xml file based on informatin it pulls from comicvine.
+    # 'verify' is essentially just running 'box' on everything that's in the target directory.  The main difference is that it will
+    #    maintain a log of everything it's already verified so as not to have to run through again unless it's changed -- but under the hood
+    #   they are both running the 'box' method, which renames, moves and updates the comicinfo.xml file based on informatin it pulls from
+    #   comicvine.  'scan' runs through each series directory looking for 'missing' issues.
     if (args.action == 'box'):
         if (args.dir is not None):
             if (os.path.exists(args.dir) is False):
@@ -74,7 +76,7 @@ def main():
         elif (args.file is not None):
             c_files = [ args.file ]
 
-        for c_file in c_files:
+        for c_file in sorted(c_files):
             box(c_file, args.target, args = args)
             write_cache(config['default']['cache_file'], args = args)
 
@@ -93,58 +95,160 @@ def main():
             c = verify(c_file, args.target, args = args)
 
             write_cache(config['default']['cache_file'])
+
     elif (args.action == 'scan'):
         api_key = config['comicvine']['api_key']
+        oldest_year = 1901
+        if ('oldest_year' in config['default']):
+            oldest_year = int(config['default']['oldest_year'])
+
         if (api_key is None):
             raise(Exception("No comicvine api key defined"))
 
         if ('scan' not in cache or args.clear_cache is True):
             cache['scan'] = {}
-        pubseries_issues = {}
-        pubseries_count = 0
-        last_pubseries = None
-        last_series = None
-        c_files = sorted(minorimpact.readdir(args.target))
+        publishers = sorted(os.listdir(args.target))
         i = 0
-        for c_file in c_files:
-            c = comic.comic(c_file, cache = cache, args = args)
-            publisher, series = list(reversed(list(reversed(os.path.dirname(c.file).split('/')))[0:2]))
-            pubseries = publisher + '/' + series
-            if (pubseries in cache['scan'] and
-                cache['scan'][pubseries]['date'] > (datetime.now() - timedelta(days = 10)) and
-                cache['scan'][pubseries]['version'] == __version__):
+        for publisher in publishers:
+            if (re.match("^\.", publisher)): continue
+            if (args.publisher is not None and args.publisher.lower() != publisher.lower()):
                 continue
+            if (publisher not in cache['scan']): cache['scan'][publisher] = {}
+            serieses = sorted(os.listdir(args.target + '/' + publisher))
+            for series in serieses:
+                if (re.match("^\.", series)): continue
 
-            if (pubseries not in pubseries_issues): pubseries_issues[pubseries] = {}
-            pubseries_issues[pubseries][c.issue()] = True
-            # How many issues are in this series?
-            # Do I have all of them?
-            # If not, which ones am I missing?
-            # What info do I need to keep to know if I've already checked this?
-            if (pubseries != last_pubseries and last_pubseries is not None):
-                print("scanning {}".format(last_pubseries))
-                result = comicvine.search_volumes(last_series, api_key, verbose = args.verbose, debug = args.debug, headless = args.yes)
-                #dump(result)
+                start_year= None
+                ver = None
+                parsed_series = parser.parse_series(series) #, debug = args.debug)
+                if ('volume' in parsed_series):
+                    start_year = parsed_series['volume']['start_year']
+                    ver = parsed_series['volume']['ver']
+                    volume = parser.make_volume(parsed_series['volume']['start_year'], ver = parsed_series['volume']['ver'])
 
-                if (result is None):
-                    print("  Can't find comicvine volume for {}".format(last_series))
-                else:
-                    series_total = result['count_of_issues']
+                if (args.year is not None and int(start_year) > int(args.year)): continue
 
-                    series_count = len(pubseries_issues[pubseries])
-                    print(" ... {}/{}".format(series_count, series_total))
-                    if (series_count == series_total):
-                        cache['scan'][last_pubseries] = { 'date':datetime.now(), 'version':__version__ }
+                c_dir = args.target + '/' + publisher + '/' + series
+                c_md5 = minorimpact.md5dir(c_dir)
+                c_files = os.listdir(c_dir)
+                series = parser.series_filename(series, reverse = True) #, debug = args.debug)
+
+                if (series in cache['scan'][publisher] and
+                    cache['scan'][publisher][series]['date'] > (datetime.now() - timedelta(days = 365)) and
+                    cache['scan'][publisher][series]['version'] == __version__ and
+                    'md5' in cache['scan'][publisher][series] and cache['scan'][publisher][series]['md5'] == md5):
+                    continue
+
+                issues = {}
+
+                for c_file in c_files:
+                    if (re.match("^\.", c_file)): continue
+                    c = comic.comic(c_dir + '/' + c_file, cache = cache, args = args)
+
+                    issues[parser.massage_issue(c.issue())] = parser.parse_date(c.date())
+
+                go_for_it = False
+                for issue in issues.keys():
+                    if (args.year is not None and args.year ==  issues[issue]['year']):
+                        go_for_it = True
+                        break
+
+                if (len(issues) > 0 and go_for_it):
+                    if (args.verbose): print("scanning {} ({})".format(series, volume))
+                    try:
+                        result = comicvine.search_volumes(series, api_key, start_year = start_year, cache = cache, verbose = args.verbose, debug = args.debug, headless = args.yes)
+                    except Exception as e:
+                        print(e)
+                        continue
+
+                    if (result is None):
+                        print("  Can't find comicvine series for {}".format(series))
                     else:
-                        print("  missing issues")
+                        series_total = result['count_of_issues']
+                        series_count = len(issues)
+                        if (series_count == series_total):
+                            if (args.verbose): print("  ... {}/{}".format(series_count, series_total))
+                            cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':md5, 'method':'auto'}
+                        else:
+                            comicvine_issues = comicvine.get_issues(result['id'], api_key, cache = cache, verbose = args.verbose, debug = args.debug, detailed = False)
+                            for i in comicvine_issues:
+                                i['issue_number'] = parser.massage_issue(i['issue_number'])
+                                if ('store_date' in i and i['store_date'] is not None):
+                                    i['date'] = i['store_date']
+                                elif ('cover_date' in i and i['cover_date'] is not None):
+                                    i['date'] = i['cover_date']
 
-                #dump(cache['scan'])
+                            series_total = 0
+                            if (series_total == len(issues)):
+                                if (args.verbose):
+                                    print("  ... {}/{}: complete".format(series_count, series_total))
+                                cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'method':'auto', 'md5':md5 }
+                            else:
+                                missing = []
+                                for i in sorted(comicvine_issues, key = lambda x:x['issue_number']):
+                                    if (i['issue_number'] not in issues):
+                                        date = ''
+                                        if ('date' in i and i['date'] is not None):
+                                            date = i['date']
+                                            year = parser.parse_date(i['date'])['year']
+                                            if (year is not None and int(year) >= oldest_year):
+                                                missing.append(i['issue_number'] + ' - ' + date)
+
+                                if (len(missing) > 0):
+                                    print("  missing issues:")
+                                    for i in missing:
+                                        print('    ', i)
+                                    if (args.yes is False):
+                                        c = minorimpact.getChar(default='n', end='\n', prompt=f"  mark {series} as 'skipped'? (y/N) ", echo=True).lower()
+                                        if (c == 'y'):
+                                            cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'method':'skipped', 'md5':md5 }
+                                        elif (c == 'q'):
+                                            write_cache(config['default']['cache_file'])
+                                            sys.exit()
+                                else:
+                                    if (args.verbose):
+                                        print("  ... {}/{}: complete post {}".format(series_count, result['count_of_issues'], oldest_year-1))
+                                    cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'method':'auto', 'md5':md5 }
+
                 write_cache(config['default']['cache_file'])
-                #i = i + 1
-                #if (i > 1): break
+            break
+    elif (args.action == 'rescan'):
+        api_key = config['comicvine']['api_key']
+        oldest_year = 1901
+        if ('oldest_year' in config['default']):
+            oldest_year = int(config['default']['oldest_year'])
 
-            last_pubseries = pubseries
-            last_series = series
+        if (api_key is None):
+            raise(Exception("No comicvine api key defined"))
+
+        if ('scan' not in cache):
+            print('No scan history.')
+            sys.exit()
+
+        for publisher in cache['scan'].keys():
+            for series in cache['scan'][publisher].keys():
+
+
+                start_year= None
+                ver = None
+                parsed_series = parser.parse_series(series) #, debug = args.debug)
+                if ('volume' in parsed_series):
+                    start_year = parsed_series['volume']['start_year']
+                    ver = parsed_series['volume']['ver']
+                    volume = parser.make_volume(parsed_series['volume']['start_year'], ver = parsed_series['volume']['ver'])
+
+                if (cache['scan'][publisher][series]['method'] != 'skipped'):
+                    continue
+
+                c_dir = args.target + '/' + publisher + '/' + series
+                if (os.path.exists(c_dir) is False):
+                    print("{} doesn't exist, clearing cache".format(c_dir))
+                    del cache['scan'][publisher][series]
+                    write_cache(config['default']['cache_file'])
+                    continue
+
+                scan(c_dir, api_key, oldest_year = oldest_year, args = args)
+
     else:
         print("Unknown action: {}".format(args.action))
 
@@ -192,6 +296,10 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
         if (args.existing is not None):
             print(f"  moving {c.file} to {args.existing}")
             if (args.dryrun is False): shutil.move(c.file, args.existing)
+    except comicvine.IssueNotFoundException as e:
+        print(e)
+    except comicvine.VolumeNotFoundException as e:
+        print(e)
     except Exception as e:
         print(traceback.format_exc())
 
@@ -218,6 +326,83 @@ def read_cache(cache_file, args = minorimpact.default_arg_flags):
     else:
         if (args.debug): print("{} does not exist".format(cache_file))
 
+def scan(c_dir, api_key, oldest_year = 1901, verbose = False, debug = False):
+    c_files = os.listdir(c_dir)
+    series = parser.series_filename(series, reverse = True) #, debug = args.debug)
+
+    issues = {}
+
+    for c_file in c_files:
+        if (re.match("^\.", c_file)): continue
+        c = comic.comic(c_dir + '/' + c_file, cache = cache, args = args)
+
+        issues[parser.massage_issue(c.issue())] = parser.parse_date(c.date())
+
+    go_for_it = False
+    for issue in issues.keys():
+        if (args.year is not None and args.year == issues[issue]['year']):
+            go_for_it = True
+            break
+
+    if (len(issues) > 0 and go_for_it):
+        if (args.verbose): print("scanning {} ({})".format(series, volume))
+        try:
+            result = comicvine.search_volumes(series, api_key, start_year = start_year, cache = cache, verbose = args.verbose, debug = args.debug, headless = args.yes)
+        except Exception as e:
+            print(e)
+            return
+
+        if (result is None):
+            print("  Can't find comicvine series for {}".format(series))
+        else:
+            series_total = result['count_of_issues']
+            series_count = len(issues)
+            if (series_count == series_total):
+                if (args.verbose): print("  ... {}/{}".format(series_count, series_total))
+                cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':md5, 'method':'auto'}
+            else:
+                comicvine_issues = comicvine.get_issues(result['id'], api_key, cache = cache, verbose = args.verbose, debug = args.debug, detailed = False)
+                for i in comicvine_issues:
+                    i['issue_number'] = parser.massage_issue(i['issue_number'])
+                    if ('store_date' in i and i['store_date'] is not None):
+                        i['date'] = i['store_date']
+                    elif ('cover_date' in i and i['cover_date'] is not None):
+                        i['date'] = i['cover_date']
+
+                series_total = 0
+                if (series_total == len(issues)):
+                    if (args.verbose):
+                        print("  ... {}/{}: complete".format(series_count, series_total))
+                    cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'method':'auto', 'md5':md5 }
+                else:
+                    missing = []
+                    for i in sorted(comicvine_issues, key = lambda x:x['issue_number']):
+                        if (i['issue_number'] not in issues):
+                            date = ''
+                            if ('date' in i and i['date'] is not None):
+                                date = i['date']
+                                year = parser.parse_date(i['date'])['year']
+                                if (year is not None and int(year) >= oldest_year):
+                                    missing.append(i['issue_number'] + ' - ' + date)
+
+                    if (len(missing) > 0):
+                        print("  missing issues:")
+                        for i in missing:
+                            print('    ', i)
+                        if (args.yes is False):
+                            c = minorimpact.getChar(default='n', end='\n', prompt=f"  mark {series} as 'skipped'? (y/N) ", echo=True).lower()
+                            if (c == 'y'):
+                                cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'method':'skipped', 'md5':md5 }
+                            elif (c == 'q'):
+                                write_cache(config['default']['cache_file'])
+                                sys.exit()
+                    else:
+                        if (args.verbose):
+                            print("  ... {}/{}: complete post {}".format(series_count, result['count_of_issues'], oldest_year-1))
+                        cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'method':'auto', 'md5':md5 }
+
+    write_cache(config['default']['cache_file'])
+
 def verify (comic_file, target_dir, args = minorimpact.default_arg_flags, verbose = False):
     global cache
     if (args.verbose): verbose = True
@@ -233,7 +418,7 @@ def verify (comic_file, target_dir, args = minorimpact.default_arg_flags, verbos
         if (verbose): print("  previously verified {}".format(cache['verify'][c.file]['date']))
         return c
 
-    verified = c.box(args = args, target_dir = target_dir, headless = args.yes)
+    verified = c.box(args = args, target_dir = target_dir, headless = args.yes, verify = True)
     if (verified == 100):
         if (verbose): print("  verified (score: {})".format(verified))
         cache['verify'][c.file] = { 'date':datetime.now(), 'md5':c.md5(), 'version':__version__ }

@@ -1,6 +1,7 @@
 
 from datetime import datetime,timedelta
 from dateutil.relativedelta import relativedelta
+from dumper import dump
 from fuzzywuzzy import fuzz
 import json
 import minorimpact
@@ -22,6 +23,15 @@ headers = {'User-Agent': 'yyreader'}
 params = {}
 
 config = minorimpact.config.getConfig(script_name = 'yyreader')
+
+class IssueNotFoundException(Exception):
+    pass
+
+class UserException(Exception):
+    pass
+
+class VolumeNotFoundException(Exception):
+    pass
 
 def get_issue_old(volume_id, issue, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
     setup_cache(cache)
@@ -49,13 +59,13 @@ def get_issue_old(volume_id, issue, api_key, cache = {}, clear_cache = False, de
     return None
 
 def get_issue(issue_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
-    url = f'{base_url}/issue/4000-{issue_id}/?api_key={api_key}&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits,description,character_credits'
+    url = f'{base_url}/issue/4000-{issue_id}/?api_key={api_key}&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits,description,character_credits,volume'
     #if (debug): print(url)
     results = get_results(url, cache = cache, clear_cache = clear_cache)
     #if (debug): print(results[0])
     return results[0]
 
-def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
+def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False, detailed = False):
     setup_cache(cache)
     volume = get_volume(volume_id, api_key,  cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
 
@@ -65,6 +75,9 @@ def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = Fals
     #if (debug): print(url)
     results = get_results(url, max = None, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     issues = []
+    if (detailed is not True):
+        return results
+
     for result in results:
         issues.append(get_issue(result['id'], api_key, cache = cache, clear_cache = clear_cache, debug = debug, verbose = verbose))
 
@@ -152,7 +165,7 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
               or ( results[i]['first_issue']['name'] is not None and (re.search('TPB$', results[i]['first_issue']['name']) or re.search('^Volume \d+$', results[i]['first_issue']['name']))) \
               or results[i]['publisher'] is None  \
               or (results[i]['publisher']['name'] in skip_publishers) \
-              or (volume.lower() == 'the amazing spider-man' and int(year) < 2014 and results[i]['start_year'] != '1963') \
+              or (volume.lower() == 'the amazing spider-man' and year is not None and int(year) < 2014 and results[i]['start_year'] != '1963') \
               or (year is not None and int(results[i]['start_year']) > int(year)+1):
                 del results[i]
                 pass
@@ -182,13 +195,13 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
         if ('year' in data and re.search(' Annual$', data['series'])):
             pass
         elif (('date' not in data or data['date'] is None) and headless is True):
-            raise Exception("Can't auto confirm without strict file date, skipping.")
+            raise VolumeNotFoundException("Can't auto confirm without strict file date, skipping.")
 
     test_volume = data['series']
     if (test_volume in cache['comicvine']['volumes']):
         test_volume = cache['comicvine']['volumes'][test_volume]['volume']
 
-    result = search_volumes(test_volume, api_key, date=data['date'], start_year=data['start_year'], year = data['year'], issue = data['issue'], cache = cache, clear_cache = clear_cache, headless = headless, verbose = verbose, debug = debug)
+    result = search_volumes(test_volume, api_key, date=data['date'] if 'date' in data else None, start_year=data['start_year'], year = data['year'], issue = data['issue'], cache = cache, clear_cache = clear_cache, headless = headless, verbose = verbose, debug = debug)
     volume_id = result['id']
     #if (debug): print("comicvine data:", result)
 
@@ -208,7 +221,7 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
         i = search_issues(volume_id, data['issue'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
 
     if (i is None):
-        raise Exception(f"Couldn't find issue #{data['issue']} of {comicvine_data['series']}")
+        raise IssueNotFoundException(f"Couldn't find issue #{data['issue']} of {comicvine_data['series']}")
 
     comicvine_data['issue'] = parser.massage_issue(i['issue_number'])
     comicvine_data['issue_id'] = i['id']
@@ -228,7 +241,7 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
 
     details = comicvine_data['issue_details']
     if (details['description'] is not None):
-        comicvine_data['description'] = parser.massage_description(details['description'], debug = True)
+        comicvine_data['description'] = parser.massage_description(details['description'], debug = False)
 
     for person in details['person_credits']:
         person_name = re.sub(', ', ' ', person['name'])
@@ -244,7 +257,6 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
             comicvine_data['pencillers'].append(person_name)
         elif (person['role'] == 'writer'):
             comicvine_data['writers'].append(person_name)
-
 
     if (details['story_arc_credits'] is not None):
         for arc in details['story_arc_credits']:
@@ -288,6 +300,9 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
 def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
     setup_cache(cache)
 
+    volume = get_volume(volume_id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
+    volume_name = volume['name']
+
     results = get_issues(volume_id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     i = len(results) - 1
     while i >= 0:
@@ -325,7 +340,7 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
                 r['ratio'] = ratio
         results = sorted(results, key = lambda x:x['ratio'], reverse = True)
 
-        if (verbose): print(f"  {len(results)} result(s) for '{test_volume}'")
+        if (debug): print(f"  {len(results)} result(s) for '{test_volume}'")
         item = 0
         default = 0
         max_ratio = 0
@@ -358,10 +373,16 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
                                 if (date is not None and (date == cover_date or date == store_date)):
                                     if (verbose): print(f"  found {r['name']} #{i['issue_number']} released on {store_date}/{cover_date}")
                                     result = r
-                                    match_issue = i
+                                    match_issue = get_issue(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
                                 elif (re.search(r' Annual$', test_volume) and (re.search(f'^{year}-', cover_date) or re.search(f'^{year}-', store_date))):
                                     result = r
-                                    match_issue = i
+                                    match_issue = get_issue(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
+        if (result is None):
+            for r in results:
+                if (r['ratio'] == 100):
+                    if (start_year is not None and r['start_year'] == start_year):
+                        if (debug): print("  found exact match: {} ({})".format(r['name'], r['start_year']))
+                        result = r
 
         if (result is not None or headless is True):
             break
@@ -389,7 +410,7 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
             pick = f'{default}'
 
         if (pick == '0' or pick == '-' or pick == '_' or pick == ''):
-            raise Exception('user cancelled')
+            raise UserException('user cancelled')
         elif (pick == 'c'):
             clear_cache = True
             continue
@@ -417,7 +438,7 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
                 comicvine_id = m.group(1)
             m = re.search('(\d+)-(\d+)', comicvine_id)
             if (m is None):
-                raise Exception("invalid comicvine id")
+                raise UserException("invalid comicvine id")
             type_id = m.group(1)
             id = m.group(2)
             if (type_id == '4000'):
@@ -425,10 +446,18 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
 
                 # We did this in the opposite order -- usually we get the mathing series and then go looking for the matching issue. Set up
                 #   the id and type variables to trigger collecting the appropriate volume information for this issue.
+                dump(match_issue)
                 test_volume = match_issue['volume']['name']
                 id = match_issue['volume']['id']
                 type_id = '4050'
-                if (verbose): print("found issue {} #{} ({})".format(test_volume,  match_issue['issue_number'],  match_issue['date']))
+                date = ''
+                if ('store_date' in match_issue and match_issue['store_date'] is not None):
+                    date = match_issue['store_date']
+                elif ('cover_date' in match_issue and match_issue['cover_date'] is not None):
+                    date = match_issue['cover_date']
+
+                if (verbose): print("found issue {} #{} ({})".format(test_volume,  match_issue['issue_number'],  date))
+
 
             if (type_id == '4050'):
                 result = get_volume(id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
@@ -439,10 +468,9 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
             test_volume = pick
 
     if (result is None):
-        raise Exception("can't find a volume for " + test_volume)
+        raise VolumeNotFoundException("can't find a volume for " + test_volume)
 
     result['match_issue'] = match_issue
-
     return result
 
 def setup_cache(cache):
