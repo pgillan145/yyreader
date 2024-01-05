@@ -300,8 +300,11 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
         print(e)
     except comicvine.VolumeNotFoundException as e:
         print(e)
+    except comicvine.UserException as e:
+        pass
     except Exception as e:
         print(traceback.format_exc())
+    print("\n")
 
 def change_extension(file_name, new_extension):
     if (re.search(r'^\.', new_extension)):

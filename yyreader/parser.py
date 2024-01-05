@@ -11,8 +11,12 @@ import time
 formats = [
             # 198900 Damage Control 001.cbr
             '^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            # 199800 Fantastic Four 1:2.cbr
+            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>1:2)\.(?P<extension>cb[rz])$',
             # 198912 Damage Control 001.cbr
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            # 199707 Ghost Rider v2 -1.cbz
+            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>-\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # Damage Control (1989) 001 (1989-12-01).cbr
             '^(?P<series>.+) \((?P<volume>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             # Damage Control (1989-2) 001 (1989-12-01).cbr
@@ -90,7 +94,7 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':' \[[^]]*\]+', 's':''},
                  { 'm':' \([^)]*[^)\d\-]+[^)]*\)', 's':'' },
                  { 'm':' \d+ of \d+ covers', 's':'' },
-                 { 'm':' v\d+ (\d+)\.', 's':r' \1.' },
+                 { 'm':' v\d+ (-?\d+)\.', 's':r' \1.' },
                  { 'm':' vII ', 's':r' ' },
                  { 'm':' #(\d+)', 's':r' \1' },
                  { 'm':' (\d)\.', 's':r' 00\1.' },
@@ -117,8 +121,8 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':' Part Three', 's':' 003' },
                  { 'm':' Part Four', 's':' 004' },
                  { 'm':' -001', 's':' -1' },
-                 { 'm':'001 1:2', 's':'1½' },
-                 { 'm':'1:2', 's':'½' },
+                 #{ 'm':'001 1:2', 's':'1½' },
+                 #{ 'm':'1:2', 's':'½' },
                ]
 
 series_subs = [
@@ -195,6 +199,7 @@ def massage_description(description, args = minorimpact.default_arg_flags, debug
 def massage_issue(issue, directors_cut = False):
     issue = re.sub('^0+','', issue)
 
+    if (issue == '1:2'): issue = '½'
     if (issue == '' or re.search('^\.', issue)): issue = f'0{issue}'
     issue = issue.upper()
     m = re.search('^(\d+)\.(.+)$', issue)
@@ -213,8 +218,8 @@ def massage_issue(issue, directors_cut = False):
             issue = f'00{issue}'
         elif (int(issue) < 100):
             issue = f'0{issue}'
-        if (directors_cut is True):
-            issue = f'{issue}.DC'
+    if (directors_cut is True):
+        issue = f'{issue}.DC'
 
     return issue
 

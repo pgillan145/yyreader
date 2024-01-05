@@ -133,7 +133,6 @@ class comic():
         comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, headless = headless, debug = debug, verbose = verbose)
         if (comicvine_data is None):
             raise Exception("can't get comicvine data.")
-
         parse_data = self.parse_data
         if (parse_data is None or parse_data == {}):
             raise Exception("No info parsed from filename")
@@ -149,7 +148,7 @@ class comic():
         go_for_it = False
         score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
         if (score < 100):
-            if (score >= 95):
+            if (score >= 93):
                 go_for_it = True
 
             if (headless is False):
@@ -373,7 +372,7 @@ class comic():
         merged_dir = parser.make_dir(merge_data)
         output += "Current Filename: {}/{}\n".format(dirname, basename)
         if (merged_name != basename or merged_dir != dirname):
-            if (verify): score -= 1
+            if (verify or score == 100): score -= 1
             output += " Proper filename: {}/{}\n".format(merged_dir, merged_name)
 
         old_url = data['url']
