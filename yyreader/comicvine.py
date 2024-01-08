@@ -159,14 +159,15 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
         while i >= 0:
             # Eliminate the volumes we can be reasonably certain are not correct based on the information
             #   we were provided or bad search results.
-            if results[i]['start_year'] is None \
+            if ('start_year' not in results[i] \
+              or results[i]['start_year'] is None \
               or re.search('^\d+$', results[i]['start_year']) is None \
               or results[i]['first_issue'] is None \
               or ( results[i]['first_issue']['name'] is not None and (re.search('TPB$', results[i]['first_issue']['name']) or re.search('^Volume \d+$', results[i]['first_issue']['name']))) \
               or results[i]['publisher'] is None  \
               or (results[i]['publisher']['name'] in skip_publishers) \
-              or (volume.lower() == 'the amazing spider-man' and year is not None and int(year) < 2014 and results[i]['start_year'] != '1963') \
-              or (year is not None and int(results[i]['start_year']) > int(year)+1):
+              or (year is not None and int(results[i]['start_year']) > int(year)+1)):
+              # or (volume.lower() == 'the amazing spider-man' and year is not None and int(year) < 2014 and results[i]['start_year'] != '1963') 
                 del results[i]
                 pass
             i = i - 1
