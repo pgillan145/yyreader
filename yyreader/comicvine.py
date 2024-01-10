@@ -33,37 +33,29 @@ class UserException(Exception):
 class VolumeNotFoundException(Exception):
     pass
 
-def get_issue_old(volume_id, issue, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
-    setup_cache(cache)
-    volume = get_volume(volume_id, api_key,  cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
+def add_date(result):
+    if ('cover_date' in result and result['cover_date'] is not None):
+        # Cover date is always just a month (i think), so the day should always be
+        #   either the first or the last day of the month, but no one cares, so force it
+        #   to be the first -- way easier, every month has a first.
+        result['cover_date'] = re.sub('-\d\d$', '-01', result['cover_date'])
 
-
-    volume_name = '{} ({}) - {}'.format(volume['name'], volume['start_year'], volume['publisher']['name'])
-
-    url = base_url + '/issues/?api_key=' + api_key + f'&format=json&sort=name:asc&filter=volume:{volume_id}&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
-    #if (debug): print(url)
-    results = get_results(url, max = None, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
-    i = len(results) - 1
-    while i >= 0:
-        if ('store_date' not in results[i] or results[i]['store_date'] is None) and ('cover_date' not in results[i] or results[i]['cover_date'] is None):
-            del results[i]
-        i = i - 1
-
-    issue = parser.massage_issue(issue)
-    if (debug): print(f"  searching for issue #{issue} of {volume_name}")
-    for i in results:
-        #if (debug): print(i)
-        if ('issue_number' in i and (issue == i['issue_number'] or parser.massage_issue(i['issue_number']) == issue)):
-            i['details'] = get_issue_details(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
-            return i
-    return None
+    if ('store_date' in result and result['store_date'] is not None):
+        result['date'] = result['store_date']
+    elif ('cover_date' in result and result['cover_date'] is not None):
+        result['date'] = result['cover_date']
+    else:
+        result['date'] = ''
 
 def get_issue(issue_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False):
     url = f'{base_url}/issue/4000-{issue_id}/?api_key={api_key}&format=json&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date,person_credits,description,character_credits,volume'
     #if (debug): print(url)
-    results = get_results(url, cache = cache, clear_cache = clear_cache)
-    #if (debug): print(results[0])
-    return results[0]
+    result = get_results(url, cache = cache, clear_cache = clear_cache)[0]
+    #if (debug): print(result)
+
+    add_date(result)
+
+    return result
 
 def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False, detailed = False):
     setup_cache(cache)
@@ -74,10 +66,14 @@ def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = Fals
     url = base_url + '/issues/?api_key=' + api_key + f'&format=json&sort=name:asc&filter=volume:{volume_id}&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
     #if (debug): print(url)
     results = get_results(url, max = None, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
-    issues = []
+
+    for result in results:
+        add_date(result)
+
     if (detailed is not True):
         return results
 
+    issues = []
     for result in results:
         issues.append(get_issue(result['id'], api_key, cache = cache, clear_cache = clear_cache, debug = debug, verbose = verbose))
 
@@ -167,7 +163,7 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
               or results[i]['publisher'] is None  \
               or (results[i]['publisher']['name'] in skip_publishers) \
               or (year is not None and int(results[i]['start_year']) > int(year)+1)):
-              # or (volume.lower() == 'the amazing spider-man' and year is not None and int(year) < 2014 and results[i]['start_year'] != '1963') 
+              # or (volume.lower() == 'the amazing spider-man' and year is not None and int(year) < 2014 and results[i]['start_year'] != '1963')
                 del results[i]
                 pass
             i = i - 1
@@ -189,6 +185,10 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
 
 #TODO: Make this take a limited set of fields for search, rather than just passing it 'data'.
 def search(data, api_key, cache = {}, clear_cache = False, headless = False, verbose = False, debug = True):
+    """Given a block of data parsed from a cbr/z file, attempts to match it to a comicvine issue and returns the data.
+
+    In headless mode, will return a match only if it's an exceedingly accurate match based on title, issue and release date.
+    """
     setup_cache(cache)
 
     if (headless):
@@ -223,14 +223,18 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
     if (i is None):
         raise IssueNotFoundException(f"Couldn't find issue #{data['issue']} of {comicvine_data['series']}")
 
+    comicvine_data['cover_date'] = i['cover_date']
+    comicvine_data['description'] = ''
+    comicvine_data['date'] = i['date']
     comicvine_data['issue'] = parser.massage_issue(i['issue_number'])
+    comicvine_data['issue_details'] = i
     comicvine_data['issue_id'] = i['id']
     comicvine_data['issue_name'] = ''
-    comicvine_data['issue_details'] = i
-    comicvine_data['description'] = ''
     comicvine_data['ratio'] = result['ratio']
+    comicvine_data['store_date'] = i['store_date']
     comicvine_data['url'] = 'http://www.comicvine.com/issue/4000-{}'.format(i['id'])
     comicvine_data['volume_url'] = 'http://www.comicvine.com/volume/4050-{}'.format(volume_id)
+
     comicvine_data['characters'] = []
     comicvine_data['colorists'] = []
     comicvine_data['inkers'] = []
@@ -277,18 +281,6 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
     if ('name' in i and i['name'] is not None):
         comicvine_data['issue_name'] = i['name']
 
-    if ('store_date' in i and i['store_date'] is not None):
-        comicvine_data['store_date'] = i['store_date']
-        comicvine_data['date'] = i['store_date']
-
-    if ('cover_date' in i):
-        comicvine_data['cover_date'] = re.sub('-\d\d$', '-01', i['cover_date'])
-        # Cover date is always just a month (i think), so the day should always be
-        #   either the first or the last day of the month, but no one cares, so force it
-        #   to be the first -- way easier.
-        if ('date' not in comicvine_data):
-            comicvine_data['date'] = comicvine_data['cover_date']
-
     #details = get_issue_details(i['id'], cache = cache, args = args, clear_cache = clear_cache)
     #self.data['description'] = re.sub('<p><em>','', re.sub('</em></p>', '', details['description']))
 
@@ -306,7 +298,7 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
     results = get_issues(volume_id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     i = len(results) - 1
     while i >= 0:
-        if ('store_date' not in results[i] or results[i]['store_date'] is None) and ('cover_date' not in results[i] or results[i]['cover_date'] is None):
+        if (results[i]['date'] == ''):
             del results[i]
         i = i - 1
 
@@ -321,6 +313,8 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
     return None
 
 def search_volumes(test_volume, api_key, start_year = None, year = None, date = None, issue = None, cache = {}, clear_cache = False, debug = False, verbose = False, headless = False):
+    """Returns the comicvine volume that best matches the given criteria."""
+
     result = None
     match_issue = None
     m = re.search('^(.+) \((\d\d\d\d)\)$', test_volume)
@@ -335,51 +329,83 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
         for r in results:
             if ('ratio' not in r):
                 ratio = fuzz.ratio(test_volume.lower(),r['name'].lower())
-                if ("The " + test_volume == r['name'] or "An " + test_volume == r['name'] or "A " + test_volume == r['name']):
-                    ratio = 100
                 r['ratio'] = ratio
-        results = sorted(results, key = lambda x:x['ratio'], reverse = True)
+
+            if ("The " + test_volume == r['name'] or "An " + test_volume == r['name'] or "A " + test_volume == r['name']):
+                ratio = 100
+
+            r['score'] = r['ratio']
 
         if (debug): print(f"  {len(results)} result(s) for '{test_volume}'")
         item = 0
         default = 0
-        max_ratio = 0
         issue_date = {}
         # If we have a date for the issue, then we can look through each volume for the given issue number to see if it has the
         #   same date.  If so, then then this is *probably* the correct volume.
         if ((date is not None) or (re.search(r' Annual$', test_volume) and year is not None and re.search(r'^\d\d\d\d$', year))):
+            date = datetime.fromisoformat(date)
             if (verbose):
                 if (date is not None):
-                    print(f"  looking for an issue #{issue} released on {date}")
-                else:
+                    print(f"  looking for an issue #{issue} released on {date.date()}")
+                elif (year is not None):
                     print(f"  looking for an issue #{issue} released in {year}")
             for r in results:
-                ratio = r['ratio']
-                if (ratio >= 80 and result is None and match_issue is None and issue is not None):
+                score = r['ratio']
+                if (r['ratio'] >= 80 and result is None and match_issue is None and issue is not None):
                     i = search_issues(r['id'], issue, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
                     if (i is not None):
                         store_date = ''
                         cover_date = ''
                         if ('store_date' in i and i['store_date'] is not None):
-                            store_date = i['store_date']
+                            store_date = datetime.fromisoformat(i['store_date'])
                         if ('cover_date' in i and i['cover_date'] is not None):
-                            # Sometimes the cover daye is the first of day of the month, sometimes it's the last, so
-                            #   for our generic 'date' comparison field, just force it to be the first, no one cares.
-                            cover_date = re.sub('-\d\d$', '-01', i['cover_date'])
+                            cover_date = datetime.fromisoformat(i['cover_date'])
 
                         if (store_date != '' or cover_date != ''):
-                            issue_date[r['id']] = f'{store_date}/{cover_date}'
-                            if (ratio >= 93):
-                                if (date is not None and (date == cover_date or date == store_date)):
+                            issue_date[r['id']] = ''
+                            if (cover_date != ''):
+                                issue_date[r['id']] = str(cover_date.date())
+
+                            if (store_date != ''):
+                                if (len(issue_date[r['id']])>0):
+                                    issue_date[r['id']] = issue_date[r['id']] + '/' + str(store_date.date())
+                                else:
+                                    issue_date[r['id']] = str(store_date.date())
+
+                            if (r['ratio'] >= 93):
+                                if (date == store_date or date == cover_date):
                                     if (verbose): print(f"  found {r['name']} #{i['issue_number']} released on {store_date}/{cover_date}")
                                     result = r
                                     match_issue = get_issue(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
-                                elif (re.search(r' Annual$', test_volume) and (re.search(f'^{year}-', cover_date) or re.search(f'^{year}-', store_date))):
-                                    result = r
-                                    match_issue = get_issue(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
+                            if ((store_date != '' and store_date > (date + timedelta(weeks = 52))) or (cover_date != '' and (cover_date > date + timedelta(weeks = 52)))):
+                                # Issue found but one of the dates is more than a year in the future
+                                score -= 15
+                            elif ((store_date != '' and store_date > date) or (cover_date != '' and cover_date > date)):
+                                # Issue found but one of the dates is in the future.
+                                score -= 10
+                            elif ((store_date != '' and store_date < date - timedelta(weeks = 52)) or (cover_date != '' and cover_date < date - timedelta(weeks = 52))):
+                                # Issue found but one of the dates is more than a year in the past
+                                score -= 15
+                            else:
+                                # The neither of the dates match.
+                                score -= 5
+                            #elif (re.search(r' Annual$', test_volume) and (re.search(f'^{year}-', cover_date) or re.search(f'^{year}-', store_date))):
+                            #    result = r
+                            #    match_issue = get_issue(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
+                        else:
+                            # No cover dates for matching issue
+                            score -= 20
+                    else:
+                        # No matching issue returned found for volume.
+                        score -= 30
+                else:
+                    # Series title ratio is less than 80
+                    score -= 40
+                r['score'] = score
+
         if (result is None):
             for r in results:
-                if (r['ratio'] == 100):
+                if (r['score'] == 100):
                     if (start_year is not None and r['start_year'] == start_year):
                         if (debug): print("  found exact match: {} ({})".format(r['name'], r['start_year']))
                         result = r
@@ -387,15 +413,18 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
         if (result is not None or headless is True):
             break
 
+        results = sorted(results, key = lambda x:x['score'], reverse = True)
+
         # We didn't find a date match, and we're not in auto-mode, so ask a grown-up for help.
+        max_score = 0
         for r in results:
             item = item + 1
-            if (r['ratio'] > max_ratio):
+            if (r['score'] > max_score):
                 default = item
-                max_ratio = r['ratio']
-            if (r['ratio'] < (max_ratio - 20)):
+                max_score = r['score']
+            if (r['score'] < (max_score - 50)):
                 break
-            menu_item = f"{item}: {r['name']} ({r['start_year']}) - {r['publisher']['name']}, {r['count_of_issues']} issue(s) (ratio: {r['ratio']})"
+            menu_item = f"{item}: {r['name']} ({r['start_year']}) - {r['publisher']['name']}, {r['count_of_issues']} issue(s) (score: {r['score']})"
             if (r['id'] in issue_date):
                 menu_item = f"{menu_item} - {issue_date[r['id']]}"
             print(menu_item)
@@ -446,15 +475,10 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
 
                 # We did this in the opposite order -- usually we get the mathing series and then go looking for the matching issue. Set up
                 #   the id and type variables to trigger collecting the appropriate volume information for this issue.
-                dump(match_issue)
                 test_volume = match_issue['volume']['name']
                 id = match_issue['volume']['id']
                 type_id = '4050'
-                date = ''
-                if ('store_date' in match_issue and match_issue['store_date'] is not None):
-                    date = match_issue['store_date']
-                elif ('cover_date' in match_issue and match_issue['cover_date'] is not None):
-                    date = match_issue['cover_date']
+                date = match_issue['date']
 
                 if (verbose): print("found issue {} #{} ({})".format(test_volume,  match_issue['issue_number'],  date))
 
