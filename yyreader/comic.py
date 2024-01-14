@@ -137,13 +137,20 @@ class comic():
         if (parse_data is None or parse_data == {}):
             raise Exception("No info parsed from filename")
 
-        # TODO: Make minimum file size something we can override?
         minimum_file_size = 1
         if ('minimum_file_size' in config['default']):
             minimum_file_size = int(config['default']['minimum_file_size'])
         minimum_file_size = minimum_file_size * 1024 * 1024
+
+        maximum_file_size = 100
+        if ('maximum_file_size' in config['default']):
+            maximum_file_size = int(config['default']['maximum_file_size'])
+        maximum_file_size = maximum_file_size * 1024 * 1024
+
         if (parse_data['size'] < minimum_file_size):
             raise Exception("file too small")
+        if (parse_data['size'] >= maximum_file_size):
+            raise Exception("file too large")
 
         go_for_it = False
         score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
@@ -166,7 +173,7 @@ class comic():
                         print("  'q': Quit")
                         print("  'y': Update the file")
                     elif (c == 'c'):
-                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], verbose =  verbose, debug = debug, clear_cache = True, headless=headless)
+                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], verbose = verbose, debug = debug, clear_cache = True, headless=headless)
                         if (comicvine_data is None):
                             raise Exception("can't get comicvine data.")
                     elif (c == 'i'):
@@ -183,7 +190,7 @@ class comic():
                         done = True
             else:
                 if (go_for_it is True):
-                    print("  Auto updating {}".format(self.file))
+                    print("  auto updating {}".format(self.file))
                     self._update(comicvine_data, target_dir = target_dir, args = args)
                     score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
                 else:
@@ -260,7 +267,7 @@ class comic():
                 print("  'q': Quit")
                 print("  'y': Move the file")
             elif (c == 'c'):
-                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True, headless = args.yes)
+                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True, cache = cache, headless = args.yes)
                 if (comicvine_data is None):
                     raise Exception("can't get comicvine data.")
                 if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
@@ -851,7 +858,7 @@ class comic():
         new_comic = parser.make_name(self.data, parse_data['extension'], directors_cut = parse_data['directors_cut'])
         dirname = os.path.dirname(self.file)
         if (dirname + '/' + new_comic != self.file):
-            if (args.verbose): print(f"  renaming {self.file} => {dirname}/{new_comic}")
+            if (args.verbose): print(f"  renaming {self.file} => {new_comic}")
             if (args.dryrun is False):
                 shutil.move(self.file, dirname + '/' + new_comic)
                 self.file = dirname + '/' + new_comic
@@ -867,7 +874,7 @@ class comic():
         if (os.path.exists(target_dir) is False):
             if (args.dryrun is False): os.makedirs(target_dir, exist_ok = True)
 
-        if (args.verbose): print(f"  moving {self.file} => {target_dir}/{new_comic}")
+        if (args.verbose): print(f"  moving {new_comic} => {target_dir}/{new_comic}")
         if (os.path.exists(f'{target_dir}/{new_comic}') is True):
             raise FileExistsException(f"{target_dir}/{new_comic} already exists")
         if (args.dryrun is False):

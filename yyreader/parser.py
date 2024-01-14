@@ -9,12 +9,16 @@ import requests
 import time
 
 formats = [
+            # Fin Fang Four 001 [20081126].cbz
+            '^(?P<series>.+) (?P<issue>-\d+[^ ]*) \[(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)\]\.(?P<extension>cb[rz])$',
             # 198900 Damage Control 001.cbr
             '^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # 199800 Fantastic Four 1:2.cbr
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>1:2)\.(?P<extension>cb[rz])$',
             # 198912 Damage Control 001.cbr
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            # 20050518 Official Handbook of the Marvel Universe - Teams 2005 001.cbz
+            '^(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # 199707 Ghost Rider v2 -1.cbz
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>-\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # Damage Control (1989) 001 (1989-12-01).cbr
@@ -288,7 +292,7 @@ def parse(comic_file, year = None, verbose = False, debug = False):
     if 'year' in date and date['year'] is not None: year = date['year']
 
     for f in formats:
-        #if (debug): print(f"testing '{f}' ({basename})")
+        if (debug): print(f"testing '{f}' ({basename})")
         m = re.search(f, basename)
         if (m is not None):
             if (debug): print(f"matched format '{f}'")
@@ -360,7 +364,7 @@ def parse_date(search_date, debug = False):
     for f in date_formats:
         m = re.search(f, search_date)
         if (m is not None):
-            print("'{}' matched '{}'".format(search_date, f))
+            if (debug): print("date '{}' matched '{}'".format(search_date, f))
             g = m.groupdict()
             if 'day' in g: date['day'] = g['day']
             if 'month' in g: date['month'] = g['month']
