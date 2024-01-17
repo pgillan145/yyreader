@@ -67,7 +67,7 @@ class comic():
     _page_count = None
     files = []
 
-    def __init__(self, file, args = minorimpact.default_arg_flags, cache = {}):
+    def __init__(self, file, args = minorimpact.default_arg_flags, cache = {}, debug = False):
         if (re.search('^/', file) is None):
             file = os.getcwd() + '/' + file
         self.file = file
@@ -91,7 +91,7 @@ class comic():
         self.data['url'] = ''
         self.data['writers'] = []
 
-        self._read_data(verbose = args.verbose, debug = False)
+        self._read_data(verbose = args.verbose, debug = args.debug)
         self.cache = cache
         #print("_read_data()")
         #print(self.data)
@@ -123,7 +123,7 @@ class comic():
         result = subprocess.run(command)
         os.chdir(cwd)
 
-    def box(self, target_dir = None, headless = True, args = minorimpact.default_arg_flags, debug = False, verbose = False, verify = False):
+    def box(self, target_dir = None, headless = True, args = minorimpact.default_arg_flags, debug = False, verbose = False, verify = False, large = False, small = False):
         if (args.debug is True): debug = True
         if (args.verbose is True): verbose = True
         if (args.yes is True): headless = True
@@ -147,15 +147,15 @@ class comic():
             maximum_file_size = int(config['default']['maximum_file_size'])
         maximum_file_size = maximum_file_size * 1024 * 1024
 
-        if (parse_data['size'] < minimum_file_size):
+        if (parse_data['size'] < minimum_file_size and small is False):
             raise Exception("file too small")
-        if (parse_data['size'] >= maximum_file_size):
+        if (parse_data['size'] >= maximum_file_size and large is False):
             raise Exception("file too large")
 
         go_for_it = False
         score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
         if (score < 100):
-            if (score >= 93):
+            if (score >= 85):
                 go_for_it = True
 
             if (headless is False):
@@ -743,7 +743,7 @@ class comic():
     def _read_data(self, verbose = False, debug = False):
         """Collect as much information from the file as possible."""
 
-        self.parse_data = parser.parse(self.file, verbose = verbose, debug = False)
+        self.parse_data = parser.parse(self.file, verbose = verbose, debug = debug)
         if (self.parse_data is None or self.parse_data == {}):
             raise Exception("No info parsed from filename {}".format(self.file))
 

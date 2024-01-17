@@ -20,6 +20,9 @@ existing_dir = /tmp/existing
 # Year before which to no longer flag issues as 'missing' during scan.
 oldest_year = 1901
 
+# Files larger than this won't be imported.  Can be overridden by passing '--large' on the command line.
+maximum_file_size = 100
+
 # Publishers to skip when considering possible matches
 skip_publishers = [ 'Panini Comics' ]
 

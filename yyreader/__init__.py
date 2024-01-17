@@ -38,7 +38,9 @@ def main():
     argparser.add_argument('--file', metavar = 'FILE',  help = "process FILE")
     argparser.add_argument('--filter', metavar = 'FILTER',  help = "Only verify series that match FILTER")
     argparser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
+    argparser.add_argument('--large', help = f"allow importing files larger than 'maximum_file_size' MB. default: 100", action='store_true')
     argparser.add_argument('--publisher', metavar = 'PUBLISHER',  help = "limit scan to PUBLISHER")
+    argparser.add_argument('--small', help = f"allow importing files smaller than 'minimum_file_size' MB. default: 1", action='store_true')
     argparser.add_argument('--target', metavar = 'TARGET',  help = "Move files to TARGET", default = config['default']['comic_dir'])
     argparser.add_argument('--year', metavar = 'YEAR', help = "When adding new items, assume YEAR for any file that doesn't include it.  While scanning, limit results to YEAR.")
     argparser.add_argument('--existing', metavar = 'EXIST', help = "Move any files that already exist to EXIST", default = config['default']['existing_dir'])
@@ -77,7 +79,7 @@ def main():
             c_files = [ args.file ]
 
         for c_file in sorted(c_files):
-            box(c_file, args.target, args = args)
+            box(c_file, args.target, args = args, large = args.large, small = args.small)
             write_cache(config['default']['cache_file'], args = args)
 
     elif (args.action == 'verify'):
@@ -253,7 +255,7 @@ def main():
         print("Unknown action: {}".format(args.action))
 
 
-def box(comic_file, target, args = minorimpact.default_arg_flags):
+def box(comic_file, target, args = minorimpact.default_arg_flags, large = False, small = False):
     global cache
 
     if (os.path.exists(comic_file) is False):
@@ -266,8 +268,8 @@ def box(comic_file, target, args = minorimpact.default_arg_flags):
         comic_file = change_extension(comic_file, ext.lower())
 
     try:
-        c = comic.comic(comic_file, cache = cache, args = args)
-        c.box(args = args, target_dir = args.target, headless = args.yes)
+        c = comic.comic(comic_file, cache = cache, args = args, debug = args.debug)
+        c.box(args = args, target_dir = args.target, headless = args.yes, large = large, small = small)
     except comic.ExtensionMismatchException as e:
         print(e)
         magic_str = magic.from_file(comic_file)

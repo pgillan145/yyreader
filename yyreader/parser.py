@@ -35,7 +35,12 @@ formats = [
             '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Hulk - Grand Design 001 - Monster (2022).cbr
             '^(?P<series>.+) (?P<issue>\d\d\d) - .+ \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            # Avengers Assemble 015AU.cbz
+            '^(?P<series>.+) (?P<issue>\d+AU)\.(?P<extension>cb[rz])$',
+            # Marvel Previews 008.cbz
             '^(?P<series>.+) (?P<issue>\d+)\.(?P<extension>cb[rz])$',
+            # Iron Man 258.2.cbr
+            '^(?P<series>.+) (?P<issue>\d+\.\d)\.(?P<extension>cb[rz])$',
             '^(?P<year>\d\d\d\d)00 (?P<series>.+)\.(?P<extension>cb[rz])$',
             '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+)\.(?P<extension>cb[rz])$',
             '^(?P<series>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
@@ -106,6 +111,8 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':'^\d+ ?- ', 's':'' },
                  { 'm':'__SLASH__', 's':'/' },
                  { 'm':'^FCBD (\d\d\d\d) ', 's':r'Free Comic Book Day \1 ' },
+                 { 'm':'Marvel Universe - Avengers Earth\'s Mightiest Heroes', 's':'Avengers Earth\'s Mightiest Heroes' },
+                 { 'm':'Marvel Universe - Ultimate Spider-Man', 's':'Ultimate Spider-Man' },
                  { 'm':' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', 's':r' - Marvel Legacy Primer Pages 001 (\1)' },
                  { 'm':'^\d+ - House of M - ', 's':'' },
                  { 'm':r'Marvel Graphic Novel No (\d+) - .*\.(cb[rz])', 's':r'Marvel Graphic Novel \1.\2' },
@@ -125,6 +132,9 @@ cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':' Part Three', 's':' 003' },
                  { 'm':' Part Four', 's':' 004' },
                  { 'm':' -001', 's':' -1' },
+                 { 'm':' \d\dpg digital scan by [^ \.]+', 's':'' },
+                 { 'm':' \d\dpg scanned by [^ \.]+', 's':'' },
+                 { 'm':' c2c scanned by [^ \.]+', 's':'' },
                  #{ 'm':'001 1:2', 's':'1½' },
                  #{ 'm':'1:2', 's':'½' },
                ]
@@ -248,7 +258,7 @@ def is_credit_page(filename):
 
 def parse(comic_file, year = None, verbose = False, debug = False):
     """Analyze the file name and pull as much information about it as possible."""
-    #if (verbose): print("parsing {}".format(comic_file))
+    if (verbose): print("parsing {}".format(comic_file))
 
     data = { 'directors_cut': False }
 
@@ -272,7 +282,7 @@ def parse(comic_file, year = None, verbose = False, debug = False):
     volume = ''
 
     (dirname, basename) = os.path.split(comic_file)
-    if (re.search('fc only', basename) is not None or re.search('cover ONLY', basename) is not None or re.search('cover only', basename) is not None):
+    if (re.search('fc only', basename, re.IGNORECASE) is not None or re.search('Cover ONLY', basename, re.IGNORECASE) is not None):
         raise Exception("Front cover only")
 
     for c in cleanup_subs:
@@ -280,6 +290,7 @@ def parse(comic_file, year = None, verbose = False, debug = False):
         if 'c' in c:
             count = c['c']
         basename = re.sub(c['m'], c['s'], basename, count = count)
+        #print(basename)
 
     if (re.search(r" - [dD]irector'?s? [Cc]ut", basename) is not None):
         data['directors_cut'] = True

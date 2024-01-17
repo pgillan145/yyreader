@@ -139,9 +139,10 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
 
     if (debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
+    volume = re.sub('\+', '%2B', volume)
     results = []
     url = base_url + '/search/?api_key=' + api_key + f'&format=json&query={volume}&resources=volume&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
-    #if (debug): print(url)
+    if (debug): print(url)
     try:
         results = get_results(url, max = 100, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     except Exception as e:
@@ -342,7 +343,6 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
 
         if (debug): print(f"  {len(results)} result(s) for '{test_volume}'")
         item = 0
-        default = 0
         issue_date = {}
         # If we have a date for the issue, then we can look through each volume for the given issue number to see if it has the
         #   same date.  If so, then then this is *probably* the correct volume.
@@ -391,13 +391,19 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
                                     match_issue = get_issue(found_issue['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
                             if ((store_date != '' and store_date > (search_date + timedelta(weeks = 52))) or (cover_date != '' and (cover_date > search_date + timedelta(weeks = 52)))):
                                 # Issue found but one of the dates is more than a year in the future
+                                score -= 25
+                            elif ((store_date != '' and store_date > search_date + timedelta(weeks=8) or (cover_date != '' and cover_date > search_date + timedelta(weeks=8)))):
+                                # Issue found but one of the dates is more than 2 months in the future
                                 score -= 15
-                            elif ((store_date != '' and store_date > search_date) or (cover_date != '' and cover_date > search_date)):
-                                # Issue found but one of the dates is in the future.
+                            elif ((store_date != '' and store_date > search_date + timedelta(weeks=4) or (cover_date != '' and cover_date > search_date + timedelta(weeks=4)))):
+                                # Issue found but one of the dates is between 1 and 2 months in the future
                                 score -= 10
+                            elif ((store_date != '' and store_date > search_date) or (cover_date != '' and cover_date > search_date)):
+                                # Issue found but one of the dates is less than a month in the future.
+                                score -= 5
                             elif ((store_date != '' and store_date < search_date - timedelta(weeks = 52)) or (cover_date != '' and cover_date < search_date - timedelta(weeks = 52))):
                                 # Issue found but one of the dates is more than a year in the past
-                                score -= 15
+                                score -= 20
                             else:
                                 # Neither of the dates match.
                                 score -= 5
@@ -425,11 +431,12 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
         results = sorted(results, key = lambda x:x['score'], reverse = True)
 
         # We didn't find a date match, and we're not in auto-mode, so ask a grown-up for help.
+        default = 0
         max_score = 0
         for r in results:
             item = item + 1
             if (r['score'] > max_score):
-                default = item
+                if (r['score'] > 80): default = item
                 max_score = r['score']
             if (r['score'] < (max_score - 50)):
                 break
