@@ -35,6 +35,10 @@ formats = [
             '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Hulk - Grand Design 001 - Monster (2022).cbr
             '^(?P<series>.+) (?P<issue>\d\d\d) - .+ \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            # Mighty Avengers 004.INH (2014).cbr
+            '^(?P<series>.+) (?P<issue>\d+\.INH) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            # Cataclysm Ultimate Comics 000.1 (2013).cbr
+            '^(?P<series>.+) (?P<issue>\d+\.1) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Avengers Assemble 015AU.cbz
             '^(?P<series>.+) (?P<issue>\d+AU)\.(?P<extension>cb[rz])$',
             # Marvel Previews 008.cbz
@@ -99,7 +103,7 @@ credit_pages = [ 'Scanned By Gird.jpg',
 
 cleanup_subs = [ { 'm':'\)\(', 's':') ('},
                  { 'm':'([^ ])\(', 's':r'\1 (' },
-                 { 'm':'[. ]\.(cb[zr])$', 's':r'.\1' },
+                 { 'm':'[\. ]+\.(cb[zr])$', 's':r'.\1' },
                  { 'm':' \[[^]]*\]+', 's':''},
                  { 'm':' \([^)]*[^)\d\-]+[^)]*\)', 's':'' },
                  { 'm':' \d+ of \d+ covers', 's':'' },

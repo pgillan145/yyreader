@@ -288,7 +288,10 @@ def box(comic_file, target, args = minorimpact.default_arg_flags, large = False,
                     print(e)
                     if (args.existing is not None):
                         print(f"  moving {c.file} to {args.existing}")
-                        if (args.dryrun is False): shutil.move(c.file, args.existing)
+                        try:
+                            if (args.dryrun is False): shutil.move(c.file, args.existing)
+                        except shutil.Error as she:
+                            print(she)
                 except Exception as e:
                     print(traceback.format_exc())
         else:
@@ -297,7 +300,10 @@ def box(comic_file, target, args = minorimpact.default_arg_flags, large = False,
         print(e)
         if (args.existing is not None):
             print(f"  moving {c.file} to {args.existing}")
-            if (args.dryrun is False): shutil.move(c.file, args.existing)
+            try:
+                if (args.dryrun is False): shutil.move(c.file, args.existing)
+            except shutil.Error as she:
+                print(she)
     except comicvine.IssueNotFoundException as e:
         print(e)
     except comicvine.VolumeNotFoundException as e:

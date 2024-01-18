@@ -140,6 +140,7 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
     if (debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
     volume = re.sub('\+', '%2B', volume)
+    volume = re.sub('&', '%26', volume)
     results = []
     url = base_url + '/search/?api_key=' + api_key + f'&format=json&query={volume}&resources=volume&field_list=id,name,start_year,count_of_issues,publisher,first_issue'
     if (debug): print(url)
