@@ -52,6 +52,8 @@ def get_issue(issue_id, api_key, cache = {}, clear_cache = False, debug = False,
     #if (debug): print(url)
     result = get_results(url, cache = cache, clear_cache = clear_cache)[0]
     #if (debug): print(result)
+    if (re.search('^ ', result['issue_number']) or re.search(' $', result['issue_number'])):
+        result['issue_number'] = result['issue_number'].strip()
 
     add_date(result)
 
@@ -132,6 +134,8 @@ def get_volume(volume_id, api_key, cache = {}, clear_cache = False, debug = Fals
     #if (debug): print(url)
     results = get_results(url, cache = cache, debug = debug, verbose = verbose, clear_cache = clear_cache)
     result = results[0]
+    if (re.search('^ ', result['name']) or re.search(' $', result['name'])):
+        result['name'] = result['name'].strip()
     return result
 
 def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, clear_cache = False, debug = False, headless = False, verbose = False):
@@ -155,6 +159,10 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
     if (len(results) > 0):
         i = len(results) - 1
         while i >= 0:
+            if (re.search('^ ', results[i]['name']) or re.search(' $', results[i]['name'])):
+                #print("WIKI ERROR: '{}':{}".format(results[i]['name'], results[i]['id']))
+                results[i]['name'] = results[i]['name'].strip()
+
             #dump(results[i])
             # Eliminate the volumes we can be reasonably certain are not correct based on the information
             #   we were provided or bad search results.
@@ -202,6 +210,7 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
             raise VolumeNotFoundException("Can't auto confirm without strict file date, skipping.")
 
     test_volume = data['series']
+    test_volume = re.sub("\(\d\d\d\d-\)","", test_volume)
     if (test_volume in cache['comicvine']['volumes'] and clear_cache is False):
         test_volume = cache['comicvine']['volumes'][test_volume]['volume']
 
@@ -304,6 +313,9 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
     results = get_issues(volume_id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
     i = len(results) - 1
     while i >= 0:
+        if (re.search('^ ', results[i]['issue_number']) or re.search(' $', results[i]['issue_number'])):
+            print("WIKI ERROR: '{}({})' issue_number='{}'".format(volume_name, volume['start_year'], results[i]['issue_number']))
+            results[i]['issue_number'] = results[i]['issue_number'].strip()
         if (results[i]['date'] == ''):
             del results[i]
         i = i - 1
@@ -311,9 +323,10 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
     issue = parser.massage_issue(issue)
     if (debug): print(f"  searching for issue #{issue} of {volume_name}")
     for i in results:
-        #if (debug): print(i)
-        if ('issue_number' in i and (issue == i['issue_number'] or parser.massage_issue(i['issue_number']) == issue)):
+        if (debug): print(i)
+        if ('issue_number' in i and (issue == i['issue_number'].strip() or parser.massage_issue(i['issue_number']) == issue)):
             result = get_issue(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
+            #print("'{}' issue_number='{}'".format(volume_name, result['issue_number']))
             #i['details'] = get_issue_details(i['id'], api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug)
             return result
     return None
