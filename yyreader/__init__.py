@@ -40,6 +40,7 @@ def main():
     argparser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
     argparser.add_argument('--large', help = f"allow importing files larger than 'maximum_file_size' MB. default: 100", action='store_true')
     argparser.add_argument('--publisher', metavar = 'PUBLISHER',  help = "limit scan to PUBLISHER")
+    argparser.add_argument('--slow', help = "Pull comicvine data at a slightly reduced rate, so as not to stress the API.", action='store_true')
     argparser.add_argument('--small', help = f"allow importing files smaller than 'minimum_file_size' MB. default: 1", action='store_true')
     argparser.add_argument('--target', metavar = 'TARGET',  help = "Move files to TARGET", default = config['default']['comic_dir'])
     argparser.add_argument('--year', metavar = 'YEAR', help = "When adding new items, assume YEAR for any file that doesn't include it.  While scanning, limit results to YEAR.")
@@ -92,9 +93,15 @@ def main():
             if (args.filter and re.search(args.filter, c_file) is None):
                 continue
 
-            i = i + 1
-            if (i > 10 and args.yes): break
-            c = verify(c_file, args.target, args = args)
+            #i = i + 1
+            #if (i > 10 and args.yes): break
+            try:
+                c = verify(c_file, args.target, args = args)
+            except comicvine.VolumeNotFoundException as e:
+                print(e)
+            except comic.FileExistsException as e:
+                print(e)
+
 
             write_cache(config['default']['cache_file'])
 
@@ -458,12 +465,11 @@ def verify (comic_file, target_dir, args = minorimpact.default_arg_flags, verbos
     if (c.file in cache['verify'] and
         cache['verify'][c.file]['md5'] == c.md5() and
         args.clear_cache is False and
-        cache['verify'][c.file]['date'] > (datetime.now() - timedelta(days = 10)) and
         cache['verify'][c.file]['version'] == __version__):
         if (verbose): print("  previously verified {}".format(cache['verify'][c.file]['date']))
         return c
 
-    verified = c.box(args = args, target_dir = target_dir, headless = args.yes, verify = True)
+    verified = c.box(args = args, target_dir = target_dir, headless = args.yes, verify = True, slow = args.slow)
     if (verified == 100):
         if (verbose): print("  verified (score: {})".format(verified))
         cache['verify'][c.file] = { 'date':datetime.now(), 'md5':c.md5(), 'version':__version__ }

@@ -123,14 +123,14 @@ class comic():
         result = subprocess.run(command)
         os.chdir(cwd)
 
-    def box(self, target_dir = None, headless = True, args = minorimpact.default_arg_flags, debug = False, verbose = False, verify = False, large = False, small = False):
+    def box(self, target_dir = None, headless = True, args = minorimpact.default_arg_flags, debug = False, verbose = False, verify = False, large = False, small = False, slow = False):
         if (args.debug is True): debug = True
         if (args.verbose is True): verbose = True
         if (args.yes is True): headless = True
 
         data = self.data
         parse_data = self.parse_data
-        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, headless = headless, debug = debug, verbose = verbose)
+        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, headless = headless, debug = debug, verbose = verbose, slow = slow)
         if (comicvine_data is None):
             raise Exception("can't get comicvine data.")
         parse_data = self.parse_data
@@ -173,7 +173,7 @@ class comic():
                         print("  'q': Quit")
                         print("  'y': Update the file")
                     elif (c == 'c'):
-                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], verbose = verbose, debug = debug, clear_cache = True, headless=headless)
+                        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], verbose = verbose, debug = debug, clear_cache = True, headless=headless, slow = slow)
                         if (comicvine_data is None):
                             raise Exception("can't get comicvine data.")
                     elif (c == 'i'):
