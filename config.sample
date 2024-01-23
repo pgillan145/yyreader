@@ -26,6 +26,9 @@ maximum_file_size = 100
 # Publishers to skip when considering possible matches
 skip_publishers = [ 'Panini Comics' ]
 
+# File in which the 'scan' action can store a list comics that are "missing"
+missing_log = /tmp/missing_comics.txt
+
 [comicvine]
 # https://comicvine.gamespot.com/api/
 api_key = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX

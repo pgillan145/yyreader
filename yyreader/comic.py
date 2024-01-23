@@ -67,7 +67,7 @@ class comic():
     _page_count = None
     files = []
 
-    def __init__(self, file, args = minorimpact.default_arg_flags, cache = {}, debug = False):
+    def __init__(self, file, cache = {}, verbose = False, debug = False):
         if (re.search('^/', file) is None):
             file = os.getcwd() + '/' + file
         self.file = file
@@ -91,7 +91,7 @@ class comic():
         self.data['url'] = ''
         self.data['writers'] = []
 
-        self._read_data(verbose = args.verbose, debug = args.debug)
+        self._read_data(verbose = verbose, debug = debug)
         self.cache = cache
         #print("_read_data()")
         #print(self.data)
