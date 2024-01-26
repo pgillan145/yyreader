@@ -148,9 +148,9 @@ class comic():
         maximum_file_size = maximum_file_size * 1024 * 1024
 
         if (parse_data['size'] < minimum_file_size and small is False):
-            raise Exception("file too small")
+            raise FileSizeException("file too small")
         if (parse_data['size'] >= maximum_file_size and large is False):
-            raise Exception("file too large")
+            raise FileSizeException("file too large")
 
         go_for_it = False
         score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
@@ -198,92 +198,6 @@ class comic():
 
         return score
 
-    def box_old(self, target_dir, data = None, args = minorimpact.default_arg_flags):
-        if (target_dir is None):
-            raise Exception("No target directory specified.")
-        elif (os.path.exists(target_dir) is False):
-            raise Exception(f"{target_dir} doesn't exist")
-
-        target_dir = re.sub('/$', '', target_dir)
-
-        match_log = {}
-        if ('match_log_file' in config['default'] and os.path.exists(config['default']['match_log_file'])):
-            with open(config['default']['match_log_file'], 'r') as f:
-                line = f.readline()
-                while line:
-                    (original,processed) = line.rstrip().split(' => ')
-                    match_log[original] = processed
-                    line = f.readline()
-        #print(match_log)
-
-        if (os.path.exists(target_dir) is False):
-            os.mkdir(target_dir)
-
-        minimum_file_size = 1
-        if ('minimum_file_size' in config['default']):
-            minimum_file_size = int(config['default']['minimum_file_size'])
-        minimum_file_size = minimum_file_size * 1024 * 1024
-
-        parse_data = self.parse_data
-        if (parse_data is None or parse_data == {}):
-            raise Exception("No info parsed from filename")
-        if (parse_data['size'] < minimum_file_size):
-            raise Exception("file too small")
-
-        comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, args = args, headless = args.yes)
-        if (comicvine_data is None):
-            raise Exception("can't get comicvine data.")
-        if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
-            os.mkdir(target_dir + '/' + comicvine_data['publisher'])
-
-        new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'])
-        name_dir = target_dir + '/' + parser.make_dir(comicvine_data)
-
-        while (self.file != name_dir + '/' + new_comic):
-            # Figure out how 'close' the filename is to what we got back from comicvine.
-            ratio = comicvine_data['ratio']
-
-            c = ''
-            if (ratio >= 93 and ('date' in parse_data and (('store_date' in comicvine_data and comicvine_data['store_date'] == parse_data['date']) or ('cover_date' in comicvine_data and comicvine_data['cover_date'] == parse_data['date']))) or (re.search(r' Annual$', comicvine_data['series']) and ('cover_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['cover_date']) or 'store_date' in comicvine_data and re.search(f'^{parse_data["year"]}-', comicvine_data['store_date'])))):
-                default_c = 'y'
-                default_text = 'Y/n'
-            else:
-                default_c = 'n'
-                default_text = 'y/N'
-
-            if (args.yes is True):
-                if (default_c == 'y'):
-                    c = 'y'
-                else:
-                    return
-
-            if (c == ''):
-                c = minorimpact.getChar(default=default_c, end='\n', prompt=f"move to {new_comic} (ratio:{ratio})? ({default_text}/?) ", echo=True).lower()
-
-            if (c == '?'):
-                print("  'c': Clear cache and search comicvine again")
-                print("  'i': Dump the data collected for this issue")
-                print("  'n': Don't move the file")
-                print("  'q': Quit")
-                print("  'y': Move the file")
-            elif (c == 'c'):
-                comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], args = args, clear_cache = True, cache = cache, headless = args.yes)
-                if (comicvine_data is None):
-                    raise Exception("can't get comicvine data.")
-                if (os.path.exists(target_dir + '/' + comicvine_data['publisher']) is False):
-                    os.mkdir(target_dir + '/' + comicvine_data['publisher'])
-                new_comic = parser.make_name(comicvine_data, parse_data['extension'], directors_cut = parse_data['directors_cut'])
-                name_dir = target_dir + '/' + parser.make_dir(comicvine_data)
-            elif (c == 'i'):
-                print("Data parsed from filename:", parse_data)
-                print("Data collected online:", comicvine_data)
-            elif (c == 'q'):
-                sys.exit()
-            elif (c == 'n'):
-                return
-            elif (c == 'y'):
-                return self._update(comicvine_data, target_dir = target_dir, args = args)
-
     def collect_info(self):
         pass
 
@@ -318,15 +232,18 @@ class comic():
         if (data['start_year'] != comicvine_data['start_year'] or parse_data['start_year'] != comicvine_data['start_year']):
             score -= 1
         output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('start year', parse_data['start_year'], data['start_year'], comicvine_data['start_year'], width = width )
+        if (data['ver'] != comicvine_data['ver'] or parse_data['ver'] != comicvine_data['ver']):
+            score -= 1
+        output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('ver', parse_data['ver'], data['ver'], comicvine_data['ver'], width = width)
+        if (data['volume'] != comicvine_data['volume'] or parse_data['volume'] != comicvine_data['volume']):
+            score -= 1
+        output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('volume', parse_data['volume'], data['volume'], comicvine_data['volume'], width = width)
         if (data['date'] != comicvine_data['date'] or parse_data['date'] != comicvine_data['date']):
             score -= 1
         output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('date', parse_data['date'], data['date'], comicvine_data['date'], width = width )
         if (data['ver'] != parse_data['ver']):
             score -= 1
             output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('ver', parse_data['ver'], data['ver'], '---', width = width)
-        if (data['volume'] != comicvine_data['volume'] or parse_data['volume'] != comicvine_data['volume']):
-            score -= 1
-        output += "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('volume', parse_data['volume'], data['volume'], comicvine_data['volume'], width = width)
         if (data['description'] != comicvine_data['description']):
             output += "{:{width}s} {:{width}s} {:<{width}d} {:<{width}d}\n".format('description', '---', len(data['description']), len(comicvine_data['description']), width = width)
             if (verify): score -= 1
@@ -407,27 +324,30 @@ class comic():
         merge_data = self.data.copy()
         merge_data['ver'] = self.parse_data['ver']
 
-        merge_data['description'] = comicvine_data['description']
-        merge_data['start_year'] = comicvine_data['start_year']
-        merge_data['volume'] = comicvine_data['start_year']
-        merge_data['series'] = comicvine_data['series']
         merge_data['issue'] = comicvine_data['issue']
+        merge_data['series'] = comicvine_data['series']
+        merge_data['start_year'] = comicvine_data['start_year']
+        #merge_data['volume'] = comicvine_data['start_year']
+        merge_data['ver'] = comicvine_data['ver']
+        merge_data['volume'] = comicvine_data['volume']
 
-        merge_data['issue_id'] = comicvine_data['issue_id']
-        merge_data['issue_name'] = comicvine_data['issue_name']
-        merge_data['publisher'] = comicvine_data['publisher']
         merge_data['characters'] = comicvine_data['characters']
         merge_data['colorists'] = comicvine_data['colorists']
+        merge_data['description'] = comicvine_data['description']
         merge_data['inkers'] = comicvine_data['inkers']
+        merge_data['issue_id'] = comicvine_data['issue_id']
+        merge_data['issue_name'] = comicvine_data['issue_name']
         merge_data['letterers'] = comicvine_data['letterers']
         merge_data['pencillers'] = comicvine_data['pencillers']
+        merge_data['publisher'] = comicvine_data['publisher']
         merge_data['story_arcs'] = comicvine_data['story_arcs']
         merge_data['url'] = comicvine_data['url']
         merge_data['writers'] = comicvine_data['writers']
 
-        if (merge_data['ver']):
-            merge_data['volume'] = "{}-{}".format(merge_data['start_year'], merge_data['ver'])
+        #if (merge_data['ver']):
+        #    merge_data['volume'] = "{}-{}".format(merge_data['start_year'], merge_data['ver'])
 
+        #TODO: Figure out of this is at all necessary.  Can't I just set merge_data['date'] = comicvine_data['date']?
         m = re.search('(\d\d\d\d)-(\d\d)-(\d\d)', comicvine_data['date'])
         if (m is None):
             raise Exception(f"Invalid date:{comicvine_data['date']}")
@@ -874,7 +794,7 @@ class comic():
         if (os.path.exists(target_dir) is False):
             if (args.dryrun is False): os.makedirs(target_dir, exist_ok = True)
 
-        if (args.verbose): print(f"  moving {new_comic} => {target_dir}/{new_comic}")
+        if (args.verbose): print(f"  moving {new_comic} => {target_dir}/")
         if (os.path.exists(f'{target_dir}/{new_comic}') is True):
             raise FileExistsException(f"{target_dir}/{new_comic} already exists")
         if (args.dryrun is False):

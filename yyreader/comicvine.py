@@ -61,9 +61,8 @@ def get_issue(issue_id, api_key, cache = {}, clear_cache = False, debug = False,
 
 def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False, detailed = False, slow = False):
     setup_cache(cache)
-    volume = get_volume(volume_id, api_key,  cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
-
-    volume_name = '{} ({}) - {}'.format(volume['name'], volume['start_year'], volume['publisher']['name'])
+    #volume = get_volume(volume_id, api_key,  cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
+    #volume_name = '{} ({}) - {}'.format(volume['name'], volume['start_year'], volume['publisher']['name'])
 
     url = base_url + '/issues/?api_key=' + api_key + f'&format=json&sort=name:asc&filter=volume:{volume_id}&field_list=id,issue_number,name,store_date,story_arc_credits,cover_date'
     #if (debug): print(url)
@@ -85,14 +84,18 @@ last_result = datetime.now()
 def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache = False, verbose = False, debug = False, slow = False):
     setup_cache(cache)
     global last_result
-    seconds_between_requests = 3 if (slow is False) else 5
+    seconds_between_requests = 3 if (slow is False) else 18
+    if (debug): print(f"seconds_between_requests:{seconds_between_requests}")
 
     offset_url = url + f'&limit={limit}&offset={offset}'
+    if (debug): print(f"request url:{offset_url}")
 
     text = None
     if (offset_url in cache['comicvine']['results'] and cache['comicvine']['results'][offset_url]['mod_date'] > (datetime.now() - timedelta(weeks = 4)) and clear_cache is False):
+        if (debug): print("using cache")
         text = cache['comicvine']['results'][offset_url]['text']
     else:
+        if (debug): print("requesting from comicvine")
         while(last_result > datetime.now() - timedelta(seconds=seconds_between_requests)):
             time.sleep(1)
         urllib3.disable_warnings()
@@ -144,8 +147,10 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
     if (debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
     url_volume = volume
-    url_volume = re.sub('\+', '%2B', url_volume)
     url_volume = re.sub('&', '%26', url_volume)
+    url_volume = re.sub('\'', '%27', url_volume)
+    url_volume = re.sub('\*', '%2A', url_volume)
+    url_volume = re.sub('\+', '%2B', url_volume)
     url_volume = re.sub('/', '%2F', url_volume)
     url_volume = re.sub(':', '%3A', url_volume)
     results = []
@@ -158,17 +163,15 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
 
     skip_publishers = eval(config['default']['skip_publishers']) if ('skip_publishers' in config['default']) else []
 
-    volume_year = {}
     if (len(results) > 0):
+        # Eliminate the volumes we can be reasonably certain are not correct based on the information
+        #   we were provided or bad search results.
         i = len(results) - 1
         while i >= 0:
             if (re.search('^ ', results[i]['name']) or re.search(' $', results[i]['name'])):
                 #print("WIKI ERROR: '{}':{}".format(results[i]['name'], results[i]['id']))
                 results[i]['name'] = results[i]['name'].strip()
 
-            #dump(results[i])
-            # Eliminate the volumes we can be reasonably certain are not correct based on the information
-            #   we were provided or bad search results.
             if ('start_year' not in results[i]
               or results[i]['start_year'] is None
               or re.search('^\d+$', results[i]['start_year']) is None
@@ -184,18 +187,36 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
             i = i - 1
 
         # TODO: This could potentially solve my 'ver' problem! Instead of throwing away all the older volumes, just increment their 'ver' values.
-        # If there are multiple volumes with identical volumes, only keep the 'latest' one.
-        results = sorted(results, key = lambda x:int(x['start_year']), reverse = True)
-        i = len(results) - 1
-        while i >= 0:
-            if (results[i]['name'] in volume_year):
-                #del results[i]
-                pass
-            else:
-                volume_year[results[i]['name']] = results[i]['start_year']
-            i = i - 1
-
+        #   Except... start_year isn't enough to determine if which one is "-2" -- I need to get the date of the first issue.  So I have to figure out which
+        #   comics have the same start year, then go through and pull the first issue of each one, so I get the actual date so I know which one was
+        #   "first."
         #results = sorted(results, key = lambda x:int(x['start_year']))
+
+        # Get a list of which of these results have identical names and identical start_years
+        first_issues = {}
+        for r in results:
+            r['ver'] = ''
+            volume_year = r['name'] +'|'+r['start_year']
+            if (volume_year not in first_issues):
+                first_issues[volume_year] = []
+            print(volume_year)
+            dump(r['first_issue'])
+            first_issues[volume_year].append({ 'name':r['name'], 'start_year':r['start_year'], 'id':r['id'], 'first_issue_id':r['first_issue']['id'], 'first_issue_number':r['first_issue']['issue_number'], 'result':r })
+
+        for issues in first_issues:
+            if (len(first_issues[issues]) > 1):
+                for issue in first_issues[issues]:
+                    i = get_issue(issue['first_issue_id'],  api_key, cache = cache, clear_cache = clear_cache, debug = debug, verbose = verbose, slow = slow)
+                    print(f"{issue['name']} ({issue['start_year']}), first_issue date: '{i['date']}'")
+                    issue['first_issue_date'] = i['date']
+                    issue['result']['first_issue']['date'] = i['date']
+                ver = 0
+                for issue in sorted(first_issues[issues], key = lambda x:x['first_issue_date']):
+                    ver += 1
+                    if (ver > 1): issue['result']['ver'] = ver
+                    else: issue['result']['ver'] = ''
+                    print(f"{issue['name']} ({issue['start_year']}), first_issue date: '{issue['first_issue_date']}' ver:'{issue['result']['ver']}'")
+
     return results
 
 #TODO: Make this take a limited set of fields for search, rather than just passing it 'data'.
@@ -226,11 +247,12 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
     comicvine_data['series'] = result['name']
     comicvine_data['start_year'] = result['start_year']
     comicvine_data['volume'] = result['start_year']
-    comicvine_data['publisher'] = result['publisher']['name']
-    #TODO: Figure out if comicvine has any way to distinguish between volumes that were released in the same year. If not, maybe
-    #   search for any volumes with the same name and same start_year and manually figure out the version based on the release date
-    #   of the first issue?  That seems like a lot of work for the three series to which this actually applies.
     comicvine_data['ver'] = ''
+    if ('ver' in result and result['ver'] is not None and result['ver'] != ''):
+        comicvine_data['ver'] = str(result['ver'])
+        comicvine_data['volume'] = f"{result['start_year']}-{result['ver']}"
+
+    comicvine_data['publisher'] = result['publisher']['name']
 
     i = None
     if ('match_issue' in result and result['match_issue'] is not None):
@@ -312,6 +334,7 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
 
     volume = get_volume(volume_id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
     volume_name = volume['name']
+    start_year = volume['start_year']
 
     results = get_issues(volume_id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
     i = len(results) - 1
@@ -324,7 +347,7 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
         i = i - 1
 
     issue = parser.massage_issue(issue)
-    if (debug): print(f"  searching for issue #{issue} of {volume_name}")
+    if (debug): print(f"  searching for issue #{issue} of {volume_name} ({start_year})")
     for i in results:
         if (debug): print(i)
         if ('issue_number' in i and (issue == i['issue_number'].strip() or parser.massage_issue(i['issue_number']) == issue)):
@@ -374,6 +397,8 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
                 search_date = datetime.fromisoformat(year + '-01-01')
                 if (verbose): print(f"  looking for an issue #{issue} released in {year}")
 
+            # Sort results so they're in order by start_year, since the next loop looks at the data in reverse order.
+            results = sorted(results, key = lambda x:int(x['start_year']))
             for i in range(len(results)-1, -1, -1):
                 r = results[i]
                 score = r['ratio']

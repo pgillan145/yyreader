@@ -422,6 +422,17 @@ def parse_volume(volume, debug = False):
         return {'start_year':start_year, 'ver':ver}
     return None
 
+def publisher_filename(publisher, reverse = False, debug = False):
+    """Turn the publisher name into something appropriate for a filename (or the opposite if reverse is True)."""
+
+    publisher = publisher.strip()
+    if (reverse is True):
+        publisher = re.sub('__SLASH__', '/', publisher)
+    else:
+        publisher = re.sub('/','__SLASH__', publisher)
+
+    return publisher
+
 def series_filename(series, reverse = False, debug = False):
     """Turn the series name into something appropriate for a filename (or the opposite if reverse is True)."""
 

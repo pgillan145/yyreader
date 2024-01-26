@@ -38,7 +38,8 @@ def main():
     argparser.add_argument('--file', metavar = 'FILE',  help = "process FILE")
     argparser.add_argument('--filter', metavar = 'FILTER',  help = "Only verify series that match FILTER")
     argparser.add_argument('--dir', metavar = 'DIR',  help = "process files in DIR")
-    argparser.add_argument('--large', help = f"allow importing files larger than 'maximum_file_size' MB. default: 100", action='store_true')
+    argparser.add_argument('--large', help = "allow importing files larger than 'maximum_file_size' MB. default: 100", action='store_true')
+    argparser.add_argument('--one', help = " ", action='store_true')
     argparser.add_argument('--publisher', metavar = 'PUBLISHER',  help = "limit scan to PUBLISHER")
     argparser.add_argument('--slow', help = "Pull comicvine data at a slightly reduced rate, so as not to stress the API.", action='store_true')
     argparser.add_argument('--small', help = f"allow importing files smaller than 'minimum_file_size' MB. default: 1", action='store_true')
@@ -88,22 +89,45 @@ def main():
             cache['verify'] = {}
 
         c_files = sorted(minorimpact.readdir(args.target))
+        file_count = len(c_files)
         i = 0
         for c_file in c_files:
+            i = i + 1
             if (args.filter and re.search(args.filter, c_file) is None):
                 continue
 
-            #i = i + 1
-            #if (i > 10 and args.yes): break
+            if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
+            # Don't re-test anything until we've tested everything new.
+            if (c_file in cache['verify']): continue
+
             try:
+                if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
                 c = verify(c_file, args.target, args = args)
             except comicvine.VolumeNotFoundException as e:
                 print(e)
             except comic.FileExistsException as e:
                 print(e)
-
+            except comic.FileSizeException as e:
+                print(e)
 
             write_cache(config['default']['cache_file'])
+
+        i = 0
+        for c_file in c_files:
+            if (args.filter and re.search(args.filter, c_file) is None):
+                continue
+            i = i + 1
+            #if (i > 10 and args.yes): break
+            try:
+                if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
+                c = verify(c_file, args.target, args = args)
+            except comicvine.VolumeNotFoundException as e:
+                print(e)
+            except comic.FileExistsException as e:
+                print(e)
+            except comic.FileSizeException as e:
+                print(e)
+
 
     elif (args.action == 'scan'):
         if ('missing_log' not in config['default'] or config['default']['missing_log'] == ''):
@@ -249,6 +273,7 @@ def main():
                 cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':md5 }
 
                 write_cache(config['default']['cache_file'])
+                # TODO: Protect this from keyboard interrupts.
                 with open(config['default']['missing_log'], 'w') as f:
                     # Load data into missing object
                     for pub in missing.keys():
@@ -455,10 +480,9 @@ def scan(c_dir, api_key, oldest_year = 1901, verbose = False, debug = False):
 
     write_cache(config['default']['cache_file'])
 
-def verify (comic_file, target_dir, args = minorimpact.default_arg_flags, verbose = False):
+def verify (comic_file, target_dir, args = minorimpact.default_arg_flags):
     global cache
     if (args.verbose): verbose = True
-    if (verbose): print("verifying {}".format(comic_file))
 
     c = comic.comic(comic_file, cache = cache, verbose = args.verbose, debug = args.debug)
 
@@ -466,21 +490,23 @@ def verify (comic_file, target_dir, args = minorimpact.default_arg_flags, verbos
         cache['verify'][c.file]['md5'] == c.md5() and
         args.clear_cache is False and
         cache['verify'][c.file]['version'] == __version__):
-        if (verbose): print("  previously verified {}".format(cache['verify'][c.file]['date']))
+        if (args.debug): print("  {}\n    previously verified {}".format(comic_file, cache['verify'][c.file]['date']))
         return c
 
-    verified = c.box(args = args, target_dir = target_dir, headless = args.yes, verify = True, slow = args.slow)
+    if (args.verbose): print("\nverifying {}".format(comic_file))
+    verified = c.box(args = args, target_dir = target_dir, headless = args.yes, verify = True, slow = args.slow, large = args.large)
     if (verified == 100):
-        if (verbose): print("  verified (score: {})".format(verified))
+        if (args.verbose): print("  verified (score: {})".format(verified))
         cache['verify'][c.file] = { 'date':datetime.now(), 'md5':c.md5(), 'version':__version__ }
     else:
-        if (verbose): print("  failed (score: {})".format(verified))
+        if (args.verbose): print("  failed (score: {})".format(verified))
         if (c.file in cache['verify']):
             del cache['verify'][c.file]
 
     if (comic_file != c.file and comic_file in cache['verify']):
         del cache['verify'][comic_file]
 
+    if (args.verbose): print('')
     return c
 
 def write_cache(cache_file, args = minorimpact.default_arg_flags):
