@@ -88,8 +88,12 @@ def main():
         if ('verify' not in cache or args.clear_cache is True):
             cache['verify'] = {}
 
-        c_files = sorted(minorimpact.readdir(args.target))
+        base_dir = args.target
+        if (args.dir is not None):
+            base_dir = args.dir
+        c_files = sorted(minorimpact.readdir(base_dir))
         file_count = len(c_files)
+
         i = 0
         for c_file in c_files:
             i = i + 1
@@ -102,7 +106,7 @@ def main():
 
             try:
                 if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
-                c = verify(c_file, args.target, args = args)
+                c = verify(c_file, base_dir, args = args)
             except comicvine.VolumeNotFoundException as e:
                 print(e)
             except comic.FileExistsException as e:
