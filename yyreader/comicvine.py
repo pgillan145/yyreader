@@ -199,23 +199,25 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
             volume_year = r['name'] +'|'+r['start_year']
             if (volume_year not in first_issues):
                 first_issues[volume_year] = []
-            print(volume_year)
-            dump(r['first_issue'])
+            if (debug):
+                print(f"{volume_year}\n")
+                dump(r['first_issue'])
             first_issues[volume_year].append({ 'name':r['name'], 'start_year':r['start_year'], 'id':r['id'], 'first_issue_id':r['first_issue']['id'], 'first_issue_number':r['first_issue']['issue_number'], 'result':r })
 
+        # For volumes that appear multiple times in the same year, pull the first issues assign a 'ver' field based on the order they were released.
         for issues in first_issues:
             if (len(first_issues[issues]) > 1):
                 for issue in first_issues[issues]:
                     i = get_issue(issue['first_issue_id'],  api_key, cache = cache, clear_cache = clear_cache, debug = debug, verbose = verbose, slow = slow)
-                    print(f"{issue['name']} ({issue['start_year']}), first_issue date: '{i['date']}'")
+                    if (debug): print(f"{issue['name']} ({issue['start_year']}), publisher:'{issue['result']['publisher']['name']}, first_issue date: '{i['date']}'")
                     issue['first_issue_date'] = i['date']
                     issue['result']['first_issue']['date'] = i['date']
                 ver = 0
                 for issue in sorted(first_issues[issues], key = lambda x:x['first_issue_date']):
+                    if (issue['first_issue_date'] == ''): continue
                     ver += 1
                     if (ver > 1): issue['result']['ver'] = ver
-                    else: issue['result']['ver'] = ''
-                    print(f"{issue['name']} ({issue['start_year']}), first_issue date: '{issue['first_issue_date']}' ver:'{issue['result']['ver']}'")
+                    if (debug): print(f"{issue['name']} ({issue['start_year']}), first_issue date: '{issue['first_issue_date']}' ver:'{issue['result']['ver']}'")
 
     return results
 
