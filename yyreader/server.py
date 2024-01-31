@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 from datetime import datetime,timedelta
+from dumper import dump
 from flask import current_app, Flask, g, make_response, render_template, redirect, request, Response
 import minorimpact.config
 import base64
@@ -19,9 +20,12 @@ app.config.from_mapping(
     )
 comic_cache = {}
 comic_dir = '/'
+config = None
 
 def main():
     global comic_dir
+    global config
+
     config = minorimpact.config.getConfig(script_name = 'yyreader')
 
     comic_dir = config['default']['comic_dir']
@@ -34,6 +38,7 @@ def main():
             debug = True
 
     yacreader.init_db()
+
     app.run(port = config['server']['port'], host = '0.0.0.0', debug = debug)
 
 def clean_cache():
@@ -84,6 +89,12 @@ def get_home_link(year = None, month = None):
     home = '{}/{}'.format(year, month)
     yacreader.add_beacon(home)
     return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
+
+@app.before_request
+def check_password():
+    #request.cookies.get('filter')
+    if (request.path != '/login' and 'password' in config['server'] and request.cookies.get('authorized') != 'True'):
+        return redirect('/login')
 
 @app.route('/arc/<arc>')
 def arc(arc = None):
@@ -347,6 +358,21 @@ def label(id):
                     labels.append(label)
     yacreader.set_labels(id, labels)
     return redirect('/read/{}'.format(id))
+
+@app.route('/login', methods = ['GET', 'POST'])
+def login():
+    #request.cookies.get('filter')
+    #response.set_cookie('series', '/seriess/{}|{}'.format(urllib.parse.quote(y['series']), y['series']), max_age=60*60*24*365)
+
+    if request.method == 'POST':
+        print("PASSWORD", request.form['password'])
+        if (request.form['password'] == config['server']['password']):
+            response = redirect('/home')
+            response.set_cookie('authorized', 'True')
+    else:
+        response = Response(render_template('login.html'))
+
+    return response
 
 @app.route('/update/<int:id>')
 def update(id):

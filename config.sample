@@ -34,6 +34,11 @@ missing_log = /tmp/missing_comics.txt
 api_key = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 
 [server]
-port = 8000
+# listening port
+port = 8616
+
 # enable debugging mode on the flask server
 debug = False
+
+# Set this value to require password access
+#password = 
