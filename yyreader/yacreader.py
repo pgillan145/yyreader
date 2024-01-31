@@ -477,9 +477,10 @@ def get_comics_by_date(year, month, db = None):
         local_db = db
 
     cursor = local_db.cursor()
-    if (month < 10): month = '0{}'.format(month)
+    zmonth = month
+    if (month < 10): zmonth = '0{}'.format(month)
     comics = []
-    sql = { 'select': 'volume, number, date, id, read, currentPage, series', 'from':'comic_info', 'where':'date like "%/{}/{}"'.format(month, year), 'params':[]}
+    sql = { 'select': 'volume, number, date, id, read, currentPage, series', 'from':'comic_info', 'where':'date like "%/{}/{}" or date like "%/{}/{}"'.format(month, year, zmonth, year), 'params':[]}
     #print(build_sql(sql), sql['params'])
     cursor.execute(build_sql(sql), sql['params'])
     rows = cursor.fetchall()
@@ -814,7 +815,7 @@ def get_publishers():
     db.close()
     return sorted(publishers, key=lambda x: x)
 
-def get_serieses(filter = None):
+def get_seriess(filter = None):
     db = connect()
     cursor = db.cursor()
 
@@ -824,7 +825,7 @@ def get_serieses(filter = None):
     #print(build_sql(sql), sql['params'])
     cursor.execute(build_sql(sql), sql['params'])
     rows = cursor.fetchall()
-    serieses = {}
+    seriess = {}
     updates = {}
     for row in rows:
         id = row['id']
@@ -853,10 +854,10 @@ def get_serieses(filter = None):
                 db.commit()
                 updates[series+new_volume] = 1
             volume = new_volume
-        serieses['{} ({})'.format(series, volume)] = 1
+        seriess['{} ({})'.format(series, volume)] = 1
     db.close()
-    #dump(serieses)
-    return  sorted(serieses.keys())
+    #dump(seriess)
+    return  sorted(seriess.keys())
      #, key=lambda x: x)
 
 def get_years(db = None):

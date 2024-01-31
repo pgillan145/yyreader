@@ -228,16 +228,19 @@ def dates(year = None, month = None):
 @app.route('/cover/<int:id>')
 def cover(id):
     cover_file = None
-    if (id in comic_cache):
-        cover_file = comic_cache[id]['cover']
-    else:
-        y = yacreader.get_comic_by_id(id)
-        comic_cache[id] = {}
-        comic_cache[id]['yacreader'] = y
-        comic_cache[id]['comic'] = comic.comic(comic_dir + '/' + y['path'])
-        cover_file = yacreader.get_cover_file(id, hash = y['hash'])
-        comic_cache[id]['cover'] = cover_file
-        comic_cache[id]['date'] = datetime.now()
+
+    #if (id in comic_cache):
+    #    cover_file = comic_cache[id]['cover']
+    #else:
+    #    y = yacreader.get_comic_by_id(id)
+    #    comic_cache[id] = {}
+    #    comic_cache[id]['yacreader'] = y
+    #    comic_cache[id]['comic'] = comic.comic(comic_dir + '/' + y['path'])
+    #    cover_file = yacreader.get_cover_file(id, hash = y['hash'])
+    #    comic_cache[id]['cover'] = cover_file
+    #    comic_cache[id]['date'] = datetime.now()
+    y = yacreader.get_comic_by_id(id)
+    cover_file = yacreader.get_cover_file(id, hash = y['hash'])
 
     cover_data = None
     with (open(cover_file, 'rb') as f):
@@ -279,7 +282,7 @@ def filter():
                     filter['labels'].append(label)
         #print(filter)
         pickled = str(base64.urlsafe_b64encode(pickle.dumps(filter)), 'utf-8')
-        response = make_response(redirect('/serieses'))
+        response = make_response(redirect('/seriess'))
         response.set_cookie('filter', pickled)
         return response
 
@@ -379,23 +382,25 @@ def link(aft_id, fore_id = None):
 @app.route('/read/<int:id>/<int:page>/<int:half>')
 def read(id, page = None, half = None):
     linked = False
-    y = None
-    # This isn't in the cache because subsequent views won't refect the currentPage values.
     # TODO: Experiment with removing the cache.  Up to this point there's been very little need to optimize, and since I started
     #   reading the image data directly from the file without unpacking it first it could be argued that caching as whole is
     #   largely unecessary (I only started caching the 'comic.py' object in the first place so the temp directory didn't get obliterated
     #   every time the object was destroyed, necessitating a lengthy decompression on every read.)
+    # This isn't in the cache because subsequent views won't refect the currentPage values.
+    #y = yacreader.get_comic_by_id(id)
+    #if (id in comic_cache):
+    #    #yacreader = comic_cache[id]['yacreader']
+    #    c = comic_cache[id]['comic']
+    #else:
+    #    c = comic.comic(comic_dir + '/' + y['path'])
+    #    comic_cache[id] = {}
+    #    comic_cache[id]['yacreader'] = y
+    #    comic_cache[id]['cover'] = yacreader.get_cover_file(id, hash = y['hash'])
+    #    comic_cache[id]['comic'] = c
+    #    comic_cache[id]['date'] = datetime.now()
+
     y = yacreader.get_comic_by_id(id)
-    if (id in comic_cache):
-        #yacreader = comic_cache[id]['yacreader']
-        c = comic_cache[id]['comic']
-    else:
-        c = comic.comic(comic_dir + '/' + y['path'])
-        comic_cache[id] = {}
-        comic_cache[id]['yacreader'] = y
-        comic_cache[id]['cover'] = yacreader.get_cover_file(id, hash = y['hash'])
-        comic_cache[id]['comic'] = c
-        comic_cache[id]['date'] = datetime.now()
+    c = comic.comic(comic_dir + '/' + y['path'])
 
     if (page is None):
         page = 1
@@ -422,7 +427,7 @@ def read(id, page = None, half = None):
     back = None
     next_page_url = None
     previous_page_url = None
-    up = { 'url':'/serieses/{}#{}'.format(urllib.parse.quote(y['series']), y['id']), 'text':'{} #{}'.format(y['series'], y['issue']) }
+    up = { 'url':'/seriess/{}#{}'.format(urllib.parse.quote(y['series']), y['id']), 'text':'{} #{}'.format(y['series'], y['issue']) }
 
     traversal = request.cookies.get('traversal') if request.cookies.get('traversal') else 'date'
     traversal_date = '/dates/{}#{}|{}'.format(y['date'].strftime('%Y/%-m'), id, y['date'].strftime('%d/%Y'))
@@ -450,9 +455,9 @@ def read(id, page = None, half = None):
                 break
             i = i + 1
         if (back is None):
-            back = {'url': '/serieses/{}#{}'.format(urllib.parse.quote(y['series']), id), 'text': '{}'.format(y['series']) }
+            back = {'url': '/seriess/{}#{}'.format(urllib.parse.quote(y['series']), id), 'text': '{}'.format(y['series']) }
         if (forth is None):
-            forth = {'url': '/serieses/{}#{}'.format(urllib.parse.quote(y['series']), id), 'text': '{}'.format(y['series']) }
+            forth = {'url': '/seriess/{}#{}'.format(urllib.parse.quote(y['series']), id), 'text': '{}'.format(y['series']) }
     elif (traversal == 'strict'):
         #TODO: Add a traversal method that goes by date but ignores linking.
         pass
@@ -494,24 +499,27 @@ def read(id, page = None, half = None):
 
     nav = { 'back':back, 'up': up, 'forth':forth, 'home':home, 'unfixed':True }
     response = make_response(render_template('read.html', half = half, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal, linked = linked ))
-    response.set_cookie('series', '/serieses/{}|{}'.format(urllib.parse.quote(y['series']), y['series']), max_age=60*60*24*365)
+    response.set_cookie('series', '/seriess/{}|{}'.format(urllib.parse.quote(y['series']), y['series']), max_age=60*60*24*365)
     response.set_cookie('date', traversal_date, max_age=60*60*24*365)
     return response
 
 @app.route('/page/<int:id>/<int:page>')
 def page(id, page):
     y = None
-    if (id in comic_cache):
-        y = comic_cache[id]['yacreader']
-        c = comic_cache[id]['comic']
-    else:
-        y = yacreader.get_comic_by_id(id)
-        c = comic.comic('/Volumes/Media/Comics/' + y['path'])
-        comic_cache[id] = {}
-        comic_cache[id]['yacreader'] = y
-        comic_cache[id]['comic'] = c
-        comic_cache[id]['cover'] = yacreader.get_cover_file(id, hash = y['hash'])
-        comic_cache[id]['date'] = datetime.now()
+    #if (id in comic_cache):
+    #    y = comic_cache[id]['yacreader']
+    #    c = comic_cache[id]['comic']
+    #else:
+    #    y = yacreader.get_comic_by_id(id)
+    #    c = comic.comic('/Volumes/Media/Comics/' + y['path'])
+    #    comic_cache[id] = {}
+    #    comic_cache[id]['yacreader'] = y
+    #    comic_cache[id]['comic'] = c
+    #    comic_cache[id]['cover'] = yacreader.get_cover_file(id, hash = y['hash'])
+    #    comic_cache[id]['date'] = datetime.now()
+
+    y = yacreader.get_comic_by_id(id)
+    c = comic.comic('/Volumes/Media/Comics/' + y['path'])
 
     if (page < 0): page = 1
     if (page > c.page_count()): page = c.page_count()
@@ -577,9 +585,9 @@ def traverse(method, id):
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
     return response
 
-@app.route('/serieses')
-@app.route('/serieses/<series>')
-def serieses(series = None):
+@app.route('/seriess')
+@app.route('/seriess/<series>')
+def seriess(series = None):
     items = []
     up = None
     home = get_home_link()
@@ -589,15 +597,15 @@ def serieses(series = None):
     if (series is None):
         last = None
         index = []
-        for series in yacreader.get_serieses(filter = filter):
+        for series in yacreader.get_seriess(filter = filter):
             if (series[0:1] != last):
                 last = series[0:1]
                 items.append({ 'name':last })
                 index.append({ 'url':'#{}'.format(last), 'text':last })
 
-            items.append({ 'url':'/serieses/{}'.format(urllib.parse.quote(series)), 'text':series, 'name':None })
+            items.append({ 'url':'/seriess/{}'.format(urllib.parse.quote(series)), 'text':series, 'name':None })
         nav = {'up':up, 'home':home }
-        return render_template('serieses.html', items = items, nav = nav, index = index)
+        return render_template('seriess.html', items = items, nav = nav, index = index)
     else:
         series = urllib.parse.unquote(series)
         for y in yacreader.get_comics_by_series(series, filter = filter):
@@ -608,10 +616,10 @@ def serieses(series = None):
             traversal_date = request.cookies.get('date')
             if (traversal_date):
                 home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
-        up = { 'url':'/serieses', 'text':'Serieses' }
+        up = { 'url':'/seriess', 'text':'Serieses' }
         nav = { 'up':up, 'home':home }
         response = make_response(render_template('comics.html', items = items, nav = nav))
         response.set_cookie('traversal', 'series', max_age=60*60*24*365)
-        response.set_cookie('series', '/serieses/{}|{}'.format(urllib.parse.quote(series), series), max_age=60*60*24*365)
+        response.set_cookie('series', '/seriess/{}|{}'.format(urllib.parse.quote(series), series), max_age=60*60*24*365)
         return response
 
