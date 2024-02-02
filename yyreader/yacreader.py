@@ -49,21 +49,23 @@ def main():
     cur = db.cursor()
 
     if (args.action == 'deleted'):
-        cur.execute("SELECT id, series, number from comic_info")
+        cur.execute("SELECT id, series, number, volume from comic_info")
         rows = cur.fetchall()
         i = 1
         for row in rows:
             id = row[0]
             series = row[1]
             number = row[2]
+            volume = row[3]
             print("scanning comic_info {} of {}".format(i, len(rows)), end='\r')
             cur.execute("SELECT path, fileName from comic where comicInfoId=?", (id, ))
             rows2 = cur.fetchall()
             if (len(rows2) == 0):
-                print("\ndeleting", id, series, number, "from comic_info")
-                cur.execute('delete from comic_info where id = ?', (id, ))
-                db.commit()
+                print("\ndeleting", id, series, volume, number, "from comic_info")
+                #cur.execute('delete from comic_info where id = ?', (id, ))
+                #db.commit()
             i = i + 1
+        sys.exit()
 
         cur.execute("SELECT id, comicInfoId from read_log")
         rows = cur.fetchall()
@@ -819,7 +821,7 @@ def get_seriess(filter = None):
     db = connect()
     cursor = db.cursor()
 
-    sql = { 'select': 'comic_info.id, comic_info.volume, comic_info.series, comic.path, comic_info.date', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id', 'params': []}
+    sql = { 'select': 'comic_info.id, comic_info.volume, comic_info.series, comic.path, comic_info.date, comic_info.number', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id', 'params': []}
     if (filter is not None):
         add_filter(sql, filter)
     #print(build_sql(sql), sql['params'])
@@ -833,6 +835,7 @@ def get_seriess(filter = None):
         series = row['series']
         volume = row['volume']
         path = row['path']
+        number = row['number']
         parsed_data = parser.parse(path)
 
         # Reset the series field based on the path if series is NULL; not sure which stupid thing I did made
@@ -867,13 +870,18 @@ def get_seriess(filter = None):
             print(f"parsed series from filename: '{series}'")
         if (volume is None):
             volume = parsed_data['volume']
-            print(f"parsed volume from filename: '{volume}'")
+            print(f"parsed volume for '{series}' from filename: '{volume}'")
             cursor.execute("update comic_info set volume=? where volume is NULL and id=?", (volume, id,))
             db.commit()
         if (date is None):
             date = f"{parsed_data['day']}/{parsed_data['month']}/{parsed_data['year']}"
-            print(f"parsed date from filename: '{date}'")
+            print(f"parsed date for '{series} ({volume})' from filename: '{date}'")
             cursor.execute("update comic_info set date=? where date is NULL and id=?", (date, id,))
+            db.commit()
+        if (number is None):
+            number = parsed_data['issue']
+            print(f"parsed number for '{series} ({volume})' from filename: '{number}'")
+            cursor.execute("update comic_info set number=? where number is NULL and id=?", (number, id,))
             db.commit()
 
         seriess['{} ({})'.format(series, volume)] = 1
