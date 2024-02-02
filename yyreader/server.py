@@ -91,10 +91,11 @@ def get_home_link(year = None, month = None):
     return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
 
 @app.before_request
-def check_password():
+def before_request():
     #request.cookies.get('filter')
     if (request.path != '/login' and 'password' in config['server'] and request.cookies.get('authorized') != 'True'):
         return redirect('/login')
+    clean_cache()
 
 @app.route('/arc/<arc>')
 def arc(arc = None):
@@ -178,7 +179,6 @@ def beacons():
 @app.route('/dates/<int:year>')
 @app.route('/dates/<int:year>/<int:month>')
 def dates(year = None, month = None):
-    clean_cache()
     items = []
     up = None
     back = None
@@ -361,11 +361,7 @@ def label(id):
 
 @app.route('/login', methods = ['GET', 'POST'])
 def login():
-    #request.cookies.get('filter')
-    #response.set_cookie('series', '/seriess/{}|{}'.format(urllib.parse.quote(y['series']), y['series']), max_age=60*60*24*365)
-
     if request.method == 'POST':
-        print("PASSWORD", request.form['password'])
         if (request.form['password'] == config['server']['password']):
             response = redirect('/home')
             response.set_cookie('authorized', 'True')
@@ -453,7 +449,7 @@ def read(id, page = None, half = None):
     back = None
     next_page_url = None
     previous_page_url = None
-    up = { 'url':'/seriess/{}#{}'.format(urllib.parse.quote(y['series']), y['id']), 'text':'{} #{}'.format(y['series'], y['issue']) }
+    up = { 'url':'/series/{}#{}'.format(urllib.parse.quote(f"{y['series']} ({y['volume']})"), y['id']), 'text':'{} #{}'.format(y['series'], y['issue']) }
 
     traversal = request.cookies.get('traversal') if request.cookies.get('traversal') else 'date'
     traversal_date = '/dates/{}#{}|{}'.format(y['date'].strftime('%Y/%-m'), id, y['date'].strftime('%d/%Y'))
@@ -481,9 +477,9 @@ def read(id, page = None, half = None):
                 break
             i = i + 1
         if (back is None):
-            back = {'url': '/seriess/{}#{}'.format(urllib.parse.quote(y['series']), id), 'text': '{}'.format(y['series']) }
+            back = {'url': '/series/{}#{}'.format(urllib.parse.quote(f"{y['series']} ({y['volume']})"), id), 'text': '{}'.format(y['series']) }
         if (forth is None):
-            forth = {'url': '/seriess/{}#{}'.format(urllib.parse.quote(y['series']), id), 'text': '{}'.format(y['series']) }
+            forth = {'url': '/series/{}#{}'.format(urllib.parse.quote(f"{y['series']} ({y['volume']})"), id), 'text': '{}'.format(y['series']) }
     elif (traversal == 'strict'):
         #TODO: Add a traversal method that goes by date but ignores linking.
         pass
@@ -525,7 +521,7 @@ def read(id, page = None, half = None):
 
     nav = { 'back':back, 'up': up, 'forth':forth, 'home':home, 'unfixed':True }
     response = make_response(render_template('read.html', half = half, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal, linked = linked ))
-    response.set_cookie('series', '/seriess/{}|{}'.format(urllib.parse.quote(y['series']), y['series']), max_age=60*60*24*365)
+    response.set_cookie('series', '/series/{}|{}'.format(urllib.parse.quote(f"{y['series']} ({y['volume']})"), y['series']), max_age=60*60*24*365)
     response.set_cookie('date', traversal_date, max_age=60*60*24*365)
     return response
 
@@ -596,6 +592,50 @@ def parse_settings_cookie(cookie_settings, setting = None):
         return settings[setting]
     return None
 
+@app.route('/series/<series>')
+def series(series = None):
+    items = []
+    up = None
+    home = get_home_link()
+
+    filter = get_filter()
+
+    series = urllib.parse.unquote(series)
+    for y in yacreader.get_comics_by_series(series, filter = filter):
+        items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/dates/{}#{}'.format(y['date'].strftime('%Y/%m'), y['id']) })
+
+    traversal_method = request.cookies.get('traversal')
+    if (traversal_method == 'date'):
+        traversal_date = request.cookies.get('date')
+        if (traversal_date):
+            home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+    up = { 'url':'/seriess', 'text':'Series' }
+    nav = { 'up':up, 'home':home }
+    response = make_response(render_template('comics.html', items = items, nav = nav))
+    response.set_cookie('traversal', 'series', max_age=60*60*24*365)
+    response.set_cookie('series', '/series/{}|{}'.format(urllib.parse.quote(series), series), max_age=60*60*24*365)
+    return response
+
+@app.route('/seriess')
+def seriess():
+    items = []
+    up = None
+    home = get_home_link()
+
+    filter = get_filter()
+
+    last = None
+    index = []
+    for series in yacreader.get_seriess(filter = filter):
+        if (series[0:1] != last):
+            last = series[0:1]
+            items.append({ 'name':last })
+            index.append({ 'url':'#{}'.format(last), 'text':last })
+
+        items.append({ 'url':'/series/{}'.format(urllib.parse.quote(series)), 'text':series, 'name':None })
+    nav = {'up':up, 'home':home }
+    return render_template('seriess.html', items = items, nav = nav, index = index)
+
 @app.route('/take/<int:year>/<int:month>')
 def take(year, month):
     beacon = '{}/{}'.format(year, month)
@@ -610,42 +650,3 @@ def traverse(method, id):
     else:
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
     return response
-
-@app.route('/seriess')
-@app.route('/seriess/<series>')
-def seriess(series = None):
-    items = []
-    up = None
-    home = get_home_link()
-
-    filter = get_filter()
-    clean_cache()
-    if (series is None):
-        last = None
-        index = []
-        for series in yacreader.get_seriess(filter = filter):
-            if (series[0:1] != last):
-                last = series[0:1]
-                items.append({ 'name':last })
-                index.append({ 'url':'#{}'.format(last), 'text':last })
-
-            items.append({ 'url':'/seriess/{}'.format(urllib.parse.quote(series)), 'text':series, 'name':None })
-        nav = {'up':up, 'home':home }
-        return render_template('seriess.html', items = items, nav = nav, index = index)
-    else:
-        series = urllib.parse.unquote(series)
-        for y in yacreader.get_comics_by_series(series, filter = filter):
-            items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/dates/{}#{}'.format(y['date'].strftime('%Y/%m'), y['id']) })
-
-        traversal_method = request.cookies.get('traversal')
-        if (traversal_method == 'date'):
-            traversal_date = request.cookies.get('date')
-            if (traversal_date):
-                home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
-        up = { 'url':'/seriess', 'text':'Serieses' }
-        nav = { 'up':up, 'home':home }
-        response = make_response(render_template('comics.html', items = items, nav = nav))
-        response.set_cookie('traversal', 'series', max_age=60*60*24*365)
-        response.set_cookie('series', '/seriess/{}|{}'.format(urllib.parse.quote(series), series), max_age=60*60*24*365)
-        return response
-

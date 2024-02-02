@@ -661,7 +661,7 @@ def get_next_comic(id, db = None):
 
     y = get_comic_by_id(id, db = local_db)
     if (y['aft_id'] is not None):
-        comic_data = get_comic_by_id(y['iaft_id'], db = local_db)
+        comic_data = get_comic_by_id(y['aft_id'], db = local_db)
     else:
         head = get_head_comic(id, db = local_db)
 
@@ -819,7 +819,7 @@ def get_seriess(filter = None):
     db = connect()
     cursor = db.cursor()
 
-    sql = { 'select': 'comic_info.id, comic_info.volume, comic_info.series, comic.path', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id', 'params': []}
+    sql = { 'select': 'comic_info.id, comic_info.volume, comic_info.series, comic.path, comic_info.date', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id', 'params': []}
     if (filter is not None):
         add_filter(sql, filter)
     #print(build_sql(sql), sql['params'])
@@ -829,13 +829,15 @@ def get_seriess(filter = None):
     updates = {}
     for row in rows:
         id = row['id']
+        date = row['date']
         series = row['series']
         volume = row['volume']
         path = row['path']
+        parsed_data = parser.parse(path)
 
         # Reset the series field based on the path if series is NULL; not sure which stupid thing I did made
         #   this happen.
-        if ((series is None or series == 'None') and re.search('^\d\d\d\d$', volume)):
+        if ((series is None or series == 'None') and volume is not None and re.search('^\d\d\d\d$', volume)):
             #print("{} ({}): {}".format(series, volume, path))
             new_series = re.search('^(.+) \(\d\d\d\d\)$', path.split('/')[2])[1]
             new_series = parser.massage_series(new_series, reverse=True)
@@ -845,20 +847,38 @@ def get_seriess(filter = None):
             series = new_series
             
         # This was fix a database issue where everything used to be in volume instead of series.
-        m = re.search('^(.+) \((\d\d\d\d)\)$', volume)
-        if (m is not None):
+        if (volume is not None and re.search('^(.+) \((\d\d\d\d)\)$', volume) is not None):
+            m = re.search('^(.+) \((\d\d\d\d)\)$', volume)
             series = m[1]
             new_volume = m[2]
             if (series + new_volume not in updates):
-                cursor.execute("update comic_info set series=?, volume=? where series is NULL and volume=?", (series, new_volume, volume,))
+                cursor.execute("update comic_info set series=?, volume=? where series is NULL and volume=? and id=?", (series, new_volume, volume, id,))
                 db.commit()
                 updates[series+new_volume] = 1
             volume = new_volume
+
+        # If series or volume are none, parse them from the 'path' field. 
+        # TODO: Write this back to the database.  It's already NULL, it's not like I'm going to make things *worse*, right?
+        if (series is None):
+            #series = parser.massage_series(parsed_data['series'], reverse=True)
+            series = parsed_data['series']
+            cursor.execute("update comic_info set series=? where series is NULL and id=?", (series, id,))
+            db.commit()
+            print(f"parsed series from filename: '{series}'")
+        if (volume is None):
+            volume = parsed_data['volume']
+            print(f"parsed volume from filename: '{volume}'")
+            cursor.execute("update comic_info set volume=? where volume is NULL and id=?", (volume, id,))
+            db.commit()
+        if (date is None):
+            date = f"{parsed_data['day']}/{parsed_data['month']}/{parsed_data['year']}"
+            print(f"parsed date from filename: '{date}'")
+            cursor.execute("update comic_info set date=? where date is NULL and id=?", (date, id,))
+            db.commit()
+
         seriess['{} ({})'.format(series, volume)] = 1
     db.close()
-    #dump(seriess)
-    return  sorted(seriess.keys())
-     #, key=lambda x: x)
+    return sorted(seriess.keys(), key=lambda x:x.lower())
 
 def get_years(db = None):
     if (db is None):
