@@ -106,7 +106,7 @@ def main():
 
             try:
                 if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
-                c = verify(c_file, base_dir, args = args)
+                c = verify(c_file, args.target, args = args)
             except comicvine.VolumeNotFoundException as e:
                 print(e)
             except comic.FileExistsException as e:
@@ -132,6 +132,7 @@ def main():
             except comic.FileSizeException as e:
                 print(e)
 
+        if (args.verbose): print("")
 
     elif (args.action == 'scan'):
         if ('missing_log' not in config['default'] or config['default']['missing_log'] == ''):
