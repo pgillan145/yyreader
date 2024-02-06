@@ -96,43 +96,29 @@ def main():
 
         # TODO: Remove some of thos duplicated code.  We really want to test everything that isn't cached, then start looking at the
         #   already cached values to see if the md5 has changed and we need to start checking again.
-        i = 0
-        for c_file in c_files:
-            i = i + 1
-            if (args.filter and re.search(args.filter, c_file) is None):
-                continue
+        rescan = False
+        while (True):
+            i = 0
+            for c_file in c_files:
+                i = i + 1
+                if (args.filter and re.search(args.filter, c_file) is None):
+                    continue
 
-            if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
-            # Don't re-test anything until we've tested everything new.
-            if (c_file in cache['verify']): continue
+                if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
+                # Don't re-test anything until we've tested everything new.
+                if (rescan is False and c_file in cache['verify']): continue
 
-            try:
-                c = verify(c_file, args.target, args = args)
-            except comicvine.VolumeNotFoundException as e:
-                print(e)
-            except comic.FileExistsException as e:
-                print(e)
-            except comic.FileSizeException as e:
-                print(e)
+                try:
+                    c = verify(c_file, args.target, args = args)
+                except comicvine.VolumeNotFoundException as e:
+                    print(e)
+                except comic.FileExistsException as e:
+                    print(e)
+                except comic.FileSizeException as e:
+                    print(e)
 
-            write_cache(config['default']['cache_file'])
-
-        i = 0
-        for c_file in c_files:
-            i = i + 1
-            if (args.filter and re.search(args.filter, c_file) is None):
-                continue
-            if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
-            try:
-                c = verify(c_file, args.target, args = args)
-            except comicvine.VolumeNotFoundException as e:
-                print(e)
-            except comic.FileExistsException as e:
-                print(e)
-            except comic.FileSizeException as e:
-                print(e)
-
-        if (args.verbose): print("")
+                write_cache(config['default']['cache_file'])
+            rescan = True
 
     elif (args.action == 'scan'):
         if ('scan_log' not in config['default'] or config['default']['scan_log'] == ''):
@@ -298,7 +284,7 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
             result = comicvine.search_volumes(series_name, api_key, start_year = start_year, cache = cache, verbose = verbose, headless = headless, debug = False, slow = slow) #debug = debug)
         except Exception as e:
             print(e)
-            return []
+            return missing
 
         if (result is None):
             print("  can't find comicvine match, skipping")
@@ -330,7 +316,7 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
                                 date = i['date']
                                 date_year = parser.parse_date(date)['year']
                                 if (date_year is not None and int(date_year) >= oldest_year):
-                                    missing[i['issue_number']] = { 'date':date, 'url':comicvine.issue_url(i['id']) }
+                                    missing[i['issue_number']] = { 'date':date, 'url':comicvine.issue_url(i['id']), 'error':'missing' }
                         elif (i['issue_number'] in missing):
                             del missing[i['issue_number']]
 
@@ -346,8 +332,9 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
     return missing
 
 def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, oldest_year = 1901, year = None, verbose = False, debug = False, headless = True, rescan = False, slow = False):
-    global cache 
+    global cache
     missing = {}
+
     if (os.path.exists(scan_log)):
         with open(scan_log, 'r') as f:
             # Load data into missing object
@@ -355,15 +342,15 @@ def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, ol
             while(line):
                 line = line.strip()
                 s = line.split('|')
-                if (len(s) == 5):
-                    (publisher, series, issue, date, url) = s
+                if (len(s) == 6):
+                    (error, publisher, series, issue, date, url) = s
                     if (os.path.exists(f'{target}/{publisher}') is True):
                         if (publisher not in missing):
                             missing[publisher] = {}
                         if (os.path.exists(f'{target}/{publisher}/{series}') is True):
                             if (series not in missing[publisher]):
                                 missing[publisher][series] = {}
-                            missing[publisher][series][issue] = { 'date':date, 'url':url }
+                            missing[publisher][series][issue] = { 'date':date, 'url':url, 'error':error}
                 else:
                     print(f"invalid line: '{line}'")
                 line = f.readline()
@@ -398,8 +385,9 @@ def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, ol
                                 for issue in missing[pub][series].keys():
                                     date = missing[pub][series][issue]['date']
                                     url = missing[pub][series][issue]['url']
+                                    error = missing[pub][series][issue]['error']
                                     # TODO: Record what kind of issue this is: missing, FileTypeException, can't match comicvine, whatever
-                                    f.write(f'{pub}|{series}|{issue}|{date}|{url}\n')
+                                    f.write(f'{error}|{pub}|{series}|{issue}|{date}|{url}\n')
                     done = True
                 except KeyboardInterrupt:
                     print("scan log dump interrupted - retrying")

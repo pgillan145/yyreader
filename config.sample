@@ -27,7 +27,7 @@ maximum_file_size = 100
 skip_publishers = [ 'Panini Comics' ]
 
 # File in which the 'scan' action can store a list comics that are "missing"
-scan_log = /tmp/missing_comics.txt
+scan_log = /tmp/scan_log.txt
 
 [comicvine]
 # https://comicvine.gamespot.com/api/
