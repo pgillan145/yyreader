@@ -429,7 +429,7 @@ class comic():
         if (re.search(r'\.cbr$', self.file, re.I) or (re.search(r'\.rar$', self.file))):
             magic_str = magic.from_file(self.file)
             if (re.search('^RAR archive data', magic_str) is None):
-                raise ExtensionMismatchException("file is rar, but file data is '{}'".format(magic_str[:16]))
+                raise ExtensionMismatchException("{} is rar, but file data is '{}'".format(self.file, magic_str[:16]))
             return True
         return False
 
@@ -437,7 +437,7 @@ class comic():
         if (re.search('\.cbz$', self.file, re.I) or (re.search('\.zip$', self.file))):
             magic_str = magic.from_file(self.file)
             if (re.search('^Zip archive data', magic_str) is None):
-                raise ExtensionMismatchException("file is zip, but file data is '{}'".format(magic_str[:16]))
+                raise ExtensionMismatchException("{} is zip, but file data is '{}'".format(self.file, magic_str[:16]))
             return True
         return False
 

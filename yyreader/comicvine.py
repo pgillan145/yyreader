@@ -59,7 +59,7 @@ def get_issue(issue_id, api_key, cache = {}, clear_cache = False, debug = False,
 
     return result
 
-def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False, detailed = False, slow = False):
+def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = False, verbose = False, detailed = False, slow = False, headless = True):
     setup_cache(cache)
     #volume = get_volume(volume_id, api_key,  cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
     #volume_name = '{} ({}) - {}'.format(volume['name'], volume['start_year'], volume['publisher']['name'])
@@ -186,12 +186,6 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
                 pass
             i = i - 1
 
-        # TODO: This could potentially solve my 'ver' problem! Instead of throwing away all the older volumes, just increment their 'ver' values.
-        #   Except... start_year isn't enough to determine if which one is "-2" -- I need to get the date of the first issue.  So I have to figure out which
-        #   comics have the same start year, then go through and pull the first issue of each one, so I get the actual date so I know which one was
-        #   "first."
-        #results = sorted(results, key = lambda x:int(x['start_year']))
-
         # Get a list of which of these results have identical names and identical start_years
         first_issues = {}
         for r in results:
@@ -220,6 +214,9 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
                     if (debug): print(f"{issue['name']} ({issue['start_year']}), first_issue date: '{issue['first_issue_date']}' ver:'{issue['result']['ver']}'")
 
     return results
+
+def issue_url(id):
+    return 'http://www.comicvine.com/issue/4000-{}'.format(id)
 
 #TODO: Make this take a limited set of fields for search, rather than just passing it 'data'.
 def search(data, api_key, cache = {}, clear_cache = False, headless = False, verbose = False, debug = True, slow = False):
@@ -274,8 +271,8 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
     comicvine_data['issue_name'] = ''
     comicvine_data['ratio'] = result['ratio']
     comicvine_data['store_date'] = i['store_date']
-    comicvine_data['url'] = 'http://www.comicvine.com/issue/4000-{}'.format(i['id'])
-    comicvine_data['volume_url'] = 'http://www.comicvine.com/volume/4050-{}'.format(volume_id)
+    comicvine_data['url'] = issue_url(i['id'])
+    comicvine_data['volume_url'] = volume_url(volume_id)
 
     comicvine_data['characters'] = []
     comicvine_data['colorists'] = []
@@ -576,4 +573,7 @@ def setup_cache(cache):
     for volume in volumes:
         if cache['comicvine']['volumes'][volume]['mod_date'] < (datetime.now() - timedelta(weeks = 1)):
             del cache['comicvine']['volumes'][volume]
+
+def volume_url(id):
+    return 'http://www.comicvine.com/volume/4050-{}'.format(id)
 

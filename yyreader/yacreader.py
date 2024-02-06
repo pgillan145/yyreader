@@ -861,7 +861,6 @@ def get_seriess(filter = None):
             volume = new_volume
 
         # If series or volume are none, parse them from the 'path' field. 
-        # TODO: Write this back to the database.  It's already NULL, it's not like I'm going to make things *worse*, right?
         if (series is None):
             #series = parser.massage_series(parsed_data['series'], reverse=True)
             series = parsed_data['series']
