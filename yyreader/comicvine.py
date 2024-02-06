@@ -80,7 +80,7 @@ def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = Fals
 
     return issues
 
-last_result = datetime.now()
+last_result = {}
 def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache = False, verbose = False, debug = False, slow = False):
     setup_cache(cache)
     global last_result
@@ -96,11 +96,17 @@ def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache =
         text = cache['comicvine']['results'][offset_url]['text']
     else:
         if (debug): print("requesting from comicvine")
-        while(last_result > datetime.now() - timedelta(seconds=seconds_between_requests)):
-            time.sleep(1)
+        request_type = 'any'
+        m = re.search('api/([^/]+)/', offset_url)
+        if (m is not None):
+            request_type = m.group(1)
+        if (request_type in last_result):
+            while(last_result[request_type] > datetime.now() - timedelta(seconds=seconds_between_requests)):
+                if (debug): print(f"waiting for next '{request_type}'")
+                time.sleep(1)
         urllib3.disable_warnings()
         r = requests.get(offset_url, headers=headers, params=params, verify=False)
-        last_result = datetime.now()
+        last_result[request_type] = datetime.now()
         text = r.text
         data = json.loads(text)
         if (data['error'] == 'OK'):
