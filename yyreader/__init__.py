@@ -261,8 +261,14 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
 
     for c_file in c_files:
         if (re.match("^\.", c_file)): continue
-        c = comic.comic(c_dir + '/' + c_file, cache = cache, verbose = verbose, debug = False)
-        issues[parser.massage_issue(c.issue())] = parser.parse_date(c.date())
+        try:
+            c = comic.comic(c_dir + '/' + c_file, cache = cache, verbose = verbose, debug = False)
+            issues[parser.massage_issue(c.issue())] = parser.parse_date(c.date())
+        except comic.ExtensionMismatchException as e:
+            print(e)
+            parse_data = parser.parse(c_file)
+            #print(f"{parse_data['issue']} = 'date':{parse_data['date']}, 'error':'extension'")
+            missing[parse_data['issue']] = { 'date':parse_data['date'], 'url':'', 'error':'extension' }
 
     valid_year = False
     for issue in issues.keys():
@@ -305,30 +311,31 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
                         i['date'] = i['cover_date']
 
                 series_total = 0
-                if (series_total == len(issues)):
+                if (series_total == len(issues) and len(missing) == 0):
                     print("  {}/{}: issue compare complete".format(series_count, series_total))
                     cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':c_md5 }
                 else:
                     for i in sorted(comicvine_issues, key = lambda x:x['issue_number']):
-                        if (i['issue_number'] not in issues):
+                        if (i['issue_number'] not in issues and i['issue_number'] not in missing):
                             date = ''
                             if ('date' in i and i['date'] is not None):
                                 date = i['date']
                                 date_year = parser.parse_date(date)['year']
                                 if (date_year is not None and int(date_year) >= oldest_year):
                                     missing[i['issue_number']] = { 'date':date, 'url':comicvine.issue_url(i['id']), 'error':'missing' }
-                        elif (i['issue_number'] in missing):
+                        elif (i['issue_number'] in issues and i['issue_number'] in missing and missing[i['issue_number']]['error'] == 'missing'):
                             del missing[i['issue_number']]
 
                     if (len(missing) > 0):
                         print("  missing issues:")
                         for i in missing:
-                            print(f"    {i}")
+                            print(f"    {i}:{missing[i]['error']}")
                     else:
                         if (verbose): print("  {}/{}: issues post {} complete".format(series_count, result['count_of_issues'], oldest_year-1))
                         cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':c_md5 }
                         missing = {}
 
+    #dump(missing)
     return missing
 
 def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, oldest_year = 1901, year = None, verbose = False, debug = False, headless = True, rescan = False, slow = False):
