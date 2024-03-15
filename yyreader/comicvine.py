@@ -69,6 +69,10 @@ def get_issues(volume_id, api_key, cache = {}, clear_cache = False, debug = Fals
     results = get_results(url, max = None, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
 
     for result in results:
+        if (re.search('^ ', result['issue_number']) or re.search(' $', result['issue_number'])):
+            #print("WIKI ERROR: '{}({})' issue_number='{}'".format(volume_name, volume['start_year'], result['issue_number']))
+            result['issue_number'] = result['issue_number'].strip()
+        result['issue_number'] = parser.massage_issue(result['issue_number'])
         add_date(result)
 
     if (detailed is not True):
@@ -84,8 +88,7 @@ last_result = {}
 def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache = False, verbose = False, debug = False, slow = False):
     setup_cache(cache)
     global last_result
-    seconds_between_requests = 3 if (slow is False) else 18
-    if (debug): print(f"seconds_between_requests:{seconds_between_requests}")
+    seconds_between_requests = 3 if (slow is False) else 20
 
     offset_url = url + f'&limit={limit}&offset={offset}'
     if (debug): print(f"request url:{offset_url}")
@@ -95,7 +98,7 @@ def get_results(url, offset=0, limit = 100, max = 100, cache = {}, clear_cache =
         if (debug): print("using cache")
         text = cache['comicvine']['results'][offset_url]['text']
     else:
-        if (debug): print("requesting from comicvine")
+        if (debug): print(f"requesting from comicvine (seconds_between_requests:{seconds_between_requests})")
         request_type = 'any'
         m = re.search('api/([^/]+)/', offset_url)
         if (m is not None):
@@ -147,12 +150,14 @@ def get_volume(volume_id, api_key, cache = {}, clear_cache = False, debug = Fals
         result['name'] = result['name'].strip()
     return result
 
-def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, clear_cache = False, debug = False, headless = False, verbose = False, slow = False):
+def get_volumes(volume, api_key, start_year = None, year = None, publisher = None,  cache = {}, clear_cache = False, debug = False, headless = False, verbose = False, slow = False):
     setup_cache(cache)
 
     if (debug): print(f"search volume:'{volume}',start_year:'{start_year}',year:'{year}'")
 
+    # TODO:…
     url_volume = volume
+    url_volume = re.sub('!', '%21', url_volume)
     url_volume = re.sub('&', '%26', url_volume)
     url_volume = re.sub('\'', '%27', url_volume)
     url_volume = re.sub('\*', '%2A', url_volume)
@@ -165,6 +170,7 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
     try:
         results = get_results(url, max = 100, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
     except Exception as e:
+        print(e)
         pass
 
     skip_publishers = eval(config['default']['skip_publishers']) if ('skip_publishers' in config['default']) else []
@@ -174,34 +180,37 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
         #   we were provided or bad search results.
         i = len(results) - 1
         while i >= 0:
-            if (re.search('^ ', results[i]['name']) or re.search(' $', results[i]['name'])):
-                #print("WIKI ERROR: '{}':{}".format(results[i]['name'], results[i]['id']))
-                results[i]['name'] = results[i]['name'].strip()
-
-            if ('start_year' not in results[i]
-              or results[i]['start_year'] is None
-              or re.search('^\d+$', results[i]['start_year']) is None
+            #dump(results[i])
+            if ('start_year' not in results[i] or results[i]['start_year'] is None or re.search('^\d+$', results[i]['start_year']) is None
+              or results[i]['resource_type'] != 'volume'
+              or 'name' not in results[i] or results[i]['name'] is None
               or results[i]['first_issue'] is None
               or (results[i]['first_issue']['name'] is not None and (re.search('TPB$', results[i]['first_issue']['name']) or re.search('^Volume \d+$', results[i]['first_issue']['name'])))
               or results[i]['publisher'] is None
+              or (publisher is not None and results[i]['publisher']['name'] != publisher)
               or (results[i]['publisher']['name'] in skip_publishers)
               or (year is not None and int(results[i]['start_year']) > int(year)+1)
               #or (volume.lower() == 'the amazing spider-man' and year is not None and int(year) < 2014 and results[i]['start_year'] != '1963')
                 ):
                 del results[i]
-                pass
+            elif (re.search('^ ', results[i]['name']) or re.search(' $', results[i]['name'])):
+                #print("WIKI ERROR: '{}':{}".format(results[i]['name'], results[i]['id']))
+                results[i]['name'] = results[i]['name'].strip()
+
             i = i - 1
 
         # Get a list of which of these results have identical names and identical start_years
         first_issues = {}
         for r in results:
             r['ver'] = ''
-            volume_year = r['name'] +'|'+r['start_year']
+            volume_year = r['publisher']['name'] + '|' + r['name'] +'|'+r['start_year']
             if (volume_year not in first_issues):
                 first_issues[volume_year] = []
             if (debug):
-                print(f"{volume_year}\n")
-                dump(r['first_issue'])
+                #print(f"{volume_year}n")
+                #dump(r['first_issue'])
+                #print("")
+                pass
             first_issues[volume_year].append({ 'name':r['name'], 'start_year':r['start_year'], 'id':r['id'], 'first_issue_id':r['first_issue']['id'], 'first_issue_number':r['first_issue']['issue_number'], 'result':r })
 
         # For volumes that appear multiple times in the same year, pull the first issues assign a 'ver' field based on the order they were released.
@@ -209,14 +218,14 @@ def get_volumes(volume, api_key, start_year = None, year = None, cache = {}, cle
             if (len(first_issues[issues]) > 1):
                 for issue in first_issues[issues]:
                     i = get_issue(issue['first_issue_id'],  api_key, cache = cache, clear_cache = clear_cache, debug = debug, verbose = verbose, slow = slow)
-                    if (debug): print(f"{issue['name']} ({issue['start_year']}), publisher:'{issue['result']['publisher']['name']}, first_issue date: '{i['date']}'")
+                    if (debug): print(f"{issue['name']} ({issue['start_year']}), publisher:'{issue['result']['publisher']['name']}', first_issue date: '{i['date']}'")
                     issue['first_issue_date'] = i['date']
                     issue['result']['first_issue']['date'] = i['date']
                 ver = 0
                 for issue in sorted(first_issues[issues], key = lambda x:x['first_issue_date']):
                     if (issue['first_issue_date'] == ''): continue
                     ver += 1
-                    if (ver > 1): issue['result']['ver'] = ver
+                    if (ver > 1): issue['result']['ver'] = str(ver)
                     if (debug): print(f"{issue['name']} ({issue['start_year']}), first_issue date: '{issue['first_issue_date']}' ver:'{issue['result']['ver']}'")
 
     return results
@@ -243,7 +252,11 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
     if (test_volume in cache['comicvine']['volumes'] and clear_cache is False):
         test_volume = cache['comicvine']['volumes'][test_volume]['volume']
 
-    result = search_volumes(test_volume, api_key, date=data['date'] if 'date' in data else None, start_year=data['start_year'], year = data['year'], issue = data['issue'], cache = cache, clear_cache = clear_cache, headless = headless, verbose = verbose, debug = debug, slow = slow)
+    test_publisher = None
+    if ('publisher' in data and data['publisher'] != '' and data['publisher'] is not None):
+        test_publisher = data['publisher']
+
+    result = search_volumes(test_volume, api_key, date=data['date'] if 'date' in data else None, start_year=data['start_year'], year = data['year'], issue = data['issue'], publisher = test_publisher, cache = cache, clear_cache = clear_cache, headless = headless, verbose = verbose, debug = debug, slow = slow)
     volume_id = result['id']
     #if (debug): print("comicvine data:", result)
 
@@ -344,9 +357,6 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
     results = get_issues(volume_id, api_key, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
     i = len(results) - 1
     while i >= 0:
-        if (re.search('^ ', results[i]['issue_number']) or re.search(' $', results[i]['issue_number'])):
-            print("WIKI ERROR: '{}({})' issue_number='{}'".format(volume_name, volume['start_year'], results[i]['issue_number']))
-            results[i]['issue_number'] = results[i]['issue_number'].strip()
         if (results[i]['date'] == ''):
             del results[i]
         i = i - 1
@@ -362,7 +372,7 @@ def search_issues(volume_id, issue, api_key, cache = {}, clear_cache = False, de
             return result
     return None
 
-def search_volumes(test_volume, api_key, start_year = None, year = None, date = None, issue = None, cache = {}, clear_cache = False, debug = False, verbose = False, headless = False, slow = False):
+def search_volumes(test_volume, api_key, start_year = None, year = None, date = None, issue = None, ver = None, publisher = None, cache = {}, clear_cache = False, debug = False, verbose = False, headless = False, slow = False):
     """Returns the comicvine volume that best matches the given criteria."""
 
     result = None
@@ -374,7 +384,7 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
 
     while (result is None):
         # Get an initial list of volumes from the site that we can start to check.
-        results = get_volumes(test_volume, api_key, start_year = start_year, year = year, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
+        results = get_volumes(test_volume, api_key, start_year = start_year, year = year, publisher = publisher, cache = cache, clear_cache = clear_cache, verbose = verbose, debug = debug, slow = slow)
 
         for r in results:
             if ('ratio' not in r):
@@ -468,9 +478,16 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
         if (result is None):
             for r in results:
                 if (r['score'] == 100):
-                    if (start_year is not None and r['start_year'] == start_year):
-                        if (debug): print("  found exact match: {} ({})".format(r['name'], r['start_year']))
-                        result = r
+                    #if ((start_year is not None and r['start_year'] == start_year)
+                        #and (ver is not None and r['ver'] == ver)):
+                    if (start_year is not None and r['start_year'] != start_year):
+                        if (debug): print(f"'{start_year}' doesn't match '{r['start_year']}'")
+                        continue
+                    if (ver is not None and r['ver'] != ver):
+                        if (debug): print(f"'{ver}' doesn't match '{r['ver']}'")
+                        continue
+                    if (debug): print("  found exact match: {} ({})".format(r['name'], r['start_year']))
+                    result = r
 
         if (result is not None or headless is True):
             break

@@ -24,6 +24,9 @@ import traceback
 
 cache = {}
 
+class YearException(Exception):
+    pass
+
 def main():
     global cache
 
@@ -96,17 +99,17 @@ def main():
 
         # TODO: Remove some of thos duplicated code.  We really want to test everything that isn't cached, then start looking at the
         #   already cached values to see if the md5 has changed and we need to start checking again.
-        rescan = False
-        while (True):
+        rescan = 0
+        while (rescan < 2):
             i = 0
             for c_file in c_files:
                 i = i + 1
                 if (args.filter and re.search(args.filter, c_file) is None):
                     continue
 
-                if (args.verbose): print(f"\rscanning {i}/{file_count}", end='')
+                if (args.verbose): print(f"\rverifying {i}/{file_count}", end='')
                 # Don't re-test anything until we've tested everything new.
-                if (rescan is False and c_file in cache['verify']): continue
+                if (rescan == 0 and c_file in cache['verify']): continue
 
                 try:
                     c = verify(c_file, args.target, args = args)
@@ -118,7 +121,8 @@ def main():
                     print(e)
 
                 write_cache(config['default']['cache_file'])
-            rescan = True
+            if (args.verbose): print("")
+            rescan += 1
 
     elif (args.action == 'scan'):
         if ('scan_log' not in config['default'] or config['default']['scan_log'] == ''):
@@ -127,9 +131,6 @@ def main():
 
 
         api_key = config['comicvine']['api_key']
-        oldest_year = 1901
-        if ('oldest_year' in config['default']):
-            oldest_year = int(config['default']['oldest_year'])
 
         if (api_key is None):
             raise(Exception("No comicvine api key defined"))
@@ -137,8 +138,10 @@ def main():
         if ('scan' not in cache or args.clear_cache is True):
             cache['scan'] = {}
 
-        scan_dir(args.target, api_key, config['default']['scan_log'], cache_file = config['default']['cache_file'], pub_filter = args.publisher, oldest_year = oldest_year, year = args.year, verbose = args.verbose, debug = args.debug, slow = args.slow)
-        scan_dir(args.target, api_key, config['default']['scan_log'], cache_file = config['default']['cache_file'], pub_filter = args.publisher, oldest_year = oldest_year, year = args.year, verbose = args.verbose, debug = args.debug, slow = args.slow, rescan = True)
+        rescan = 0
+        while (rescan < 2):
+            scan_dir(args.target, api_key, config['default']['scan_log'], cache_file = config['default']['cache_file'], pub_filter = args.publisher, year = args.year, verbose = args.verbose, debug = args.debug, slow = args.slow, rescan = False if (rescan == 0) else True)
+            rescan += 1
 
     else:
         print("Unknown action: {}".format(args.action))
@@ -227,7 +230,7 @@ def read_cache(cache_file, args = minorimpact.default_arg_flags):
         if (args.debug): print("{} does not exist".format(cache_file))
 
 
-def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, verbose = False, debug = False, headless = True, slow = False):
+def scan(target, publisher, series, api_key, year = None, verbose = False, debug = False, headless = True, slow = False):
     global cache
     if (debug): print(f"reading {publisher}/{series}/")
 
@@ -242,7 +245,7 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
 
     if (year is not None and int(start_year) > int(year)):
         if (debug): print(f"  released after {year}, skipping")
-        return []
+        return missing
 
     c_dir = target + '/' + publisher + '/' + series
     c_md5 = minorimpact.md5dir(c_dir)
@@ -255,19 +258,21 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
 
     c_files = os.listdir(c_dir)
     series_name = parser.series_filename(series, reverse = True)
-    print(f"scanning {series_name} ({volume})")
+    print(f"scanning {publisher}/{series_name} ({volume}):")
 
     issues = {}
-
-    for c_file in c_files:
+    first_issue = None
+    for c_file in sorted(c_files):
         if (re.match("^\.", c_file)): continue
         try:
             c = comic.comic(c_dir + '/' + c_file, cache = cache, verbose = verbose, debug = False)
+            if (first_issue is None): first_issue = c
             issues[parser.massage_issue(c.issue())] = parser.parse_date(c.date())
         except comic.ExtensionMismatchException as e:
+            # If we can't read the file because the extension is wrong and the file is undreadable, automatically mark it as
+            #   'missing', but with a special error code.
             print(e)
             parse_data = parser.parse(c_file)
-            #print(f"{parse_data['issue']} = 'date':{parse_data['date']}, 'error':'extension'")
             missing[parse_data['issue']] = { 'date':parse_data['date'], 'url':'', 'error':'extension' }
 
     valid_year = False
@@ -279,66 +284,109 @@ def scan(target, publisher, series, api_key, year = None, oldest_year = 1901, ve
             break
 
     if (year is True and valid_year is False):
-        print(f"  no releases in {year}. skipping")
-        return missing
+        raise YearException(f"no releases in {year}")
 
     if (len(issues) > 0):
-        # TODO: Don't get get the volume based on the series_name, it can still mismatch easily.  Instead, parse the first file and use parse_data so we can
-        #   triangulate based on issue date and issue number.
         if (verbose): print("  collecting volume info from comicvine")
         try:
-            result = comicvine.search_volumes(series_name, api_key, start_year = start_year, cache = cache, verbose = verbose, headless = headless, debug = False, slow = slow) #debug = debug)
-        except Exception as e:
+            # Get the volume information based on one of the issues. That way, we can triangluate based on name, issue number and release data and end up
+            #   with as close to a perfect volume match as possible.
+            comicvine_data = comicvine.search(first_issue.parse_data, api_key, cache = cache, debug = debug, headless = headless, verbose = verbose, slow = slow)
+            comicvine_volume = comicvine.get_volume(comicvine_data['volume_id'], api_key, cache = cache, verbose = verbose, debug = debug, slow = slow)
+        except comicvine.VolumeNotFoundException as e:
             print(e)
+            missing[first_issue.parse_data['issue']] = { 'date':first_issue.parse_data['date'], 'url':'', 'error':'volume' }
+            return missing
+        except Exception as e:
+            print(traceback.format_exc())
             return missing
 
-        if (result is None):
+        if (comicvine_volume is None):
+            # TODO: We uncover some series level stuff here that we really should be flagging in the the log, but it
+            #   was originally set up to be issue level.
             print("  can't find comicvine match, skipping")
         else:
-            series_total = result['count_of_issues']
+            # Get the "count of issues" from comicvine for this series and compare them.  If they match, we should be golden.
+            # TODO: Fixure out if we're actually golden - what are the occasions when the counts might match but we're still missing issues?
+            #   1. We have multiple copies of one issue but are missing another (No - the list of issues indexed by number, so multiple issues
+            #       would only be counted as one.
+            #   2. I accidently scooped in a "cover only" version of the issue, rather than the full issue.
+            #       TODO: Check to see how many pages a comic is and flag it if it's too low.
+            #   3. A comic is neither 'cbr' nor 'cbz', and is therefore actually invalid.
+            #   4. 2 & 3 seem like they're more 'verify' than 'scan'.
+            series_total = comicvine_volume['count_of_issues']
             series_count = len(issues)
+
             if (series_count == series_total):
                 print("  {}/{} totals match".format(series_count, series_total))
                 cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':c_md5 }
             else:
+                # count value from comicvine doesn't match the number of files, so let's dig deeper
                 if (verbose): print("  collecting issue list from comicvine")
-                comicvine_issues = comicvine.get_issues(result['id'], api_key, cache = cache, verbose = verbose, debug = debug, detailed = False, slow = slow, headless = headless)
-                for i in comicvine_issues:
-                    i['issue_number'] = parser.massage_issue(i['issue_number'])
-                    if ('store_date' in i and i['store_date'] is not None):
-                        i['date'] = i['store_date']
-                    elif ('cover_date' in i and i['cover_date'] is not None):
-                        i['date'] = i['cover_date']
+                comicvine_issues = comicvine.get_issues(comicvine_volume['id'], api_key, cache = cache, verbose = verbose, debug = debug, detailed = False, slow = slow, headless = headless)
+                #for i in comicvine_issues:
+                #    i['issue_number'] = parser.massage_issue(i['issue_number'])
+                #    if ('store_date' in i and i['store_date'] is not None):
+                #        i['date'] = i['store_date']
+                #    elif ('cover_date' in i and i['cover_date'] is not None):
+                #        i['date'] = i['cover_date']
+                #dump(comicvine_issues)
 
-                series_total = 0
+                series_total = len(comicvine_issues)
                 if (series_total == len(issues) and len(missing) == 0):
-                    print("  {}/{}: issue compare complete".format(series_count, series_total))
+                    # In theory this should never be different than 'count_of_issues' and should never come up.  I'm half
+                    #   tempted to count it as an error.
+                    print("  {}/{}: issue counts match".format(series_count, series_total))
                     cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':c_md5 }
+                elif (len(issues) > len(comicvine_issues)):
+                    print(f"  too many issues:")
+                    print(f"    issues:{len(issues)}")
+                    print(f"    comicvine issues:{len(comicvine_issues)}")
+                    volume_url = comicvine.volume_url(comicvine_volume['id'])
+                    print(f"    comicvine volume:{volume_url}")
+                    print(f"    issue url:       {first_issue['url']}")
+                    raise Exception("we've got too many issues! We might have gotten the wrong series from comicvine.")
                 else:
+                    # Go through the list of issues we got from comicvine.
                     for i in sorted(comicvine_issues, key = lambda x:x['issue_number']):
+                        i['issue_number'] = parser.massage_issue(i['issue_number'])
                         if (i['issue_number'] not in issues and i['issue_number'] not in missing):
+                            # Comicvine gave us an issue we don't have.
+                            # TODO: If we decide to re-add looking only looking at series with issues released in a certain --year,
+                            #   figure out if we still need any of this date code.
                             date = ''
                             if ('date' in i and i['date'] is not None):
                                 date = i['date']
                                 date_year = parser.parse_date(date)['year']
-                                if (date_year is not None and int(date_year) >= oldest_year):
-                                    missing[i['issue_number']] = { 'date':date, 'url':comicvine.issue_url(i['id']), 'error':'missing' }
+
+                            # It's not in out list of issues, and we can't check the date to see if it's too "old",
+                            #   so add it to the list of 'missing' issues.
+                            missing[i['issue_number']] = { 'date':date, 'url':comicvine.issue_url(i['id']), 'error':'missing' }
                         elif (i['issue_number'] in issues and i['issue_number'] in missing and missing[i['issue_number']]['error'] == 'missing'):
+                            # If something was previously marked 'missing' but it's here, delete it.
                             del missing[i['issue_number']]
 
                     if (len(missing) > 0):
+                        # If we've got anything in the 'missing' pile, don't cache this directory.
                         print("  missing issues:")
                         for i in missing:
                             print(f"    {i}:{missing[i]['error']}")
                     else:
-                        if (verbose): print("  {}/{}: issues post {} complete".format(series_count, result['count_of_issues'], oldest_year-1))
-                        cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':c_md5 }
-                        missing = {}
+                        if (verbose):
+                            print(f"  count mismatches:")
+                            print(f"    missing:{len(missing)}")
+                            print(f"    issues:{len(issues)}")
+                            print(f"    comicvine issues:{len(comicvine_issues)}")
+                            volume_url = comicvine.volume_url(comicvine_volume['id'])
+                            print(f"    comicvine volume:{volume_url}")
+                            print(f"    issue url:       {first_issue['url']}")
+                        raise Exception("we don't have any missing issues but our counts don't match and I don't know why!")
+                        #cache['scan'][publisher][series] = { 'date':datetime.now(), 'version':__version__, 'md5':c_md5 }
 
     #dump(missing)
     return missing
 
-def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, oldest_year = 1901, year = None, verbose = False, debug = False, headless = True, rescan = False, slow = False):
+def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, year = None, verbose = False, debug = False, headless = True, rescan = False, slow = False):
     global cache
     missing = {}
 
@@ -376,9 +424,19 @@ def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, ol
             if (rescan is False and series in cache['scan'][publisher]): continue
             # TODO: If you specify a year, and the series doesn't have any issues during that year, the missing list for the series comes back empty. THAT
             #   IS PROBABLY NOT TRUE.
-            m = scan(target, publisher, series, api_key, oldest_year = oldest_year, year = year, verbose = verbose, debug = debug, headless = headless, slow = slow)
-            if (len(m) > 0):
-                missing[publisher][series] = m
+            try:
+                m = scan(target, publisher, series, api_key, year = year, verbose = verbose, debug = debug, headless = headless, slow = slow)
+                if (len(m) > 0):
+                    missing[publisher][series] = m
+                else:
+                    if (series in missing[publisher]):
+                        del missing[publisher][series]
+                    if (len(missing[publisher]) == 0):
+                        del missing[publisher]
+            except YearException as e:
+                print(e)
+                continue
+ 
             write_cache(cache_file)
 
             done = False
@@ -387,9 +445,9 @@ def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, ol
                 try:
                     with open(scan_log, 'w') as f:
                         # Load data into missing object
-                        for pub in missing.keys():
-                            for series in missing[pub].keys():
-                                for issue in missing[pub][series].keys():
+                        for pub in sorted(missing.keys()):
+                            for series in sorted(missing[pub].keys()):
+                                for issue in sorted(missing[pub][series].keys()):
                                     date = missing[pub][series][issue]['date']
                                     url = missing[pub][series][issue]['url']
                                     error = missing[pub][series][issue]['error']
@@ -403,6 +461,10 @@ def scan_dir(target, api_key, scan_log, cache_file = None, pub_filter = None, ol
             if (interrupted is True):
                 sys.exit()
             #if (len(m) > 0):
+            #    sys.exit()
+
+            #c = minorimpact.getChar()
+            #if (c == 'q'):
             #    sys.exit()
 
 def verify (comic_file, target_dir, args = minorimpact.default_arg_flags):

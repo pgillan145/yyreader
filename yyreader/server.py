@@ -361,12 +361,11 @@ def label(id):
 
 @app.route('/login', methods = ['GET', 'POST'])
 def login():
+    response = Response(render_template('login.html'))
     if request.method == 'POST':
         if (request.form['password'] == config['server']['password']):
             response = redirect('/home')
             response.set_cookie('authorized', 'True')
-    else:
-        response = Response(render_template('login.html'))
 
     return response
 
