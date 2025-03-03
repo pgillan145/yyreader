@@ -110,6 +110,8 @@ class comic():
 
         xml_file = 'ComicInfo.xml'
 
+        if (os.path.exists(xml_file)):
+            os.chmod(xml_file, 0o644)
         with (open(xml_file, 'w') as x):
             x.write(xml_data)
 

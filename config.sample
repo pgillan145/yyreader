@@ -10,6 +10,8 @@ minimum_file_size = 5
 rar = /usr/local/bin/rar
 # Location of the 'unzip' system utility.
 unzip = /usr/bin/unzip
+# Location of the 'zip' system utility.
+zip = /usr/bin/zip
 
 # Where the comics ultimately want to live
 comic_dir = /Volumes/Media/Comics
