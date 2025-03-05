@@ -231,7 +231,7 @@ def get_volumes(volume, api_key, start_year = None, year = None, publisher = Non
     return results
 
 def issue_url(id):
-    return 'http://www.comicvine.com/issue/4000-{}'.format(id)
+    return 'http://comicvine.gamespot.com/issue/4000-{}'.format(id)
 
 #TODO: Make this take a limited set of fields for search, rather than just passing it 'data'.
 def search(data, api_key, cache = {}, clear_cache = False, headless = False, verbose = False, debug = True, slow = False):
@@ -598,5 +598,5 @@ def setup_cache(cache):
             del cache['comicvine']['volumes'][volume]
 
 def volume_url(id):
-    return 'http://www.comicvine.com/volume/4050-{}'.format(id)
+    return 'http://comicvine.gamespot.com/volume/4050-{}'.format(id)
 

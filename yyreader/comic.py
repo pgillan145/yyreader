@@ -103,7 +103,7 @@ class comic():
         if (self.data_dir is None or os.path.exists(self.data_dir) is False):
             self._unpack()
 
-        xml_data = self._generate_xml_data(verbose = verbose, debug = False)
+        xml_data = self._generate_xml_data(verbose = verbose, debug = debug)
         #print(xml_data)
         cwd = os.getcwd()
         os.chdir(self.temp_dir.name)
@@ -187,13 +187,13 @@ class comic():
                     elif (c == 'n'):
                         done = True
                     elif (c == 'y'):
-                        self._update(comicvine_data, target_dir = target_dir, args = args)
+                        self._update(comicvine_data, target_dir = target_dir, debug = debug, args = args)
                         score = self.compare(comicvine_data = comicvine_data, verbose = False)
                         done = True
             else:
                 if (go_for_it is True):
                     print("  auto updating {}".format(self.file))
-                    self._update(comicvine_data, target_dir = target_dir, args = args)
+                    self._update(comicvine_data, target_dir = target_dir, debug = debug, args = args)
                     score = self.compare(comicvine_data = comicvine_data, verbose = False, verify = verify)
                 else:
                     print("  score:{} too low to auto update {} -- skipping".format(score, self.file))
@@ -397,7 +397,7 @@ class comic():
             return self.data[name]
 
     def _generate_xml_data(self, verbose = False, debug = False):
-        xml_version = '1'
+        xml_version = '1.1'
         comicinfo = ET.Element('ComicInfo')
         for x in xml_map:
             array = False
@@ -411,7 +411,7 @@ class comic():
                 if (array): # or (type(self.data[data_field]) is list)):
                     if (len(self.data[data_field]) > 0):
                         element = ET.SubElement(comicinfo, x)
-                        element.text = '\n'.join(self.data[data_field])
+                        element.text = ','.join(self.data[data_field])
                         if (debug): print("xml write {}({})={}".format(x, data_field, ','.join(self.data[data_field])))
                 else:
                     element = ET.SubElement(comicinfo, x)
@@ -774,7 +774,7 @@ class comic():
         self.data = merge_data
 
         if (args.verbose): print("  adding ComicInfo.xml to file")
-        if (args.dryrun is False): self._add_xml(verbose = verbose, debug = False)
+        if (args.dryrun is False): self._add_xml(verbose = verbose, debug = debug)
 
         original_file = self.file
         new_comic = parser.make_name(self.data, parse_data['extension'], directors_cut = parse_data['directors_cut'])
