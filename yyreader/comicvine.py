@@ -256,6 +256,8 @@ def search(data, api_key, cache = {}, clear_cache = False, headless = False, ver
     if ('publisher' in data and data['publisher'] != '' and data['publisher'] is not None):
         test_publisher = data['publisher']
 
+    #print("comicvine.search: data=")
+    #dump(data)
     result = search_volumes(test_volume, api_key, date=data['date'] if 'date' in data else None, start_year=data['start_year'], year = data['year'], issue = data['issue'], publisher = test_publisher, cache = cache, clear_cache = clear_cache, headless = headless, verbose = verbose, debug = debug, slow = slow)
     volume_id = result['id']
     #if (debug): print("comicvine data:", result)
@@ -406,7 +408,6 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
 
             if (date is not None and date != ''):
                 search_date = datetime.fromisoformat(date)
-                #print(f"  looking for an issue #{issue} released on {search_date.date()}")
                 if (verbose): print("  looking for issues #{} released on {}".format(issue, date))
             elif (year is not None and re.search(r'^\d\d\d\d$', year)):
                 search_date = datetime.fromisoformat(year + '-01-01')

@@ -60,16 +60,23 @@ class ExtensionMismatchException(Exception):
     pass
 
 class comic():
-    data = {}
-    data_dir = None
-    file = None
-    temp_dir = None
-    _page_count = None
-    files = []
+    #data = {}
+    #data_dir = None
+    #file = None
+    #temp_dir = None
+    #_page_count = None
+    #files = []
 
     def __init__(self, file, cache = {}, verbose = False, debug = False):
+        self.data = {}
+        self.data_dir = None
+        self.temp_dir = None
+        self._page_count = None
+        self.files = []
+
         if (re.search('^/', file) is None):
             file = os.getcwd() + '/' + file
+
         self.file = file
 
         self.data['day'] = None
@@ -132,12 +139,12 @@ class comic():
 
         data = self.data
         parse_data = self.parse_data
+        if (parse_data is None or parse_data == {}):
+            raise Exception("No info parsed from filename")
+
         comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, headless = headless, debug = debug, verbose = verbose, slow = slow)
         if (comicvine_data is None):
             raise Exception("can't get comicvine data.")
-        parse_data = self.parse_data
-        if (parse_data is None or parse_data == {}):
-            raise Exception("No info parsed from filename")
 
         minimum_file_size = 1
         if ('minimum_file_size' in config['default']):
@@ -209,13 +216,13 @@ class comic():
         if (debug is False and args.debug is True):
             debug = args.debug
 
+        data = self.data
+        parse_data = self.parse_data
+
         if (comicvine_data is None):
             comicvine_data = comicvine.search(parse_data, config['comicvine']['api_key'], cache = self.cache, args = args, headless = headless)
             if (comicvine_data is None):
                 raise Exception("can't get comicvine data.")
-
-        data = self.data
-        parse_data = self.parse_data
 
         score = fuzz.ratio(data['series'].lower(),comicvine_data['series'].lower())
         if ("The " + data['series'] == comicvine_data['series'] or "An " + data['series'] == comicvine_data['series'] or "A " + data['series'] == comicvine_data['series']):
@@ -320,6 +327,11 @@ class comic():
         return self.data['date']
 
     def issue(self):
+        #print("SHIT data:")
+        #dump(self.data)
+        #print("SHIT parse_data:")
+        #dump(self.parse_data)
+
         return self.data['issue']
 
     def merge_data(self, comicvine_data):
@@ -669,6 +681,9 @@ class comic():
         if (self.parse_data is None or self.parse_data == {}):
             raise Exception("No info parsed from filename {}".format(self.file))
 
+        #print("FUCK comic._read_data")
+        #dump(self.parse_data)
+
         if (self.parse_data is not None):
             if ('day' in self.parse_data):
                 self.data['day'] = self.parse_data['day']
@@ -806,6 +821,9 @@ class comic():
             #    with open(config['default']['match_log_file'], 'a') as f:
             #        f.write(f"{self.file} => {match_log[comic]}\n")
             self.file = target_dir + '/' + new_comic
+
+    def url(self):
+        return self.data['url']
 
     def __del__(self):
         if (self.temp_dir is not None):
