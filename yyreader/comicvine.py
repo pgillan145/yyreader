@@ -440,6 +440,9 @@ def search_volumes(test_volume, api_key, start_year = None, year = None, date = 
                                 else:
                                     issue_date[r['id']] = str(cover_date.date())
 
+                            if (len(issue_date[r['id']])>0):
+                                issue_date[r['id']] = f"issue:#{issue} date:{issue_date[r['id']]}"
+
                             if (r['ratio'] >= 93):
                                 if (search_date == store_date or search_date == cover_date
                                     #( store_date is not '' and search_date == store_date + timedelta(months=1))
