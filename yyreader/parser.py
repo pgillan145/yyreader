@@ -10,80 +10,80 @@ import time
 
 formats = [
             # Fin Fang Four 001 [20081126].cbz
-            '^(?P<series>.+) (?P<issue>-\d+[^ ]*) \[(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)\]\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>-\d+[^ ]*) \[(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)\]\.(?P<extension>cb[rz])$',
             # 198900 Damage Control 001.cbr
-            '^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            r'^(?P<year>\d\d\d\d)00 (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # 199800 Fantastic Four 1:2.cbr
-            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>1:2)\.(?P<extension>cb[rz])$',
+            r'^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>1:2)\.(?P<extension>cb[rz])$',
             # 198912 Damage Control 001.cbr
-            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            r'^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # 20050518 Official Handbook of the Marvel Universe - Teams 2005 001.cbz
-            '^(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            r'^(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d) (?P<series>.+) (?P<issue>\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # 199707 Ghost Rider v2 -1.cbz
-            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>-\d+[^ ]*)\.(?P<extension>cb[rz])$',
+            r'^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+) (?P<issue>-\d+[^ ]*)\.(?P<extension>cb[rz])$',
             # Damage Control (1989) 001 (1989-12-01).cbr
-            '^(?P<series>.+) \((?P<volume>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) \((?P<volume>\d\d\d\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             # Damage Control (1989-2) 001 (1989-12-01).cbr
-            '^(?P<series>.+) \((?P<volume>\d\d\d\d-\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) \((?P<volume>\d\d\d\d-\d)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
             # Earth X (1999)/Earth X (1999) ½ (2000-01-01).cbz
-            '^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>[^ ]+) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>[^ ]+) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) \((?P<volume>\d\d\d\d[^\)]*)\) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Daredevil 359 (1996-12-01).cbz
-            '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)-(?P<month>\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+[^ ]*) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Hulk - Grand Design 001 - Monster (2022).cbr
-            '^(?P<series>.+) (?P<issue>\d\d\d) - .+ \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d\d\d) - .+ \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Mighty Avengers 004.INH (2014).cbr
-            '^(?P<series>.+) (?P<issue>\d+\.INH) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+\.INH) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Cataclysm Ultimate Comics 000.1 (2013).cbr
-            '^(?P<series>.+) (?P<issue>\d+\.1) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+\.1) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
             # Avengers Assemble 015AU.cbz
-            '^(?P<series>.+) (?P<issue>\d+AU)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+AU)\.(?P<extension>cb[rz])$',
             # Marvel Previews 008.cbz
-            '^(?P<series>.+) (?P<issue>\d+)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+)\.(?P<extension>cb[rz])$',
             # Iron Man 258.2.cbr
-            '^(?P<series>.+) (?P<issue>\d+\.\d)\.(?P<extension>cb[rz])$',
-            '^(?P<year>\d\d\d\d)00 (?P<series>.+)\.(?P<extension>cb[rz])$',
-            '^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
-            '^(?P<series>.+)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) (?P<issue>\d+\.\d)\.(?P<extension>cb[rz])$',
+            r'^(?P<year>\d\d\d\d)00 (?P<series>.+)\.(?P<extension>cb[rz])$',
+            r'^(?P<year>\d\d\d\d)(?P<month>\d\d) (?P<series>.+)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+) \((?P<year>\d\d\d\d)\)\.(?P<extension>cb[rz])$',
+            r'^(?P<series>.+)\.(?P<extension>cb[rz])$',
           ]
 
-date_formats = [ '\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
-                 '\(?(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)?',
-                 '(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
-                 '(?P<year>\d\d\d\d)(?P<month>\d\d)',
+date_formats = [ r'\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
+                 r'\(?(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)?',
+                 r'(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
+                 r'(?P<year>\d\d\d\d)(?P<month>\d\d)',
                ]
 
 description_formats = [
-                        '^<p><em>(?P<description>.+?)<\/em><\/p><p><em>(?P<description2>.+?)<\/em><\/p>.*$',
-                        '^<p><em>(?P<description>.+?)<\/em><\/p>.*$',
-                        '^<p><i>(?P<description>.+?)<\/i><\/p><p>(?P<description2>.+?)<\/p>.*$',
-                        '^<p><i>(?P<description>.+?)<\/i><\/p>.*$',
-                        '^<i>(?P<description>.+?)<\/i>.*$',
-                        '^<p>(?P<description>.+?)<\/p>.*$',
-                        '^<h3>(?P<description>.+?)<\/h3><p>(?P<description2>.+?)<\/p>.*$',
+                        r'^<p><em>(?P<description>.+?)<\/em><\/p><p><em>(?P<description2>.+?)<\/em><\/p>.*$',
+                        r'^<p><em>(?P<description>.+?)<\/em><\/p>.*$',
+                        r'^<p><i>(?P<description>.+?)<\/i><\/p><p>(?P<description2>.+?)<\/p>.*$',
+                        r'^<p><i>(?P<description>.+?)<\/i><\/p>.*$',
+                        r'^<i>(?P<description>.+?)<\/i>.*$',
+                        r'^<p>(?P<description>.+?)<\/p>.*$',
+                        r'^<h3>(?P<description>.+?)<\/h3><p>(?P<description2>.+?)<\/p>.*$',
                     ]
 
 description_subs = [
-                    { 'm':'<h2> ?(.+)<\/h2><br\/>', 's':r'\1' },
-                    { 'm':'<h2> ?(.+)<\/h2>', 's':r'\1' },
-                    { 'm':'<u><b>(.+)<\/b><\/u><br\/>', 's':r'\1' },
-                    { 'm':'<u><b>(.+)<\/b><\/u>', 's':r'\1' },
-                    { 'm':'<br\/>', 's':r', ' },
-                    { 'm':'<br \/>', 's':r', ' },
-                    { 'm':', $', 's':r'' },
+                    { 'm':r'<h2> ?(.+)<\/h2><br\/>', 's':r'\1' },
+                    { 'm':r'<h2> ?(.+)<\/h2>', 's':r'\1' },
+                    { 'm':r'<u><b>(.+)<\/b><\/u><br\/>', 's':r'\1' },
+                    { 'm':r'<u><b>(.+)<\/b><\/u>', 's':r'\1' },
+                    { 'm':r'<br\/>', 's':r', ' },
+                    { 'm':r'<br \/>', 's':r', ' },
+                    { 'm':r', $', 's':r'' },
                  ]
 
 
-series_formats = [ '^(?P<series>.+) \((?P<volume>.+)\)$',
-                   '^(?P<series>.+)$'
+series_formats = [ r'^(?P<series>.+) \((?P<volume>.+)\)$',
+                   r'^(?P<series>.+)$'
                  ]
 
-volume_formats = [ '^(?P<start_year>\d\d\d\d)$',
-                   '^(?P<start_year>\d\d\d\d)[v\-](?P<ver>\d+)$',
+volume_formats = [ r'^(?P<start_year>\d\d\d\d)$',
+                   r'^(?P<start_year>\d\d\d\d)[v\-](?P<ver>\d+)$',
                  ]
 
 credit_pages = [ 'Scanned By Gird.jpg',
@@ -101,62 +101,62 @@ credit_pages = [ 'Scanned By Gird.jpg',
                  'zzzGlorithSolo.jpg',
                ]
 
-cleanup_subs = [ { 'm':'\)\(', 's':') ('},
-                 { 'm':'([^ ])\(', 's':r'\1 (' },
-                 { 'm':'[\. ]+\.(cb[zr])$', 's':r'.\1' },
-                 { 'm':' \[[^]]*\]+', 's':''},
-                 { 'm':' \([^)]*[^)\d\-]+[^)]*\)', 's':'' },
-                 { 'm':' \d+ of \d+ covers', 's':'' },
-                 { 'm':' v\d+ (-?\d+)\.', 's':r' \1.' },
-                 { 'm':' vII ', 's':r' ' },
-                 { 'm':' #(\d+)', 's':r' \1' },
-                 { 'm':' (\d)\.', 's':r' 00\1.' },
-                 { 'm':' (\d\d)\.', 's':r' 0\1.' },
-                 { 'm':'^\d+ ?- ', 's':'' },
-                 { 'm':'__SLASH__', 's':'/' },
-                 { 'm':'^FCBD (\d\d\d\d) ', 's':r'Free Comic Book Day \1 ' },
-                 { 'm':'Marvel Universe - Avengers Earth\'s Mightiest Heroes', 's':'Avengers Earth\'s Mightiest Heroes' },
-                 { 'm':'Marvel Universe - Ultimate Spider-Man', 's':'Ultimate Spider-Man' },
-                 { 'm':' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', 's':r' - Marvel Legacy Primer Pages 001 (\1)' },
-                 { 'm':'^\d+ - House of M - ', 's':'' },
+cleanup_subs = [ { 'm':r'\)\(', 's':') ('},
+                 { 'm':r'([^ ])\(', 's':r'\1 (' },
+                 { 'm':r'[\. ]+\.(cb[zr])$', 's':r'.\1' },
+                 { 'm':r' \[[^]]*\]+', 's':''},
+                 { 'm':r' \([^)]*[^)\d\-]+[^)]*\)', 's':'' },
+                 { 'm':r' \d+ of \d+ covers', 's':'' },
+                 { 'm':r' v\d+ (-?\d+)\.', 's':r' \1.' },
+                 { 'm':r' vII ', 's':r' ' },
+                 { 'm':r' #(\d+)', 's':r' \1' },
+                 { 'm':r' (\d)\.', 's':r' 00\1.' },
+                 { 'm':r' (\d\d)\.', 's':r' 0\1.' },
+                 { 'm':r'^\d+ ?- ', 's':'' },
+                 { 'm':r'__SLASH__', 's':'/' },
+                 { 'm':r'^FCBD (\d\d\d\d) ', 's':r'Free Comic Book Day \1 ' },
+                 { 'm':r'Marvel Universe - Avengers Earth\'s Mightiest Heroes', 's':'Avengers Earth\'s Mightiest Heroes' },
+                 { 'm':r'Marvel Universe - Ultimate Spider-Man', 's':'Ultimate Spider-Man' },
+                 { 'm':r' - Marvel Legacy Primer Pages \((\d\d\d\d)\)', 's':r' - Marvel Legacy Primer Pages 001 (\1)' },
+                 { 'm':r'^\d+ - House of M - ', 's':'' },
                  { 'm':r'Marvel Graphic Novel No (\d+) - .*\.(cb[rz])', 's':r'Marvel Graphic Novel \1.\2' },
-                 { 'm':' - ', 's':': ', 'c':1 },
-                 { 'm':' Book 1 of \d+', 's':' 001' },
-                 { 'm':' Book 2 of \d+', 's':' 002' },
-                 { 'm':' Book One of [^ \.]+', 's':' 001' },
-                 { 'm':' Book Two of [^ \.]+', 's':' 002' },
-                 { 'm':' Book Three of [^ \.]+', 's':' 003' },
-                 { 'm':' Book Four of [^ \.]+', 's':' 004' },
-                 { 'm':' Book One', 's':' 001' },
-                 { 'm':' Book Two', 's':' 002' },
-                 { 'm':' Book Three', 's':' 003' },
-                 { 'm':' Book Four', 's':' 004' },
-                 { 'm':' Part One', 's':' 001' },
-                 { 'm':' Part Two', 's':' 002' },
-                 { 'm':' Part Three', 's':' 003' },
-                 { 'm':' Part Four', 's':' 004' },
-                 { 'm':' -001', 's':' -1' },
-                 { 'm':' \d\dpg digital scan by [^ \.]+', 's':'' },
-                 { 'm':' \d\dpg scanned by [^ \.]+', 's':'' },
-                 { 'm':' c2c scanned by [^ \.]+', 's':'' },
+                 { 'm':r' - ', 's':': ', 'c':1 },
+                 { 'm':r' Book 1 of \d+', 's':' 001' },
+                 { 'm':r' Book 2 of \d+', 's':' 002' },
+                 { 'm':r' Book One of [^ \.]+', 's':' 001' },
+                 { 'm':r' Book Two of [^ \.]+', 's':' 002' },
+                 { 'm':r' Book Three of [^ \.]+', 's':' 003' },
+                 { 'm':r' Book Four of [^ \.]+', 's':' 004' },
+                 { 'm':r' Book One', 's':' 001' },
+                 { 'm':r' Book Two', 's':' 002' },
+                 { 'm':r' Book Three', 's':' 003' },
+                 { 'm':r' Book Four', 's':' 004' },
+                 { 'm':r' Part One', 's':' 001' },
+                 { 'm':r' Part Two', 's':' 002' },
+                 { 'm':r' Part Three', 's':' 003' },
+                 { 'm':r' Part Four', 's':' 004' },
+                 { 'm':r' -001', 's':' -1' },
+                 { 'm':r' \d\dpg digital scan by [^ \.]+', 's':'' },
+                 { 'm':r' \d\dpg scanned by [^ \.]+', 's':'' },
+                 { 'm':r' c2c scanned by [^ \.]+', 's':'' },
                  #{ 'm':'001 1:2', 's':'1½' },
                  #{ 'm':'1:2', 's':'½' },
                ]
 
 series_subs = [
-                { 'm': '(.+) starring .*', 's': r'\1' },
-                { 'm': '(Marvel Action Hour) featuring (.*)', 's': r'\1 - \2' },
-                { 'm': '(.+) featuring .*', 's': r'\1' },
-                { 'm': 'Astonishing Tales and .*', 's': 'Astonishing Tales' },
-                { 'm': 'Marvel Premiere and .*', 's': 'Marvel Premiere' },
-                { 'm': 'Jungle Action & Black Panther', 's': 'Jungle Action' },
-                { 'm': 'Marvel Spotlight and .*', 's': 'Marvel Spotlight' },
-                { 'm': 'Marvel Team-Up: .*', 's': 'Marvel Team-Up' },
-                { 'm': 'Marvel Two In One: .*', 's': 'Marvel Two-in-One' },
-                { 'm': 'Marvel Two-in-One: .*', 's': 'Marvel Two-in-One' },
-                { 'm': 'Supernatural Thrillers and .*', 's': 'Supernatural Thrillers' },
-                { 'm': 'Peter Parker the Spectacular Spider-Man', 's':'The Spectacular Spider-Man' },
-                { 'm': 'US1', 's':'U.S. 1' },
+                { 'm': r'(.+) starring .*', 's': r'\1' },
+                { 'm': r'(Marvel Action Hour) featuring (.*)', 's': r'\1 - \2' },
+                { 'm': r'(.+) featuring .*', 's': r'\1' },
+                { 'm': r'Astonishing Tales and .*', 's': 'Astonishing Tales' },
+                { 'm': r'Marvel Premiere and .*', 's': 'Marvel Premiere' },
+                { 'm': r'Jungle Action & Black Panther', 's': 'Jungle Action' },
+                { 'm': r'Marvel Spotlight and .*', 's': 'Marvel Spotlight' },
+                { 'm': r'Marvel Team-Up: .*', 's': 'Marvel Team-Up' },
+                { 'm': r'Marvel Two In One: .*', 's': 'Marvel Two-in-One' },
+                { 'm': r'Marvel Two-in-One: .*', 's': 'Marvel Two-in-One' },
+                { 'm': r'Supernatural Thrillers and .*', 's': 'Supernatural Thrillers' },
+                { 'm': r'Peter Parker the Spectacular Spider-Man', 's':'The Spectacular Spider-Man' },
+                { 'm': r'US1', 's':'U.S. 1' },
              ]
 
 def FileNameException(Exception):
@@ -218,9 +218,9 @@ def massage_issue(issue, directors_cut = False):
     issue = re.sub('^0+','', issue)
 
     if (issue == '1:2'): issue = '½'
-    if (issue == '' or re.search('^\.', issue)): issue = f'0{issue}'
+    if (issue == '' or re.search(r'^\.', issue)): issue = f'0{issue}'
     issue = issue.upper()
-    m = re.search('^(\d+)\.(.+)$', issue)
+    m = re.search(r'^(\d+)\.(.+)$', issue)
     if (m is not None):
         i = m.group(1)
         extra_crap = m.group(2)
@@ -231,7 +231,7 @@ def massage_issue(issue, directors_cut = False):
         issue = i
         if (extra_crap not in ('NOW', 'INH')):
             issue = f'{issue}.{extra_crap}'
-    elif (re.search('^\d+$', issue)):
+    elif (re.search(r'^\d+$', issue)):
         if (int(issue) < 10):
             issue = f'00{issue}'
         elif (int(issue) < 100):
@@ -242,7 +242,7 @@ def massage_issue(issue, directors_cut = False):
     return issue
 
 def convert_name_to_date(comic):
-    m = re.search('([^/]+) \((\d\d\d\d)\) (\d+[^ ]+) \((\d\d\d\d)-(\d\d)-(\d\d)\)\.(cb[rz])$', comic)
+    m = re.search(r'([^/]+) \((\d\d\d\d)\) (\d+[^ ]+) \((\d\d\d\d)-(\d\d)-(\d\d)\)\.(cb[rz])$', comic)
     if (m is None):
         return None
     series = m.group(1)
@@ -270,7 +270,7 @@ def parse(comic_file, year = None, verbose = False, debug = False):
     if (os.path.exists(comic_file)):
         data['size'] = os.path.getsize(comic_file)
 
-    if (re.search('\.cb[rz]$', comic_file, re.I) is None):
+    if (re.search(r'\.cb[rz]$', comic_file, re.I) is None):
         raise Exception("invalid file type")
 
     #if (debug is True): print(comic_file)
@@ -365,7 +365,7 @@ def parse(comic_file, year = None, verbose = False, debug = False):
             data['date'] = f'{year}-{month}-01'
             data['day'] = '01'
             data['month'] = month
-        if (re.search('^\d+$', year) and issue is not None and re.search('^\d+$', issue) and month is not None and month != '00' and re.search('^\d+$', month)):
+        if (re.search(r'^\d+$', year) and issue is not None and re.search(r'^\d+$', issue) and month is not None and month != '00' and re.search(r'^\d+$', month)):
             months = int(issue) - 1
             if (re.search(' annual',series.lower())):
                 months = (int(issue) - 1) * 12
