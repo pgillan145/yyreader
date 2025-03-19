@@ -10,7 +10,7 @@ import pickle
 import re
 import sqlite3
 import urllib.parse
-from . import comic, yacreader
+from . import comic, backend
 
 app = Flask(__name__, template_folder='templates')
 app.config.from_mapping(
@@ -37,7 +37,7 @@ def main():
         if (config_debug is True):
             debug = True
 
-    yacreader.init_db()
+    backend.init_db()
 
     app.run(port = config['server']['port'], host = '0.0.0.0', debug = debug)
 
@@ -74,7 +74,7 @@ def get_filter(filter = None):
 
 def get_home_link(year = None, month = None):
     # I can't decide if going back to the latest beacon or going back to the last date viewed is a better definition of 'home'
-    beacons = yacreader.get_beacons()
+    beacons = backend.get_beacons()
     if (len(beacons) > 0):
         if ( year is not None and month is not None and beacons[0]['name'] == '{}/{}'.format(year, month)):
             return None
@@ -84,10 +84,10 @@ def get_home_link(year = None, month = None):
         traversal_date = request.cookies.get('date')
         return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
 
-    year = yacreader.get_years()[0]
-    month = yacreader.get_months(year)[0]
+    year = backend.get_years()[0]
+    month = backend.get_months(year)[0]
     home = '{}/{}'.format(year, month)
-    yacreader.add_beacon(home)
+    backend.add_beacon(home)
     return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
 
 @app.before_request
@@ -99,14 +99,14 @@ def before_request():
 
 @app.route('/arc/<arc>')
 def arc(arc = None):
-    db = yacreader.connect()
+    db = backend.connect()
     home = get_home_link()
     cursor = db.cursor()
     comics = []
-    #TODO: yacreader.get_comics_by_arc()
+    #TODO: backend.get_comics_by_arc()
     #TODO: Fix navigation.
     for row in cursor.execute('select id, storyArc, comicInfoId from comic_info_arc where storyArc=?', (arc,)).fetchall():
-        comics.append({ 'yacreader':yacreader.get_comic_by_id(row['comicInfoId'], db = db) })
+        comics.append({ 'yacreader':backend.get_comic_by_id(row['comicInfoId'], db = db) })
 
     db.close()
     nav = { 'home':home }
@@ -117,12 +117,12 @@ def arc(arc = None):
 @app.route('/arclink/<int:aft_id>/<int:fore_id>')
 def arclink(aft_id = None, fore_id = None):
     home = get_home_link()
-    db = yacreader.connect()
+    db = backend.connect()
     cursor = db.cursor()
 
     if (aft_id is not None):
         if (fore_id is not None):
-            yacreader.link(fore_id, aft_id, db = db)
+            backend.link(fore_id, aft_id, db = db)
         else:
             cursor.execute('insert into arclinkskip(comicInfoId) values (?)', (aft_id,))
             db.commit()
@@ -134,13 +134,13 @@ def arclink(aft_id = None, fore_id = None):
         if (arclinkskip is not None):
             continue
 
-        arc_issue = yacreader.get_comic_by_id(row['comicInfoId'], db=db)
+        arc_issue = backend.get_comic_by_id(row['comicInfoId'], db=db)
         if (arc_issue['fore_id'] is not None):
             continue
         previous_issue = None
 
         i = 0
-        comics = yacreader.get_comics_by_series(arc_issue['series'])
+        comics = backend.get_comics_by_series(arc_issue['series'])
         for i in range(0, len(comics)):
             if (arc_issue['id'] == comics[i]['id'] and i > 0):
                 row = cursor.execute('select id, storyArc, comicInfoId from comic_info_arc where comicInfoId=?', (comics[i-1]['id'],)).fetchone()
@@ -158,7 +158,7 @@ def arclink(aft_id = None, fore_id = None):
 
 @app.route('/arcs')
 def arcs():
-    db = yacreader.connect()
+    db = backend.connect()
     cursor = db.cursor()
     arcs = []
     #TODO: Add an index.
@@ -172,7 +172,7 @@ def arcs():
 
 @app.route('/beacons')
 def beacons():
-    beacons = yacreader.get_beacons()
+    beacons = backend.get_beacons()
     return render_template('beacons.html', beacons = beacons, nav = { 'home':True })
 
 @app.route('/dates')
@@ -186,13 +186,13 @@ def dates(year = None, month = None):
     home = get_home_link(year, month)
 
     if (year is None and month is None):
-        for year in yacreader.get_years():
+        for year in backend.get_years():
             items.append({ 'url':'/dates/{}'.format(year), 'text':'{}'.format(year) })
         nav = { 'back':back, 'up':up, 'forth':forth, 'home':home }
         return render_template('byyear.html', items = items, nav = nav)
 
     elif (year is not None and month is None):
-        years = yacreader.get_years()
+        years = backend.get_years()
         i = 0
         while i < len(years):
             if (years[i] == year):
@@ -200,7 +200,7 @@ def dates(year = None, month = None):
                 if (i < len(years)-1): forth = { 'url': '/dates/{}'.format(years[i+1]), 'text':'{}'.format(years[i+1]) }
                 break
             i = i + 1
-        for month in yacreader.get_months(year):
+        for month in backend.get_months(year):
             items.append({ 'url':'/dates/{}/{}'.format(year, month), 'text':'{}/{}'.format(month, year) })
 
         up = { 'url':'/dates', 'text':'Years' }
@@ -208,28 +208,30 @@ def dates(year = None, month = None):
         return render_template('bymonth.html', items = items, nav = nav)
 
     elif (year is not None and month is not None):
-        yacreader.update_beacon('{}/{}'.format(year, month))
+        backend.update_beacon('{}/{}'.format(year, month))
 
         up = { 'url':'/dates/{}'.format(year), 'text':str(year) }
-        (prev_year, prev_month) = yacreader.get_previous_date(year, month)
+        (prev_year, prev_month) = backend.get_previous_date(year, month)
         if (prev_year is not None):
             back = { 'url':'/dates/{}/{}'.format(prev_year, prev_month), 'text':'{}/{}'.format(prev_month, prev_year) }
-            if (yacreader.get_beacon('{}/{}'.format(prev_year, prev_month)) is not None):
-                yacreader.delete_beacon('{}/{}'.format(prev_year, prev_month))
-                yacreader.add_beacon('{}/{}'.format(year, month))
+            if (backend.get_beacon('{}/{}'.format(prev_year, prev_month)) is not None):
+                backend.delete_beacon('{}/{}'.format(prev_year, prev_month))
+                backend.add_beacon('{}/{}'.format(year, month))
 
-        (next_year, next_month) = yacreader.get_next_date(year, month)
+        (next_year, next_month) = backend.get_next_date(year, month)
         if (next_year is not None):
             forth = { 'url':'/dates/{}/{}'.format(next_year, next_month), 'text':'{}/{}'.format(next_month, next_year) }
 
-        for y in yacreader.get_comics_by_date(year, month):
+        for y in backend.get_comics_by_date(year, month):
             short_series = '{} ({})'.format(y['series'][0:25], y['series'])
             items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'short_series':short_series, 'datelink':'/dates/{}'.format(y['date'].strftime('%Y/%m')) })
 
-        if (yacreader.get_beacon('{}/{}'.format(year, month)) is None):
-            beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
-        elif (len(yacreader.get_beacons()) > 1):
+        #if (backend.get_beacon('{}/{}'.format(year, month)) is None):
+        #    beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
+        if (len(backend.get_beacons()) > 1):
             beacon = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'}
+        else:
+            beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
         nav = {'back':back, 'forth':forth, 'up':up, 'beacon':beacon, 'home':home }
         response = make_response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
@@ -243,15 +245,15 @@ def cover(id):
     #if (id in comic_cache):
     #    cover_file = comic_cache[id]['cover']
     #else:
-    #    y = yacreader.get_comic_by_id(id)
+    #    y = backend.get_comic_by_id(id)
     #    comic_cache[id] = {}
     #    comic_cache[id]['yacreader'] = y
     #    comic_cache[id]['comic'] = comic.comic(comic_dir + '/' + y['path'])
-    #    cover_file = yacreader.get_cover_file(id, hash = y['hash'])
+    #    cover_file = backend.get_cover_file(id, hash = y['hash'])
     #    comic_cache[id]['cover'] = cover_file
     #    comic_cache[id]['date'] = datetime.now()
-    y = yacreader.get_comic_by_id(id)
-    cover_file = yacreader.get_cover_file(id, hash = y['hash'])
+    y = backend.get_comic_by_id(id)
+    cover_file = backend.get_cover_file(id, hash = y['hash'])
 
     cover_data = None
     with (open(cover_file, 'rb') as f):
@@ -263,7 +265,7 @@ def cover(id):
 @app.route('/drop/<int:year>/<int:month>')
 def drop(year, month):
     beacon = '{}/{}'.format(year, month)
-    yacreader.add_beacon(beacon)
+    backend.add_beacon(beacon)
     return redirect('/dates/' + beacon)
 
 @app.route('/filter')
@@ -298,11 +300,11 @@ def filter():
         return response
 
     publishers = []
-    for publisher in yacreader.get_publishers():
+    for publisher in backend.get_publishers():
         publishers.append(publisher)
 
     labels = []
-    for label in yacreader.get_labels():
+    for label in backend.get_labels():
         labels.append(label)
 
 
@@ -320,7 +322,7 @@ def history(page = 1):
     up = { 'url':'/', 'text':'Index' }
     forth = None
     items = []
-    history = yacreader.get_history()
+    history = backend.get_history()
     home = get_home_link()
 
     (page_count, spillover) = divmod(len(history), per_page)
@@ -356,7 +358,7 @@ def label(id):
                 label = m.group(1)
                 if (request.args.get(arg) == 'on' and label not in labels):
                     labels.append(label)
-    yacreader.set_labels(id, labels)
+    backend.set_labels(id, labels)
     return redirect('/read/{}'.format(id))
 
 @app.route('/login', methods = ['GET', 'POST'])
@@ -371,20 +373,20 @@ def login():
 
 @app.route('/update/<int:id>')
 def update(id):
-    y = yacreader.get_comic_by_id(id)
+    y = backend.get_comic_by_id(id)
     nav = { 'home':get_home_link() }
-    return render_template('update.html', yacreader = y, nav = nav, labels = yacreader.get_labels())
+    return render_template('update.html', yacreader = y, nav = nav, labels = backend.get_labels())
 
 @app.route('/link/<int:aft_id>')
 @app.route('/link/<int:aft_id>/<int:fore_id>')
 def link(aft_id, fore_id = None):
-    y = yacreader.get_comic_by_id(aft_id)
+    y = backend.get_comic_by_id(aft_id)
     if (y['fore_id'] is not None):
-        yacreader.unlink(aft_id)
+        backend.unlink(aft_id)
     else:
         if (fore_id is None):
             # Get the previous series
-            issues = yacreader.get_comics_by_series(y['series'])
+            issues = backend.get_comics_by_series(y['series'])
             i = 0
             while (i < len(issues)):
                 if (issues[i]['issue'] == y['issue'] and (i > 0)):
@@ -393,7 +395,7 @@ def link(aft_id, fore_id = None):
                 i = i + 1
 
         if (fore_id is not None):
-            yacreader.link(fore_id, aft_id)
+            backend.link(fore_id, aft_id)
 
     response = make_response(redirect('/read/{}'.format(aft_id)))
     return response
@@ -408,7 +410,7 @@ def read(id, page = None, half = None):
     #   largely unecessary (I only started caching the 'comic.py' object in the first place so the temp directory didn't get obliterated
     #   every time the object was destroyed, necessitating a lengthy decompression on every read.)
     # This isn't in the cache because subsequent views won't refect the currentPage values.
-    #y = yacreader.get_comic_by_id(id)
+    #y = backend.get_comic_by_id(id)
     #if (id in comic_cache):
     #    #yacreader = comic_cache[id]['yacreader']
     #    c = comic_cache[id]['comic']
@@ -416,11 +418,11 @@ def read(id, page = None, half = None):
     #    c = comic.comic(comic_dir + '/' + y['path'])
     #    comic_cache[id] = {}
     #    comic_cache[id]['yacreader'] = y
-    #    comic_cache[id]['cover'] = yacreader.get_cover_file(id, hash = y['hash'])
+    #    comic_cache[id]['cover'] = backend.get_cover_file(id, hash = y['hash'])
     #    comic_cache[id]['comic'] = c
     #    comic_cache[id]['date'] = datetime.now()
 
-    y = yacreader.get_comic_by_id(id)
+    y = backend.get_comic_by_id(id)
     c = comic.comic(comic_dir + '/' + y['path'])
 
     if (page is None):
@@ -462,7 +464,7 @@ def read(id, page = None, half = None):
 
     if (traversal == 'series'):
         # If the user was looking specifically at the issues in a particular series, then the page turns on the first and last pages will go the prev/next issues.
-        issues = yacreader.get_comics_by_series(y['series'])
+        issues = backend.get_comics_by_series(y['series'])
         i = 0
         while (i < len(issues)):
             if (issues[i]['issue'] == y['issue'] and (i > 0) and back is None):
@@ -485,11 +487,14 @@ def read(id, page = None, half = None):
     elif (traversal == 'date'):
         #back = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         #forth = back
-        p = yacreader.get_previous_comic(y['id'])
-        n = yacreader.get_next_comic(y['id'])
+        print("FOO")
+        p = backend.get_previous_comic(y['id'])
+        print("FOO2")
+        n = backend.get_next_comic(y['id'])
+        print("FOO3")
         #TODO: Figure out how to display long ass titles in what are supposed to be small buttons.  Just the first few
         #   characters?  Maybe tiny cover thumbnails?
-        if (p['aft_id'] == y['id']):
+        if (p and p['aft_id'] == y['id']):
             linked = True
         if (p):
             back = {'url': '/read/{}'.format(p['id']), 'text':'{} #{}'.format(p['series'], p['issue'])}
@@ -498,7 +503,7 @@ def read(id, page = None, half = None):
     else:
         print("unknown traversal:", traversal)
 
-    if (page == 1):
+    if (page == 1 and back):
         previous_page_url =  back['url']
     elif (page > 1):
         if (half == 2):
@@ -516,7 +521,7 @@ def read(id, page = None, half = None):
 
     if (parse_settings_cookie(request.cookies.get('settings'), 'logging') is True):
         # TODO: This doesn't get set until you go into settings and turn logging off and on again.
-        yacreader.update_read_log(id, page, page_count = c.page_count())
+        backend.update_read_log(id, page, page_count = c.page_count())
 
     nav = { 'back':back, 'up': up, 'forth':forth, 'home':home, 'unfixed':True }
     response = make_response(render_template('read.html', half = half, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal, linked = linked ))
@@ -531,16 +536,16 @@ def page(id, page):
     #    y = comic_cache[id]['yacreader']
     #    c = comic_cache[id]['comic']
     #else:
-    #    y = yacreader.get_comic_by_id(id)
+    #    y = backend.get_comic_by_id(id)
     #    c = comic.comic('/Volumes/Media/Comics/' + y['path'])
     #    comic_cache[id] = {}
     #    comic_cache[id]['yacreader'] = y
     #    comic_cache[id]['comic'] = c
-    #    comic_cache[id]['cover'] = yacreader.get_cover_file(id, hash = y['hash'])
+    #    comic_cache[id]['cover'] = backend.get_cover_file(id, hash = y['hash'])
     #    comic_cache[id]['date'] = datetime.now()
 
-    y = yacreader.get_comic_by_id(id)
-    c = comic.comic('/Volumes/Media/Comics/' + y['path'])
+    y = backend.get_comic_by_id(id)
+    c = comic.comic(f"{config['default']['comic_dir']}/{y['path']}")
 
     if (page < 0): page = 1
     if (page > c.page_count()): page = c.page_count()
@@ -600,7 +605,7 @@ def series(series = None):
     filter = get_filter()
 
     series = urllib.parse.unquote(series)
-    for y in yacreader.get_comics_by_series(series, filter = filter):
+    for y in backend.get_comics_by_series(series, filter = filter):
         items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'datelink':'/dates/{}#{}'.format(y['date'].strftime('%Y/%m'), y['id']) })
 
     traversal_method = request.cookies.get('traversal')
@@ -625,7 +630,7 @@ def seriess():
 
     last = None
     index = []
-    for series in yacreader.get_seriess(filter = filter):
+    for series in backend.get_seriess(filter = filter):
         if (series[0:1] != last):
             last = series[0:1]
             items.append({ 'name':last })
@@ -638,7 +643,7 @@ def seriess():
 @app.route('/take/<int:year>/<int:month>')
 def take(year, month):
     beacon = '{}/{}'.format(year, month)
-    yacreader.delete_beacon(beacon)
+    backend.delete_beacon(beacon)
     return redirect('/dates/' + beacon)
 
 @app.route('/traverse/<method>/<int:id>')

@@ -263,6 +263,7 @@ def is_credit_page(filename):
 def parse(comic_file, year = None, verbose = False, debug = False):
     """Analyze the file name and pull as much information about it as possible."""
     if (debug): print("parsing {}".format(comic_file))
+    print("parsing {}".format(comic_file))
 
     data = { 'directors_cut': False }
 

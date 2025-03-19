@@ -608,7 +608,7 @@ class comic():
             pass
         return img
 
-    def page(self, number, crop = True):
+    def page(self, number, crop = True, thumbnail = False):
         #test = img.crop((0, 0, 200, 200))
         #tmp = "/Users/pgillan/tmp/crop.jpg"
         #return test.tobytes()
@@ -617,15 +617,18 @@ class comic():
         #f.close()
         #return data
 
+        # Return raw file
+        #with (open(self.page_file(number), 'rb') as f):
+        #    data = f.read()
+        #return data
+
         img = self._page_img(number, crop = crop)
+        if (thumbnail is True):
+            img = img.reduce(3)
+
         out = BytesIO()
         img.save(out, format='JPEG')
         return out.getvalue()
-
-        # Return raw file
-        with (open(self.page_file(number), 'rb') as f):
-            data = f.read()
-        return data
 
     def page_color(self, page, crop = True):
         """Returns the hex code for the median color that appears along the outer edge of the page."""
@@ -760,6 +763,9 @@ class comic():
             self.data['date'] = '{}-{}-{}'.format(self.data['year'], self.data['month'], self.data['day'])
 
         #print(result)
+
+    def series(self):
+        return self.data['series']
 
     def _unpack(self):
         if (self.data_dir is not None and os.path.exists(self.data_dir) is True):
