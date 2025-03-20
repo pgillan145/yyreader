@@ -15,271 +15,6 @@ from . import comic, parser
 
 config = None
 
-'''
-def main():
-    argparser = argparse.ArgumentParser(description="Scan comic directory", formatter_class=argparse.RawTextHelpFormatter)
-    argparser.add_argument('action', help = \'\'\'Specify one of the following:
-  'scan'
-  'deleted'  look for files that have been deleted but are still in the database.
-  'filedate' find all files with mismatches database date entries.
-  'filetype' find all files with data that doesn't match their extension.
-  'xml'      files with invalid ComicInfo.xml files. (NOT IMPLEMENTED)
-  'dupes'    try to identify duplicated records. (NOT IMPLEMENTED)
-  'holes'    find series with missing issues. (NOT IMPLEMENTED)
-  'verify'   recheck database items against file and comicvine data. (NOT IMPLEMENTED) \'\'\')
-
-    argparser.add_argument('-v', '--verbose', action='store_true')
-    argparser.add_argument('-y', '--yes', action='store_true')
-    argparser.add_argument('-1', '--one', help = "Just process a single entry, for testing.  Also enables --verbose and --debug.", action='store_true')
-    argparser.add_argument('-u', '--update', action='store_true', help = "Update item metadata.")
-    #argparser.add_argument('--comicvine',  help = "Pull external comicvine data when running --update, otherwise just update with what can be parsed from the filename.", action='store_true')
-    argparser.add_argument('--series', metavar = 'VOL', help = "Only --update or --scan comics in VOL.")
-    argparser.add_argument('--debug', action='store_true')
-    argparser.add_argument('--dryrun', action='store_true')
-
-
-    args = argparser.parse_args()
-    config = minorimpact.config.getConfig(script_name = 'yyreader')
-
-    if (args.one is True):
-        args.verbose = True
-        args.debug = True
-
-    init_db()
-    db = connect()
-    cur = db.cursor()
-
-    if (args.action == 'deleted'):
-        cur.execute("SELECT id, series, number, volume from comic_info")
-        rows = cur.fetchall()
-        i = 1
-        for row in rows:
-            id = row[0]
-            series = row[1]
-            number = row[2]
-            volume = row[3]
-            print("scanning comic_info {} of {}".format(i, len(rows)), end='\r')
-            cur.execute("SELECT path, fileName from comic where comicInfoId=?", (id, ))
-            rows2 = cur.fetchall()
-            if (len(rows2) == 0):
-                print("\ndeleting", id, series, volume, number, "from comic_info")
-                #cur.execute('delete from comic_info where id = ?', (id, ))
-                #db.commit()
-            i = i + 1
-        sys.exit()
-
-        cur.execute("SELECT id, comicInfoId from read_log")
-        rows = cur.fetchall()
-        i = 1
-        for row in rows:
-            id = row[0]
-            comic_info_id = row[1]
-            print("scanning read_log {} of {}".format(i, len(rows)), end='\r')
-            cur.execute("SELECT id, series, number from comic_info where id=?", (comic_info_id, ))
-            rows2 = cur.fetchall()
-            if (len(rows2) == 0):
-                print("\ndeleting", id, "from read_log")
-                cur.execute('delete from comic_info where id = ?', (id, ))
-                db.commit()
-            i = i + 1
-        print('')
-
-        cur.execute("SELECT id, comicInfoId from comic_info_arc")
-        rows = cur.fetchall()
-        i = 1
-        for row in rows:
-            id = row[0]
-            comic_info_id = row[1]
-            print("scanning comic_info_arc {} of {}".format(i, len(rows)), end='\r')
-            cur.execute("SELECT id, series, number from comic_info where id=?", (comic_info_id, ))
-            rows2 = cur.fetchall()
-            if (len(rows2) == 0):
-                print("\ndeleting", id, "from comic_info_arc")
-                cur.execute('delete from comic_info_arc where id = ?', (id, ))
-                db.commit()
-            i = i + 1
-        print('')
-
-        cur.execute("SELECT id, foreComicId, aftComicId from link")
-        i = 1
-        rows = cur.fetchall()
-        for row in rows:
-            id = row[0]
-            fore_id = row[1]
-            aft_id = row[2]
-            print("scanning link {} of {}".format(i, len(rows)), end='\r')
-            cur.execute("SELECT id, series, number from comic_info where id=?", (fore_id, ))
-            rows2 = cur.fetchall()
-            if (len(rows2) == 0):
-                print("\ndeleting", id, "from link")
-                cur.execute('delete from link where id = ?', (id, ))
-                db.commit()
-            cur.execute("SELECT id, series, number from comic_info where id=?", (aft_id, ))
-            rows2 = cur.fetchall()
-            if (len(rows2) == 0):
-                print("\ndeleting", id, "from link")
-                cur.execute('delete from link where id = ?', (id, ))
-                db.commit()
-            i = i + 1
-        print('')
-
-    cur.execute('select comic.path, comic_info.series, comic_info.number, comic_info.date, comic.id, comic_info.id, comic_info.comicVineID, comic_info.title, comic_info.storyArc, comic_info.writer, comic_info.penciller, comic.fileName from comic, comic_info where comic.comicInfoId=comic_info.id')
-    rows = cur.fetchall()
-    i = 0
-    for row in rows:
-        path = row[0]
-        series = row[1]
-        issue = row[2]
-        date = row[3]
-        comic_info_id = row[5]
-        comicvine_id = row[6]
-        title = row[7]
-        writer = row[9]
-        penciller = row[10]
-        fileName = row[11]
-
-        if (args.series is not None):
-            if (re.search(args.series, series) is None or re.search(args.series, path) is None):
-                continue
-
-        if (args.action in ('filetype', 'filedate', 'xml', 'verify', 'dupes', 'holes')):
-            #c = comic.comic(config['default']['comic_dir'] + path, args = args)
-            if (args.action == 'filedate'):
-                file_name = config['default']['comic_dir'] + path
-                parse_data = parser.parse(file_name, args = args)
-                if ('date' in parse_data):
-                    file_date = parse_data['date']
-                    if (re.search(r'^0\/', date) is None):
-                        dbdate = convert_yacreader_date(date)
-                        if (file_date != dbdate.strftime('%Y-%m-%d')):
-                            print("{}: dbdate '{}' doesn't match file date '{}'".format(file_name, dbdate.strftime('%Y-%m-%d'), file_date))
-                            if (comicvine_id is not None):
-                                print("comicvine url: https://comicvine.gamespot.com/unknown/4000-{}".format(comicvine_id))
-            if (args.action == 'filetype'):
-                magic_str = magic.from_file(file_name)
-                for ext in comic.ext_map:
-                    if (re.search('\\.{}$'.format(ext), file_name) and re.search('^{}'.format(comic.ext_map[ext]), magic_str) is None):
-                        print("{}: extension '{}' doesn't match file type '{}'".format(file_name, ext, magic_str[:16]))
-                        new_ext = None
-                        for ext2 in comic.ext_map:
-                            if (re.search('^{}'.format(comic.ext_map[ext2]), magic_str)):
-                                new_ext = ext2
-                                break
-                        if (new_ext is None):
-                            print("'{}' is unknown".format(magic_str))
-                            break
-
-                        if (args.yes):
-                            c = 'y'
-                        else:
-                            c = minorimpact.getChar(default='y', end='\n', prompt="change file extension to {}? (Y/n) ".format(new_ext), echo=True).lower()
-                        if (c == 'q'):
-                            sys.exit()
-                        elif (c == 'y'):
-                                new_file_name = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), file_name)
-                                print("moving {} to {}".format(file_name, new_file_name))
-                                if (args.dryrun is False):
-                                    shutil.move(file_name, new_file_name)
-
-                                new_path = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), path)
-                                new_fileName = re.sub('\\.{}$'.format(ext), '.{}'.format(new_ext), fileName)
-                                print("update comic set path = {}, fileName = {} where comicInfoId = {}".format(new_path, new_fileName, comic_info_id))
-                                if (args.dryrun is False):
-                                    try:
-                                        cur.execute('update comic set path = ?, fileName = ? where comicInfoId = ?', (new_path, new_fileName, comic_info_id))
-                                        db.commit()
-                                    except Exception as e:
-                                        print(e)
-                        break
-            if (args.action ==  'xml'):
-                #TODO: scan files for valid, up-to-date ComicInfo.xml files.  The Notes field should contain "yyreader xml v1", at this point...
-                #TODO: Make the xml version a variable.
-                print("This isn't written yet, check back, like, later, and stuff.")
-                pass
-            if (args.action == 'holes'):
-                #TODO: Scan all the existing volumes for "holes" -- places where the numbers either don't start with 1, or skip some value.  (Check comicvine for "total
-                #   number of issues"?  I mean, that's a good idea, but for current titles the caching tends to make more difficult than it ought to be.)
-                print("This doesn't exist yet either.")
-                pass
-            if (args.action == 'verify'):
-                #TODO: Compare what's in the database to what's in the file and what's in comicvine, and then retrieve, rewrite and reupdate everything.
-                #TODO: Make an optional "subset" value (ie, a number of items or a percentage) that can be set, so that only a portion of the whole will be checked rather
-                #   than however many thousands of items exist?  Maybe add also add a "last_checked" field somewhere so we know not to check the same items more than
-                #   once every x days.
-                print("Nope.")
-                pass
-            if (args.action == 'dupes'):
-                #TODO: Identify duplicate issues.
-                print("Nein.")
-                pass
-
-        elif (args.update):
-            #TODO: Settle on what 'done' means when it comes to what data should be in the yacreader database.  Technically all we need is issue number, date and volume to
-            #   just read the books, but I also want arcs, publishers and some of the creatives in there for filtering and searching.
-            #if (comicvine_id is not None and date is not None and title is not None and writer is not None and penciller is not None):
-            #    continue
-            if (date is not None and issue is not None and series is not None and re.search(r'^0\/', date) is None):
-                if (args.debug): print("--SKIP--")
-                if (args.debug): print("path: " + path)
-                if (args.debug): print("issue: " + str(issue))
-                if (args.debug): print("date: " + str(date))
-                if (args.debug): print("comicInfoId: " + str(comic_info_id))
-                if (args.debug): print("comicVineID: " + str(comicvine_id))
-                continue
-
-            if (args.debug): print("--UPDATE--")
-            if (args.debug): print("path: " + path)
-            if (args.debug): print("date: " + str(date))
-            if (args.debug): print("comicInfoId: " + str(comic_info_id))
-            if (args.debug): print("comicVineID: " + str(comicvine_id))
-
-            c = comic.comic(config['default']['comic_dir'] + path, args = args)
-            if (c.get('date') is not None):
-                print("updating " + path)
-
-                arcs = c.get('story_arcs')
-                arc_name = arcs[0] if (len(arcs) > 0) else None
-                characters = '\n'.join(c.get('characters')) if (c.get('characters')) else None
-                colorist = '\n'.join(c.get('colorists')) if (c.get('colorists')) else None
-                description = c.get('description')
-                inker = '\n'.join(c.get('inkers')) if (c.get('inkers')) else None
-                issue = c.get('issue')
-                issue_id = c.get('issue_id')
-                issue_name = c.get('name')
-                letterer = '\n'.join(c.get('letterers')) if (c.get('letterers')) else None
-                date = c.get('date')
-                penciller = '\n'.join(c.get('pencillers')) if (c.get('pencillers')) else None
-                publisher = c.get('publisher')
-                series = c.get('series')
-                writer = '\n'.join(c.get('writers')) if (c.get('writers')) else None
-
-                i = i + 1
-                m = re.search('^(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)$', date)
-                dbdate = m.group('day') + '/' + m.group('month') + '/' + m.group('year')
-                if (args.debug): print("update comic_info set edited = TRUE, date = {}, series = {}, number = {}, title = {}, comicVineID = {}, storyArc = {}, publisher = {}, writer = {}, penciller = {}, synopsis = {}, letterer = {}, inker = {}, colorist = {}, characters = {} where id = {}".format(dbdate, series, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
-                try:
-                    if (args.dryrun is False):
-                        cur.execute('update comic_info set edited = TRUE, date = ?, series = ?, number = ?, title = ?, comicVineID = ?, storyArc = ?, publisher = ?, writer = ?, penciller = ?, synopsis = ?, letterer = ?, inker = ?, colorist = ?, characters = ? where id = ?', (dbdate, series, issue, issue_name, issue_id, arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters, comic_info_id))
-                except Exception as e:
-                    print(e)
-                    break
-
-                for arc in arcs:
-                    if (args.debug): print("insert into comic_info_arc (storyArc, comicInfoId) values ({}, {})".format(arc, comic_info_id))
-                    try:
-                        if (args.dryrun is False):
-                            cur.execute('insert into comic_info_arc (storyArc, comicInfoId) values (?, ?)', (arc, comic_info_id))
-                    except Exception as e:
-                        if (str(e) != 'UNIQUE constraint failed: comic_info_arc.storyArc, comic_info_arc.comicInfoId'):
-                            print(e)
-                            pass
-                db.commit()
-
-        #if (i > 10): break
-        if (args.one is True): break
-    db.close()
-'''
-
 config = None
 
 def connect():
@@ -371,9 +106,11 @@ def add_beacon(name):
     db.close()
 
 def add_comic(comic, db = None):
-    local_db = db
+    # TODO: Make an 'update_comic' function that will update the database with changes.
     if (db is None):
         local_db = connect()
+    else:
+        local_db = db
 
     cursor = local_db.cursor()
 
@@ -382,12 +119,59 @@ def add_comic(comic, db = None):
 
     folder_id = get_folder_id(comic)
 
-    print(f"{comic.series()}, {comic.get('issue_name')}, {comic.issue()}, {convert_date_to_yacreader(comic.date())}")
-    cursor.execute('insert into comic_info (series, title, number,date, hash, volume) VALUES (?,?,?,?,?,?)', (comic.series(), comic.get('issue_name'), comic.issue(), convert_date_to_yacreader(comic.date()), comic.md5(), comic.get('volume')))
+
+    #TODO: Settle on what 'done' means when it comes to what data should be in the yacreader database.  Technically all we need is issue number, date and volume to
+    #   just read the books, but I also want arcs, publishers and some of the creatives in there for filtering and searching.   
+    #if (comicvine_id is not None and date is not None and title is not None and writer is not None and penciller is not None):
+    #    continue
+
+    arcs = comic.get('story_arcs')
+    arc_name = arcs[0] if (len(arcs) > 0) else None
+    print(f"arc_name:{arc_name}")
+    characters = ','.join(comic.get('characters')) if (comic.get('characters')) else None
+    colorist = ','.join(comic.get('colorists')) if (comic.get('colorists')) else None
+    description = comic.get('description')
+    inker = ','.join(comic.get('inkers')) if (comic.get('inkers')) else None
+    issue = comic.get('issue')
+    issue_id = comic.get('issue_id')
+    issue_name = comic.get('name')
+    letterer = ','.join(comic.get('letterers')) if (comic.get('letterers')) else None
+    date = comic.get('date')
+    penciller = ','.join(comic.get('pencillers')) if (comic.get('pencillers')) else None
+    publisher = comic.get('publisher')
+    series = comic.get('series')
+    writer = ','.join(comic.get('writers')) if (comic.get('writers')) else None
+
+    sql = { 'insert': 'comic_info',
+            'fields': ['series', 'title', 'number', 'date', 'hash', 'volume', 'numPages', 'storyArc', 'publisher', 'writer', 'penciller', 'synopsis', 'letterer', 'inker', 'colorist', 'characters' ],
+            'params': [ comic.series(), comic.get('issue_name'), comic.issue(), convert_date_to_yacreader(comic.date()), comic.md5(), comic.get('volume'), comic.page_count(), arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters ],
+          }
+    sql_string = build_sql(sql)
+    print (sql_string)
+    cursor.execute(sql_string, sql['params'])
     comic_id = cursor.lastrowid
 
-    print(folder_id)
-    cursor.execute('insert into comic (parentId, comicInfoId, fileName, path) VALUES (?,?,?,?)', (folder_id, comic_id, os.path.split(comic.file)[1], re.sub( config['default']['comic_dir'], '', comic.file)))
+    sql = { 'insert': 'comic',
+            'fields': ['parentId', 'comicInfoId', 'fileName', 'path'],
+            'params': [ folder_id, comic_id, os.path.split(comic.file)[1], re.sub( config['default']['comic_dir'], '', comic.file) ],
+          }
+    sql_string = build_sql(sql)
+    print (sql_string)
+    cursor.execute(sql_string, sql['params'])
+
+    for arc in arcs:
+        sql = { 'insert': 'comic_info_arc',
+                'fields': ['storyArc', 'comicInfoId'],
+                'params': [arc, comic_id],
+              }
+        sql_string = build_sql(sql)
+        print (sql_string)
+        try:
+            cursor.execute(sql_string, sql['params'])
+        except Exception as e:
+            if (str(e) != 'UNIQUE constraint failed: comic_info_arc.storyArc, comic_info_arc.comicInfoId'):
+                print(e)
+                pass
 
     local_db.commit()
 
@@ -440,15 +224,37 @@ def add_filter(sql, filter):
 
 def build_sql(sql):
     sql_string = ''
-    sql_string = 'select ' + sql['select']
-    sql_string = sql_string +  ' from '
-    sql_string = sql_string + sql['from']
-    if ('where' in sql and sql['where'] != ''):
-        sql_string = sql_string + ' where '
-        sql_string = sql_string + sql['where']
-    if ('order' in sql and sql['order'] != ''):
-        sql_string = sql_string + ' order by '
-        sql_string = sql_string + sql['order']
+    if ('select' in sql):
+        sql_string = 'select ' + sql['select']
+        sql_string = sql_string + ' from '
+        sql_string = sql_string + sql['from']
+        if ('where' in sql and sql['where'] != ''):
+            sql_string = sql_string + ' where '
+            sql_string = sql_string + sql['where']
+
+        if ('order' in sql and sql['order'] != ''):
+            sql_string = sql_string + ' order by '
+            sql_string = sql_string + sql['order']
+    elif ('insert' in sql):
+        sql_string = 'insert into ' + sql['insert']
+        fields = []
+        values = []
+        if (len(sql['fields']) != len(sql['params'])):
+            raise Eception("invalid number of fields or parameters")
+
+        for field in sql['fields']:
+            fields.append(field)
+            values.append('?')
+        sql_string = sql_string + '(' + ','.join(fields) + ') values (' + ','.join(values) + ')'
+    elif ('update' in sql):
+        sql_string = 'update ' + sql['update']
+        fields = []
+        values = []
+        sql_string = sql_string + 'set '
+        for field in sql['fields']:
+            sql_string = sql_string + f'{field} = ?, '
+        sql_string = re.sub(r', $', '', sql_string)
+
     return sql_string
 
 def convert_date_to_yacreader(date):
@@ -654,8 +460,11 @@ def get_cover_file(id, hash = None):
 
     return cover_file
 
-def get_folder_id(comic):
-    local_db = connect()
+def get_folder_id(comic, db = None):
+    local_db = db
+    if (db is None):
+        local_db = connect()
+
     cursor = local_db.cursor()
 
     comic_dir = config['default']['comic_dir']
@@ -675,10 +484,15 @@ def get_folder_id(comic):
             cursor.execute('insert into folder (parentId, name, path) VALUES (?,?,?)', (parent_id,i,current_path))
             folder_id = cursor.lastrowid
             parent_id = folder_id
+            local_db.commit()
 
+
+    if (db is None):
+        local_db.close()
 
     if (folder_id is None):
         raise Exception(f"Can't get folder id for {comic.file}")
+
     return folder_id
 
 def get_history():
@@ -729,15 +543,23 @@ def get_months(year, db = None):
     months = []
     cursor.execute('select distinct(date) from comic_info')
     rows = cursor.fetchall()
+    print(f"rows:{len(rows)}")
+
+    dump(rows)
     for row in rows:
+        print("FUCK")
+        print(row[0])
         if (row[0] is None):
             continue
         date = convert_yacreader_date(row[0])
+        print(date.year)
         if (date.year != year):
             continue
         month = int(date.strftime('%m'))
         if (month not in months):
             months.append(month)
+
+    dump(months)
     if (db is None):
         local_db.close()
 
@@ -833,7 +655,7 @@ def get_next_date(year, month, db = None):
     next_year = None
     next_month = None
     months = get_months(year, db = local_db)
-    if (month == months[len(months)-1]):
+    if (len(months) == 0 or month == months[len(months)-1]):
         years = get_years(db = local_db)
         for i in range(0, len(years)):
             if (years[i] == year and i < (len(years) - 1)):
@@ -841,7 +663,7 @@ def get_next_date(year, month, db = None):
                 break
         if (next_year is not None):
             months = get_months(next_year, db = local_db)
-            next_month = months[0]
+            if (len(months) > 0): next_month = months[0]
     else:
         next_year = year
         next_month = month + 1
@@ -917,7 +739,7 @@ def get_previous_date(year, month, db = None):
     prev_year = None
     prev_month = None
     months = get_months(year, db = local_db)
-    if (month == months[0]):
+    if (len(months) == 0 or month == months[0]):
         years = get_years()
         for i in range(0, len(years)):
             if (years[i] == year and i > 0):
@@ -926,13 +748,14 @@ def get_previous_date(year, month, db = None):
 
         if (prev_year is not None):
             months = get_months(prev_year, db = local_db)
-            prev_month = months[len(months)-1]
+            if (len(months) > 0): prev_month = months[len(months)-1]
     else:
         prev_year = year
         prev_month = month - 1
 
     if (db is None):
         local_db.close()
+
     return (prev_year, prev_month)
 
 def get_publishers():
@@ -1058,16 +881,16 @@ def link(foreid, aftid, db = None):
         local_db.close()
 
 def scan(comic):
-    local_db = connect()
-    cursor = local_db.cursor()
+    db = connect()
+    cursor = db.cursor()
 
-    folder_id = get_folder_id(comic)
+    folder_id = get_folder_id(comic, db = db)
 
     print(f"folder_id:{folder_id}")
 
     comic_data = get_comic_by_series(comic.series(), comic.issue(), comic.date()) 
     if (comic_data is None):
-        comic_data = add_comic(comic)
+        comic_data = add_comic(comic, db = db)
 
     if (comic_data is None):
         raise Exception("couldn't add comic to database")
@@ -1081,8 +904,7 @@ def scan(comic):
     #    count = cursor.execute('select count(*) from label, comic_label where label.id=comic_label.label_id and label.name = ?', (label,)).fetchone()[0]
     #    cursor.execute('insert into comic_label (label_id,comic_id, ordering) select label.id, ?, ? from label where label.name = ?', (comic_id, count+1, label))
     
-    local_db.commit()
-    local_db.close()
+    db.close()
     
 def set_labels(id, labels):
     local_db = connect()

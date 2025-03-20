@@ -55,8 +55,16 @@ def main():
         c = comic.comic(comic_file)
         try:
             yyreader.backend.scan(c)
+        except sqlite3.IntegrityError as e:
+            print(e)
+            if (str(e) == 'UNIQUE constraint failed: comic_info.hash'):
+                continue
+            else:
+                break
         except Exception as e:
-            continue
+            print(type(e).__name__)
+            print(e)
+            break
         if (args.one is True): break
 
     db.close()

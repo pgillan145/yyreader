@@ -76,12 +76,15 @@ def get_home_link(year = None, month = None):
     # I can't decide if going back to the latest beacon or going back to the last date viewed is a better definition of 'home'
     beacons = backend.get_beacons()
     if (len(beacons) > 0):
-        if ( year is not None and month is not None and beacons[0]['name'] == '{}/{}'.format(year, month)):
+        if ( year is not None and month is not None and beacons[0]['name'] == f'{year}/{month}'):
+            # TODO: Figure out why this is here and why it returns 'None' rather than a link to this
+            #   year and month.
             return None
         # TODO: Just change everything on the frontend over to 'year/month' so I can stop all these stupid translations.
         return { 'url':'/dates/' + beacons[0]['name'], 'text': "{}/{}".format(beacons[0]['name'].split('/')[1], beacons[0]['name'].split('/')[0]) }
     elif (request.cookies.get('date')):
         traversal_date = request.cookies.get('date')
+        print(f"traversal_date:{traversal_date}")
         return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
 
     year = backend.get_years()[0]
