@@ -433,13 +433,14 @@ def read(id, page = None, half = None):
         if ('current_page' in y and y['current_page'] is not None and y['current_page'] < c.page_count()):
             page = int(y['current_page'])
 
-    if (page < 1): page = 1
     if (page > c.page_count()): page = c.page_count()
+    if (page < 1): page = 1
 
     crop = parse_settings_cookie(request.cookies.get('settings'), 'crop') if request.cookies.get('settings') else True
     if (request.args.get('crop','')):
         crop = False if (request.args.get('crop','') == 'False') else True
 
+    #print(f"page:{page}")
     (w, h) = c.page_size(page, crop = crop)
     image_height = h
     image_width = w

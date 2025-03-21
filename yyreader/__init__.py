@@ -164,6 +164,8 @@ def box(comic_file, target, args = minorimpact.default_arg_flags, large = False,
     try:
         c = comic.comic(comic_file, cache = cache, verbose = args.verbose, debug = args.debug)
         c.box(args = args, target_dir = args.target, headless = args.yes, large = large, small = small)
+    except comic.PageCountZeroException as e:
+        print(e)
     except comic.ExtensionMismatchException as e:
         print(e)
         magic_str = magic.from_file(comic_file)

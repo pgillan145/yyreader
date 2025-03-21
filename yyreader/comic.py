@@ -59,6 +59,9 @@ class FileSizeException(Exception):
 class ExtensionMismatchException(Exception):
     pass
 
+class PageCountZeroException(Exception):
+    pass
+
 class comic():
     #data = {}
     #data_dir = None
@@ -122,15 +125,37 @@ class comic():
         with (open(xml_file, 'w') as x):
             x.write(xml_data)
 
+        tmp_file_name = os.path.splitext(self.file)[0] + "-tmp" + os.path.splitext(self.file)[1]
+        shutil.copy(self.file, tmp_file_name)
+
+        if (debug): print(f"writing ComicInfo.xml to {tmp_file_name}")
         command = None
         if (self.is_cbr()):
-            command = [config['default']['rar'], 'a', '-inul', self.file, xml_file]
+            command = [config['default']['rar'], 'a', '-inul', tmp_file_name, xml_file]
         elif (self.is_cbz()):
-            command = [config['default']['zip'], '-q', self.file, xml_file]
+            command = [config['default']['zip'], '-q', tmp_file_name, xml_file]
+
 
         if (command is None): raise Exception("can't add xml files, unknown file type")
-        result = subprocess.run(command)
+        if (debug): print(f"{command}")
+        try:
+            result = subprocess.run(command)
+        except Exception as e:
+            os.chdir(cwd)
+            raise e
+
         os.chdir(cwd)
+
+        tmp_comic = comic(tmp_file_name, verbose = verbose, debug = debug)
+        page_count = tmp_comic.page_count()
+        if (debug): print(f"page count of {tmp_file_name} is {page_count}")
+        if (tmp_comic.page_count() == 0):
+            if (debug): print(f"removing {tmp_file_name}")
+            os.remove(tmp_file_name)
+            raise PageCountZeroException("page count of file after ComicInfo.xml is zero")
+        else:
+            if (debug): print(f"moving {tmp_file_name} to {self.file}")
+            shutil.move(tmp_file_name, self.file)
 
     def box(self, target_dir = None, headless = True, args = minorimpact.default_arg_flags, debug = False, verbose = False, verify = False, large = False, small = False, slow = False):
         if (args.debug is True): debug = True
@@ -392,11 +417,16 @@ class comic():
             for f in result.stdout.split('\n'):
                 m = re.search(r'^ *\d+ +[\d-]+ [\d:]+ +(.+)$', f)
                 if (m is not None):
-                    files.append(m.group(1))
+                    f = m.group(1)
+                    files.append(f)
         else:
             self._unpack()
             for f in os.listdir(self.data_dir):
                 files.append(f)
+
+        if (len(files) == 0):
+            raise PageCountZeroException("file count is zero")
+
         self.files = files
         return self.files
 
@@ -592,6 +622,7 @@ class comic():
             tmp.write(result.stdout)
             img = Image.open(tmp, formats=['JPEG'])
         elif (self.is_cbz()):
+            print(f"number:{number}")
             page_file = self.page_file(number)
             page_file = re.sub('\[', '\\\[', page_file)
             page_file = re.sub('\]', '\\\]', page_file)
@@ -642,11 +673,16 @@ class comic():
         stat = ImageStat.Stat(img, mask)
         #print("extrema:", stat.extrema)
         #print("count:", stat.count)
-        #print("median:", stat.median)
+        print("median:", stat.median)
         #print("mean:", stat.mean)
         #print("rms:", stat.rms)
         colors = stat.median
-        return to_hex(colors[0], colors[1], colors[2])
+        try:
+            return to_hex(colors[0], colors[1], colors[2])
+        except Exception as e:
+            print(e)
+            return to_hex(0, 0, 0)
+            
 
     def page_count(self):
         if (self._page_count is None):
@@ -654,13 +690,14 @@ class comic():
         return self._page_count
 
     def page_file(self, page):
-        if (page < 1): page = 1
         if (page > self.page_count()): page = self.page_count()
+        if (page < 1): page = 1
 
         files = self._page_files()
         page_file = files[page - 1]
+
+        #return self.data_dir + '/' + page_file
         return page_file
-        return self.data_dir + '/' + page_file
 
     def _page_files(self):
         page_files = []
