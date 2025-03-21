@@ -547,7 +547,12 @@ class comic():
             width = 0
             last = None
             for b in test.getdata():
-                hex = to_hex(b[0], b[1], b[2])
+                try:
+                    hex = to_hex(b[0], b[1], b[2])
+                except Exception as e:
+                    print(e)
+                    hex = to_hex(0,0,0)
+
                 if (hex != last and last is not None):
                     width = width - 1
                     break
@@ -566,7 +571,11 @@ class comic():
             size = 0
             last = None
             for b in test.getdata():
-                hex = to_hex(b[0], b[1], b[2])
+                try:
+                    hex = to_hex(b[0], b[1], b[2])
+                except Exception as e:
+                    print(e)
+                    hex = to_hex(0,0,0)
                 #print(size, hex)
                 if (hex != last and last is not None):
                     size = size - 1
@@ -583,7 +592,11 @@ class comic():
             width = 0
             last = None
             for b in test.getdata():
-                hex = to_hex(b[0], b[1], b[2])
+                try:
+                    hex = to_hex(b[0], b[1], b[2])
+                except Exception as e:
+                    print(e)
+                    hex = to_hex(0,0,0)
                 if (hex != last and last is not None):
                     width = width - 1
                     break
@@ -601,7 +614,11 @@ class comic():
             size = 0
             last = None
             for b in test.getdata():
-                hex = to_hex(b[0], b[1], b[2])
+                try:
+                    hex = to_hex(b[0], b[1], b[2])
+                except Exception as e:
+                    print(e)
+                    hex = to_hex(0,0,0)
                 #print(size, hex)
                 if (hex != last and last is not None):
                     size = size - 1
