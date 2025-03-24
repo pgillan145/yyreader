@@ -1,5 +1,32 @@
 {% extends 'base.html' %}
 {% block content %}
+<script>
+            function checkKey(e) {
+                e = e || window.event;
+                switch(e.keyCode) {
+                    case 37: // left
+                        {% if previous_page_url is not none %}
+                            window.location.assign('{{previous_page_url}}');
+                        {% endif %}
+                        break;
+                    case 27: // esc
+                    case 36: //home
+                    case 38: //up
+                        {% if nav.home is defined %}
+                            window.location.assign('{{nav.home.url}}');
+                        {% endif %}
+                        break;
+                    case 39: //right
+                        {% if next_page_url is not none %}
+                            window.location.assign('{{next_page_url}}');
+                        {% endif %}
+                        break;
+                    default:
+                        //alert(e.keyCode);
+                }
+            }
+            document.onkeydown = checkKey;
+</script>
 <div class='w3-center'>
     <div onclick="readnav_open();" class='readnav'></div>
     <div class='page'>
@@ -11,9 +38,9 @@
         {% if previous_page_url is not none %}
             <a href='{{previous_page_url}}'><div class='page back'></div></a>
         {% endif %}
-    {% if next_page_url is not none %}
-        <a href='{{next_page_url}}'><div class='page next'></div></a>
-    {% endif %}
+        {% if next_page_url is not none %}
+            <a href='{{next_page_url}}'><div class='page next'></div></a>
+        {% endif %}
     </div>
     <div id='readnav' class='readnav' style='display:none' onclick="readnav_close();">
         <div>

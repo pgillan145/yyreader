@@ -27,6 +27,32 @@
             function readnav_close() {
                 document.getElementById('readnav').style.display='none'
             }
+/*
+            function checkKey(e) {
+                e = e || window.event;
+                switch(e.keyCode) {
+                    case 37: // left
+                        {% if previous_page_url is not none %}
+                            window.location.assign('{{previous_page_url}}');
+                        {% endif %}
+                        break;
+                    case 36: //home
+                    case 38: //up
+                        {% if nav.home is defined %}
+                            window.location.assign('{{nav.home.url}}');
+                        {% endif %}
+                        break;
+                    case 39: //right
+                        {% if next_page_url is not none %}
+                            window.location.assign('{{next_page_url}}');
+                        {% endif %}
+                        break;
+                    default:
+                        //alert(e.keyCode);
+                }
+            }
+            document.onkeydown = checkKey;
+*/
         </script>
         <style>
             body {
