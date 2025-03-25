@@ -654,6 +654,13 @@ class comic():
         if (img is not None and crop is True):
             img = img.crop(self.border(img))
             pass
+
+        #if md5(img.tobytes()).hexdigest() == '0e6eed12c279a1188930ace4dcd14457'
+        # then this is a "credit" page, but I don't know what to do with that information
+        # because we look at which pages are "valid" based on filename. We call a list of pages
+        # a lot, and I wouldn't want to have to fully extract, read and perform a hash against
+        # every page file that often; it would be slow as fuck.
+
         return img
 
     def page(self, number, crop = True, thumbnail = False):
