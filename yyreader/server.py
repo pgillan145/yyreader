@@ -520,7 +520,7 @@ def read(id, page = None, half = None):
             next_page_url = '/read/{}/{}/{}'.format(id, (page), 2)
         else:
             next_page_url = '/read/{}/{}'.format(id, (page+1))
-    elif (page == c.page_count()):
+    elif (page == c.page_count() and forth is not None):
         next_page_url =  forth['url']
 
     if (parse_settings_cookie(request.cookies.get('settings'), 'logging') is True):

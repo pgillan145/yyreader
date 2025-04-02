@@ -101,6 +101,9 @@ credit_pages = [ 'Scanned By Gird.jpg',
                  'zzzGlorithSolo.jpg',
                ]
 
+credit_page_md5s = [ '230c9448ebd7fdbf2d68ed438aa4765d',
+                   ]
+
 cleanup_subs = [ { 'm':r'\)\(', 's':') ('},
                  { 'm':r'([^ ])\(', 's':r'\1 (' },
                  { 'm':r'[\. ]+\.(cb[zr])$', 's':r'.\1' },
