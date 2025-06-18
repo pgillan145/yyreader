@@ -33,7 +33,7 @@
         {% if half == 2 %}
             <img class='page page2' src='/page/{{yacreader.id}}/{{page}}?crop={{crop}}'>
         {% else %}
-            <img class='page page1' src='/page/{{yacreader.id}}/{{page}}?crop={{crop}}'>
+            <img class='page page1' src='/page/{{yacreader.id}}/{{page}}/{{zoom}}/{{section}}?crop={{crop}}'>
         {% endif %}
         {% if previous_page_url is not none %}
             <a href='{{previous_page_url}}'><div class='page back'></div></a>

@@ -663,7 +663,7 @@ class comic():
 
         return img
 
-    def page(self, number, crop = True, thumbnail = False):
+    def page(self, number, crop = True, thumbnail = False, zoom = 1, section = 1):
         #test = img.crop((0, 0, 200, 200))
         #tmp = "/Users/pgillan/tmp/crop.jpg"
         #return test.tobytes()
@@ -679,7 +679,33 @@ class comic():
 
         img = self._page_img(number, crop = crop)
         if (thumbnail is True):
-            img = img.reduce(3)
+            img = img.reduce(4)
+        elif (zoom < 3):
+            img = img.reduce(2)
+
+        overlap = 25
+        w, h = img.size
+        if (zoom == 2):
+            if (section == 1):
+                img = img.crop((0, 0, (w/2) + overlap, h))
+            else:
+                img = img.crop(((w/2) - overlap, 0, w, h))
+        elif (zoom == 3):
+            if (section == 1):
+                img = img.crop((0,0,w,(h/3) + overlap))
+            elif (section == 2):
+                img = img.crop((0,(h/3) - overlap, w, (2*(h/3)) + overlap))
+            else:
+                img = img.crop((0,(2*(h/3)) - overlap, w, h))
+        elif (zoom == 4):
+            if (section == 1):
+                img = img.crop((0,0,w/2 + overlap, (h/2) + overlap))
+            elif (section == 2):
+                img = img.crop(((w/2) - overlap, 0, w, (h/2) + overlap))
+            elif (section == 3):
+                img = img.crop((0,(h/2) - overlap, (w/2) - overlap, h))
+            else:
+                img = img.crop(((w/2) - overlap,(h/2) - overlap,w,h))
 
         out = BytesIO()
         img.save(out, format='JPEG')

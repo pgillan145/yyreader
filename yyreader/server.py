@@ -405,8 +405,9 @@ def link(aft_id, fore_id = None):
 
 @app.route('/read/<int:id>')
 @app.route('/read/<int:id>/<int:page>')
-@app.route('/read/<int:id>/<int:page>/<int:half>')
-def read(id, page = None, half = None):
+@app.route('/read/<int:id>/<int:page>/<int:zoom>')
+@app.route('/read/<int:id>/<int:page>/<int:zoom>/<int:section>')
+def read(id, page = None, zoom = 1, section = 1):
     linked = False
     # TODO: Experiment with removing the cache.  Up to this point there's been very little need to optimize, and since I started
     #   reading the image data directly from the file without unpacking it first it could be argued that caching as whole is
@@ -441,11 +442,11 @@ def read(id, page = None, half = None):
         crop = False if (request.args.get('crop','') == 'False') else True
 
     #print(f"page:{page}")
-    (w, h) = c.page_size(page, crop = crop)
-    image_height = h
-    image_width = w
-    if (image_height < image_width and half is None):
-        half = 1
+    #(w, h) = c.page_size(page, crop = crop)
+    #image_height = h
+    #image_width = w
+    #if (image_height < image_width and half is None):
+    #    half = 1
 
     color = c.page_color(page, crop = crop)
     text_color = '#' + complementaryColor(color)
@@ -507,34 +508,37 @@ def read(id, page = None, half = None):
     else:
         print("unknown traversal:", traversal)
 
-    if (page == 1 and back):
+    if (page == 1 and section == 1 and back):
         previous_page_url =  back['url']
-    elif (page > 1):
-        if (half == 2):
-            previous_page_url = '/read/{}/{}/{}'.format(id, (page), 1)
-        else:
-            previous_page_url = '/read/{}/{}'.format(id, (page-1))
+    elif (section > 1):
+       previous_page_url = '/read/{}/{}/{}/{}'.format(id, (page), zoom, section-1)
+    else:
+        previous_page_url = '/read/{}/{}/{}'.format(id, (page-1), zoom)
+
 
     if (page < c.page_count()):
-        if (half == 1):
-            next_page_url = '/read/{}/{}/{}'.format(id, (page), 2)
+        if (zoom == section or zoom == 1):
+            next_page_url = '/read/{}/{}/{}'.format(id, (page+1), zoom)
         else:
-            next_page_url = '/read/{}/{}'.format(id, (page+1))
+            next_page_url = '/read/{}/{}/{}/{}'.format(id, (page), zoom, section + 1)
     elif (page == c.page_count() and forth is not None):
         next_page_url =  forth['url']
+
 
     if (parse_settings_cookie(request.cookies.get('settings'), 'logging') is True):
         # TODO: This doesn't get set until you go into settings and turn logging off and on again.
         backend.update_read_log(id, page, page_count = c.page_count())
 
     nav = { 'back':back, 'up': up, 'forth':forth, 'home':home, 'unfixed':True }
-    response = make_response(render_template('read.html', half = half, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal, linked = linked ))
+    response = make_response(render_template('read.html', zoom = zoom, section = section, page = page, yacreader = y, crop = crop, next_page_url = next_page_url, previous_page_url = previous_page_url, page_count = c.page_count(), nav = nav, data_dir = c.data_dir, background_color = color, text_color = text_color, traversal = traversal, linked = linked ))
     response.set_cookie('series', '/series/{}|{}'.format(urllib.parse.quote(f"{y['series']} ({y['volume']})"), y['series']), max_age=60*60*24*365)
     response.set_cookie('date', traversal_date, max_age=60*60*24*365)
     return response
 
 @app.route('/page/<int:id>/<int:page>')
-def page(id, page):
+@app.route('/page/<int:id>/<int:page>/<int:zoom>')
+@app.route('/page/<int:id>/<int:page>/<int:zoom>/<int:section>')
+def page(id, page, zoom = 1, section = 1):
     y = None
     #if (id in comic_cache):
     #    y = comic_cache[id]['yacreader']
@@ -555,7 +559,9 @@ def page(id, page):
     if (page > c.page_count()): page = c.page_count()
 
     crop = True if (request.args.get('crop','True') == 'True') else False
-    return Response(c.page(page, crop = crop), mimetype = 'image/jpeg')
+    #zoom = int(request.args.get('zoom', 1))
+    #section = int(request.args.get('section', 1))
+    return Response(c.page(page, crop = crop, zoom = zoom, section = section), mimetype = 'image/jpeg')
 
 @app.route('/settings')
 @app.route('/settings/<setting>/<value>')
