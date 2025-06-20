@@ -97,7 +97,7 @@ def get_home_link(year = None, month = None):
 def before_request():
     #request.cookies.get('filter')
     if ('allow_ip' in config['server'] and request.remote_addr != config['server']['allow_ip']):
-        return ("Permission denied", 400)
+        return ("Permission denied", 403)
     if (request.path != '/login' and 'password' in config['server'] and request.cookies.get('authorized') != 'True'):
         return redirect('/login')
     clean_cache()
