@@ -41,3 +41,7 @@ debug = False
 
 # Set this value to require password access
 #password = 
+
+# If this value is set, requests from any other ip will return a 400 error
+#allow_ip =
+
