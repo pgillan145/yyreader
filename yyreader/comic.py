@@ -50,6 +50,27 @@ def compare_lists(list1, list2, width = 22):
             ret = ret + "{:{width}s} {:{width}s} {:{width}s} {:{width}s}\n".format('', '', fw, rw, width = width)
     return ret
 
+def add_overlap_overlay(img, overlap, top = False, bottom = False, left = False, right = False):
+    w, h = img.size
+    if (overlap > h):
+        return img
+
+    osquare = Image.new("RGBA", img.size, (255,255,255,0))
+    draw = ImageDraw.Draw(osquare)
+    if (top):
+        draw.rectangle([0,0,w,overlap*2], fill=(64,64,64,75))
+    if (bottom):
+        draw.rectangle([0,h-overlap*2,w,h], fill=(64,64,64,75))
+    if (left):
+        draw.rectangle([0,0,overlap*2,h], fill=(64,64,64,75))
+    if (right):
+        draw.rectangle([w-overlap*2,0,w,h], fill=(64,64,64,75))
+
+    if (top or bottom):
+        img = Image.alpha_composite(img,osquare)
+
+    return img
+
 class FileExistsException(Exception):
     pass
 
@@ -678,35 +699,60 @@ class comic():
         #return data
 
         img = self._page_img(number, crop = crop)
+
+        overlap = 75
+        w, h = img.size
+        size = w*h
+
         if (thumbnail is True):
             img = img.reduce(4)
-        elif (zoom < 3):
+        elif (zoom < 3 and size > 2000000):
+            print("reducing", "w:", w, "h:", h, "size:", size)
             img = img.reduce(2)
+            w, h = img.size
+            size = w*h
 
-        overlap = 25
-        w, h = img.size
-        if (zoom == 2):
+        print("w:", w, "h:", h, "size:", size)
+
+        img = img.convert("RGBA")
+        if (zoom == 0):
             if (section == 1):
                 img = img.crop((0, 0, (w/2) + overlap, h))
             else:
                 img = img.crop(((w/2) - overlap, 0, w, h))
+        elif (zoom == 2):
+            if (section == 1):
+                img = img.crop((0, 0, w, (h/2) + overlap))
+                img = add_overlap_overlay(img, overlap, bottom = True)
+            else:
+                img = img.crop((0, (h/2)-overlap, w, h))
+                img = add_overlap_overlay(img, overlap, top = True)
+
         elif (zoom == 3):
             if (section == 1):
                 img = img.crop((0,0,w,(h/3) + overlap))
+                img = add_overlap_overlay(img, overlap, bottom = True)
             elif (section == 2):
                 img = img.crop((0,(h/3) - overlap, w, (2*(h/3)) + overlap))
+                img = add_overlap_overlay(img, overlap, top = True, bottom = True)
             else:
                 img = img.crop((0,(2*(h/3)) - overlap, w, h))
+                img = add_overlap_overlay(img, overlap, top = True)
         elif (zoom == 4):
             if (section == 1):
-                img = img.crop((0,0,w/2 + overlap, (h/2) + overlap))
+                img = img.crop((0,0,(w/2) + overlap, (h/2) + overlap))
+                img = add_overlap_overlay(img, overlap, bottom = True, right = True)
             elif (section == 2):
                 img = img.crop(((w/2) - overlap, 0, w, (h/2) + overlap))
+                img = add_overlap_overlay(img, overlap, bottom = True, left = True)
             elif (section == 3):
-                img = img.crop((0,(h/2) - overlap, (w/2) - overlap, h))
+                img = img.crop((0,(h/2) - overlap, (w/2) + overlap, h))
+                img = add_overlap_overlay(img, overlap, top = True, right = True)
             else:
-                img = img.crop(((w/2) - overlap,(h/2) - overlap,w,h))
+                img = img.crop(((w/2) - overlap,(h/2) - overlap, w, h))
+                img = add_overlap_overlay(img, overlap, top = True, left = True)
 
+        img = img.convert('RGB')
         out = BytesIO()
         img.save(out, format='JPEG')
         return out.getvalue()
@@ -732,7 +778,6 @@ class comic():
         except Exception as e:
             print(e)
             return to_hex(0, 0, 0)
-            
 
     def page_count(self):
         if (self._page_count is None):

@@ -127,7 +127,7 @@ def add_comic(comic, db = None):
 
     arcs = comic.get('story_arcs')
     arc_name = arcs[0] if (len(arcs) > 0) else None
-    print(f"arc_name:{arc_name}")
+    #print(f"arc_name:{arc_name}")
     characters = ','.join(comic.get('characters')) if (comic.get('characters')) else None
     colorist = ','.join(comic.get('colorists')) if (comic.get('colorists')) else None
     description = comic.get('description')
@@ -147,7 +147,7 @@ def add_comic(comic, db = None):
             'params': [ comic.series(), comic.get('issue_name'), comic.issue(), convert_date_to_yacreader(comic.date()), comic.md5(), comic.get('volume'), comic.page_count(), arc_name, publisher, writer, penciller, description, letterer, inker, colorist, characters ],
           }
     sql_string = build_sql(sql)
-    print (sql_string)
+    #print (sql_string)
     cursor.execute(sql_string, sql['params'])
     comic_id = cursor.lastrowid
 
@@ -156,7 +156,7 @@ def add_comic(comic, db = None):
             'params': [ folder_id, comic_id, os.path.split(comic.file)[1], re.sub( config['default']['comic_dir'], '', comic.file) ],
           }
     sql_string = build_sql(sql)
-    print (sql_string)
+    #print (sql_string)
     cursor.execute(sql_string, sql['params'])
 
     for arc in arcs:
@@ -165,7 +165,7 @@ def add_comic(comic, db = None):
                 'params': [arc, comic_id],
               }
         sql_string = build_sql(sql)
-        print (sql_string)
+        #print (sql_string)
         try:
             cursor.execute(sql_string, sql['params'])
         except Exception as e:
@@ -259,7 +259,7 @@ def build_sql(sql):
 
 def convert_date_to_yacreader(date):
     yacreader_date = datetime.fromisoformat(date).strftime('%-d/%-m/%Y')
-    print(f"yacreader_date:{yacreader_date}")
+    #print(f"yacreader_date:{yacreader_date}")
     return yacreader_date
 
 def convert_yacreader_date(yacreader_date):
@@ -276,7 +276,6 @@ def delete_beacon(name):
     except Exception as e:
         print(e)
     db.close()
-
 
 def get_beacon(name):
     beacon = None
@@ -317,7 +316,7 @@ def get_comic_by_id(id, db = None):
     comic_data = get_comic(sql, db = db)
     return comic_data
 
-def get_comic(sql, db = None):
+def get_comic(sql, db = None, read_previous = False):
     if (sql is None):
         raise Exception("SQL not defined")
 
@@ -327,16 +326,16 @@ def get_comic(sql, db = None):
         local_db = db
 
     cursor = local_db.cursor()
-    #sql = { 'select': 'comic_info.volume, comic_info.number as issue, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher, comic_info.series', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id and comic_info.id = ?', 'params':[id]}
 
     sql_text = f"{build_sql(sql), sql['params']}"
 
-    print(sql_text)
+    #print(sql_text)
     cursor.execute(build_sql(sql), sql['params'])
 
     rows = cursor.fetchall()
     comic_data = None
     for row in rows:
+        read_previous = False
         issue = row['issue']
         volume = row['volume']
         series = row['series']
@@ -373,7 +372,7 @@ def get_comic(sql, db = None):
 
         if (current_page is None or current_page == 0):
             current_page = 1
-        comic_data = { 'id':id, 'series':series, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'publisher':publisher, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels }
+        comic_data = { 'id':id, 'series':series, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'publisher':publisher, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels, 'read_previous': read_previous }
 
     if (db is None):
         local_db.close()
@@ -384,9 +383,9 @@ def get_comic(sql, db = None):
     return comic_data
 
 def get_comics_by_date(year, month, db = None):
-    print(month)
+    #print(month)
     zmonth = month
-    print(month)
+    #print(month)
     if (month < 10): zmonth = '0{}'.format(month)
     sql = { 'select': 'volume, number, date, id, read, currentPage, series', 'from':'comic_info', 'where':'date like "%/{}/{}" or date like "%/{}/{}"'.format(month, year, zmonth, year), 'params':[]}
 
@@ -495,6 +494,7 @@ def get_folder_id(comic, db = None):
 
     return folder_id
 
+#select ci.id from comic_info ci, read_log where ci.id=read_log.comicInfoID')
 def get_history():
     db = connect()
     cursor = db.cursor()
@@ -543,23 +543,22 @@ def get_months(year, db = None):
     months = []
     cursor.execute('select distinct(date) from comic_info')
     rows = cursor.fetchall()
-    print(f"rows:{len(rows)}")
+    #print(f"rows:{len(rows)}")
 
-    dump(rows)
+    #dump(rows)
     for row in rows:
-        print("FUCK")
-        print(row[0])
+        #print(row[0])
         if (row[0] is None):
             continue
         date = convert_yacreader_date(row[0])
-        print(date.year)
+        #print(date.year)
         if (date.year != year):
             continue
         month = int(date.strftime('%m'))
         if (month not in months):
             months.append(month)
 
-    dump(months)
+    #dump(months)
     if (db is None):
         local_db.close()
 
@@ -684,13 +683,12 @@ def get_previous_comic(id, db = None):
     if (y['fore_id'] is not None):
         comic_data = get_comic_by_id(y['fore_id'], db = local_db)
     else:
-        print(y['date'])
+        #print(y['date'])
         (year, month) = y['date'].strftime('%Y|%-m').split('|')
         year = int(year)
         month = int(month)
-        print(year, month)
+        #print(year, month)
         issues = get_comics_by_date(year, month, db = local_db)
-        print("FUCK")
 
         i = len(issues) - 1
         for issue in list(reversed(issues)):
@@ -699,8 +697,7 @@ def get_previous_comic(id, db = None):
                 break
             i = i - 1
 
-        print("FUCK2")
-        print(len(issues))
+        #print(len(issues))
         while (comic_data is None and year is not None and month is not None and len(issues) > 0):
             i = len(issues) - 1
             for issue in list(reversed(issues)):
@@ -716,15 +713,12 @@ def get_previous_comic(id, db = None):
             if (comic_data is None):
                 (year, month) = get_previous_date(year, month, db = local_db)
                 if (year is None or month is None):
-                    print("FUCK4")
                     break
                 issues = get_comics_by_date(year, month, db = local_db)
                 current = len(issues)
-        print("FUCK3")
 
     if (db is None):
         local_db.close()
-    print("SHIT")
     return comic_data
 
 def get_previous_date(year, month, db = None):
@@ -894,7 +888,7 @@ def scan(comic):
 
     if (comic_data is None):
         raise Exception("couldn't add comic to database")
-    print(comic_data['id'])
+    #print(comic_data['id'])
 
     #try:
         #comic_id = cursor.execute('select id from comic_info where series=?', (id, )).fetchone()[0]

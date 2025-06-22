@@ -494,11 +494,8 @@ def read(id, page = None, zoom = 1, section = 1):
     elif (traversal == 'date'):
         #back = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         #forth = back
-        print("FOO")
         p = backend.get_previous_comic(y['id'])
-        print("FOO2")
         n = backend.get_next_comic(y['id'])
-        print("FOO3")
         #TODO: Figure out how to display long ass titles in what are supposed to be small buttons.  Just the first few
         #   characters?  Maybe tiny cover thumbnails?
         if (p and p['aft_id'] == y['id']):
