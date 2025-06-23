@@ -394,7 +394,7 @@ def get_comics_by_date(year, month, db = None):
 def get_comics_by_series(series, db = None, filter = None):
     volume = ''
 
-    m = re.search('^(.+) \((\d\d\d\d)\)$', series)
+    m = re.search(r'^(.+) \((\d\d\d\d(-\d)?)\)$', series)
     if (m is not None):
         series = m[1]
         volume = m[2]

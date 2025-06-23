@@ -45,3 +45,5 @@ debug = False
 # If this value is set, requests from any other ip will return a 400 error
 #allow_ip =
 
+[reader]
+overlap_percent = 5

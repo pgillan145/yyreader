@@ -700,34 +700,17 @@ class comic():
 
         img = self._page_img(number, crop = crop)
 
-        overlap = 75
-        w, h = img.size
-        size = w*h
-
-        if (thumbnail is True):
-            img = img.reduce(4)
-        elif (zoom < 3 and size > 2000000):
-            print("reducing", "w:", w, "h:", h, "size:", size)
-            img = img.reduce(2)
-            w, h = img.size
-            size = w*h
-
-        print("w:", w, "h:", h, "size:", size)
 
         img = img.convert("RGBA")
-        if (zoom == 0):
-            if (section == 1):
-                img = img.crop((0, 0, (w/2) + overlap, h))
-            else:
-                img = img.crop(((w/2) - overlap, 0, w, h))
-        elif (zoom == 2):
+        w, h = img.size
+        overlap = int(h*(int(config['reader']['overlap_percent'])/100))
+        if (zoom == 2):
             if (section == 1):
                 img = img.crop((0, 0, w, (h/2) + overlap))
                 img = add_overlap_overlay(img, overlap, bottom = True)
             else:
                 img = img.crop((0, (h/2)-overlap, w, h))
                 img = add_overlap_overlay(img, overlap, top = True)
-
         elif (zoom == 3):
             if (section == 1):
                 img = img.crop((0,0,w,(h/3) + overlap))
@@ -751,6 +734,15 @@ class comic():
             else:
                 img = img.crop(((w/2) - overlap,(h/2) - overlap, w, h))
                 img = add_overlap_overlay(img, overlap, top = True, left = True)
+
+        w, h = img.size
+        target = 2000000
+        if (thumbnail is True):
+            target = 200000
+
+        while (w * h > target):
+            img = img.reduce(2)
+            w, h = img.size
 
         img = img.convert('RGB')
         out = BytesIO()
