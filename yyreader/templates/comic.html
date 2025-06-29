@@ -4,8 +4,9 @@
         <a href='/read/{{item.yacreader.id}}'><img class='w3-round w3-card' src='/cover/{{item.yacreader.id}}' height=200></a>
     </div>
     <div class='w3-cell m3'>
-        <a class='w3-margin' href='/series/{{item.yacreader.series}} ({{item.yacreader.volume}})'>{{item.yacreader.series}}</a><br /><a class='w3-margin' href='/read/{{item.yacreader.id}}'>#{{item.yacreader.issue}}</a><br />
+        <a class='w3-margin' href='/series/{{item.yacreader.series}} ({{item.yacreader.volume}})'>{{item.yacreader.series}} ({{item.yacreader.volume}})</a><br /><a class='w3-margin' href='/read/{{item.yacreader.id}}'>#{{item.yacreader.issue}}</a><br />
         <a class='w3-margin' href={{item.datelink}}>{{item.date}}</a><br />
         {% if item.yacreader.read == 0 and item.yacreader.current_page > 1 %}<a class='w3-margin' href='/markunread/{{item.yacreader.id}}'>Mark Unread</a><br />{% endif %}
+        <a class='w3-margin' href='/quit/{{item.yacreader.series}} ({{item.yacreader.volume}})'>Quit Series</a><br />
     </div>
 </div>

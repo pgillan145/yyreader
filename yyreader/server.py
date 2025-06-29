@@ -467,6 +467,13 @@ def markunread(id):
     response = make_response(redirect(home['url']))
     return response
 
+@app.route('/quit/<series>')
+def quit(series):
+    backend.quit_series(series)
+    home = get_home_link()
+    response = make_response(redirect(home['url']))
+    return response
+
 @app.route('/read/<int:id>')
 @app.route('/read/<int:id>/<int:page>')
 @app.route('/read/<int:id>/<int:page>/<int:zoom>')

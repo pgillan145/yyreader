@@ -57,6 +57,7 @@ def init_db():
     cursor.execute('CREATE TABLE IF NOT EXISTS comic_info_arc (id INTEGER PRIMARY KEY, storyArc TEXT NOT NULL, arcNumber INTEGER, arcCount INTEGER, comicVineID TEXT, comicInfoId INTEGER NOT NULL, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     cursor.execute('CREATE TABLE IF NOT EXISTS link (id INTEGER PRIMARY KEY, name TEXT, foreComicId INTEGER NOT NULL, aftComicId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(foreComicId) REFERENCES comic_info(id) ON DELETE CASCADE, FOREIGN KEY(aftComicId) REFERENCES comic_info(id) ON DELETE CASCADE)')
     cursor.execute('CREATE TABLE IF NOT EXISTS read_log (id INTEGER PRIMARY KEY, start_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, currentPage INTEGER default 1, end_date TIMESTAMP, comicInfoId INTEGER NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP, FOREIGN KEY(comicInfoId) REFERENCES comic_info(id) ON DELETE CASCADE)')
+    cursor.execute('CREATE TABLE IF NOT EXISTS quit_series (id INTEGER PRIMARY KEY, series TEXT NOT NULL, volume TEXT NOT NULL, mod_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP)')
     db.commit()
 
     # Add indexes
@@ -398,23 +399,25 @@ def get_comic(sql, db = None):
     return comic_data
 
 def get_comics_by_current(db = None):
-    #month = 1
-    #zmonth = '01'
-    #year = 1987
-    #sql = { 'select': 'volume, number, date, id, read, currentPage, series',
-    #        'from':'comic_info',
-    #        'where':'date like "%/{}/{}" or date like "%/{}/{}"'.format(month, year, zmonth, year),
-    #        'params':[]}
-    #return get_comics(sql, db = db)
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+
+    cursor = local_db.cursor()
 
     # THIS NEEDS TO GO THROUGHT EVERYTHING THAT'S BEEN READ, IDENTIFY THE SERIES, THEN COLLECT THE NEXT
     # ISSUE THAT COMES AFTER THE LATEST READ ISSUE.
     max_read = {}
     history = get_history(db = db)
     for c in history:
-        print(c['series'], c['volume'], c['issue'])
+        #print(c['series'], c['volume'], c['issue'])
         s = c['series']
         v = c['volume']
+        cursor.execute('select * from quit_series where series = ? and volume = ?', (s, v, ))
+        q = cursor.fetchall()
+        if (q is not None and len(q) > 0):
+            continue
         sv = f'{s} ({v})'
         if (c['series'] not in max_read or (c['series'] in max_read and max_read[c['series']]['date'] < c['date'])):
             max_read[sv] = c
@@ -435,6 +438,9 @@ def get_comics_by_current(db = None):
                 if (c2['date'] > c['date'] and c2['read'] is False):
                     comics.append(c2)
                     break
+
+    if (db is None):
+        local_db.close()
 
     return sorted(comics, key = lambda x:(x['date']))
 
@@ -906,7 +912,7 @@ def get_read_previous(series, volume, db = None):
         local_db = db
 
     cursor = local_db.cursor()
-    
+
     rows = None
     try:
         # TODO: could just select count(*) and not pull hundreds of records for no reason
@@ -976,6 +982,26 @@ def mark_unread(id, db = None):
     local_db.commit()
     #except Exception as e:
     #    print(e)
+
+    if (db is None):
+        local_db.close()
+
+def quit_series(series, db = None):
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+    cursor = local_db.cursor()
+
+    volume = None
+    m = re.search(r'^(.+) \((\d\d\d\d(-\d)?)\)$', series)
+    if (m is not None):
+        series = m[1]
+        volume = m[2]
+
+    if (volume is not None):
+        cursor.execute('insert into quit_series (series, volume) values (?, ?)', (series, volume, ))
+        local_db.commit()
 
     if (db is None):
         local_db.close()
