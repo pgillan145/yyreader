@@ -1,9 +1,11 @@
 <a name='{{item.yacreader.id}}'>
 <div class='w3-row w3-margin'>
-    <div class='w3-cell m3 w3-leftbar {% if item.yacreader.read == 1 %}w3-border-red{% elif item.yacreader.current_page > 1 %}w3-border-yellow{% else %}w3-border-white{% endif %}'>
+    <div class='w3-cell m3 w3-leftbar {% if item.yacreader.read == 1 %}w3-border-red{% elif item.yacreader.current_page > 1 %}w3-border-yellow{% elif item.yacreader.read_previous is true %}w3-border-green{% else %}w3-border-white{% endif %}'>
         <a href='/read/{{item.yacreader.id}}'><img class='w3-round w3-card' src='/cover/{{item.yacreader.id}}' height=200></a>
     </div>
     <div class='w3-cell m3'>
-        <a class='w3-margin' href='/read/{{item.yacreader.id}}'>{{item.yacreader.series}} #{{item.yacreader.issue}}</a><br /><a href={{item.datelink}}>{{item.date}}</a>
+        <a class='w3-margin' href='/series/{{item.yacreader.series}} ({{item.yacreader.volume}})'>{{item.yacreader.series}}</a><br /><a class='w3-margin' href='/read/{{item.yacreader.id}}'>#{{item.yacreader.issue}}</a><br />
+        <a class='w3-margin' href={{item.datelink}}>{{item.date}}</a><br />
+        {% if item.yacreader.read == 0 and item.yacreader.current_page > 1 %}<a class='w3-margin' href='/markunread/{{item.yacreader.id}}'>Mark Unread</a><br />{% endif %}
     </div>
 </div>

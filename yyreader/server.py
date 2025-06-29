@@ -8,6 +8,7 @@ import base64
 import os
 import pickle
 import re
+import rsa
 import sqlite3
 import urllib.parse
 from . import comic, backend
@@ -21,6 +22,7 @@ app.config.from_mapping(
 comic_cache = {}
 comic_dir = '/'
 config = None
+publicKey, privateKey = rsa.newkeys(512)
 
 def main():
     global comic_dir
@@ -75,17 +77,31 @@ def get_filter(filter = None):
 def get_home_link(year = None, month = None):
     # I can't decide if going back to the latest beacon or going back to the last date viewed is a better definition of 'home'
     beacons = backend.get_beacons()
-    if (len(beacons) > 0):
-        if ( year is not None and month is not None and beacons[0]['name'] == f'{year}/{month}'):
-            # TODO: Figure out why this is here and why it returns 'None' rather than a link to this
-            #   year and month.
-            return None
-        # TODO: Just change everything on the frontend over to 'year/month' so I can stop all these stupid translations.
-        return { 'url':'/dates/' + beacons[0]['name'], 'text': "{}/{}".format(beacons[0]['name'].split('/')[1], beacons[0]['name'].split('/')[0]) }
-    elif (request.cookies.get('date')):
-        traversal_date = request.cookies.get('date')
-        print(f"traversal_date:{traversal_date}")
-        return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+    traversal = request.cookies.get('traversal')
+    #if (len(beacons) > 0):
+    #    if ( year is not None and month is not None and beacons[0]['name'] == f'{year}/{month}'):
+    #        # TODO: Figure out why this is here and why it returns 'None' rather than a link to this
+    #        #   year and month.
+    #        return None
+    #    # TODO: Just change everything on the frontend over to 'year/month' so I can stop all these stupid translations.
+    #    return { 'url':'/dates/' + beacons[0]['name'], 'text': "{}/{}".format(beacons[0]['name'].split('/')[1], beacons[0]['name'].split('/')[0]) }
+    if (traversal == 'series'):
+        if (request.cookies.get('series')):
+            traversal_series = request.cookies.get('series')
+            print(f"traversal_series:{traversal_series}")
+            return {'url':traversal_series.split('|')[0], 'text':traversal_series.split('|')[1]}
+        else:
+            return {'url':'/seriess', 'text':'Series'}
+    elif (traversal == 'current'):
+        return {'url':'/current', 'text':'Current'}
+    else: # traversal == 'date'
+        if (request.cookies.get('date')):
+            traversal_date = request.cookies.get('date')
+            print(f"traversal_date:{traversal_date}")
+            return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+        else:
+            return {'url':'dates', 'text':'Dates'}
+
 
     year = backend.get_years()[0]
     month = backend.get_months(year)[0]
@@ -98,8 +114,19 @@ def before_request():
     #request.cookies.get('filter')
     if ('allow_ip' in config['server'] and request.remote_addr != config['server']['allow_ip']):
         return ("Permission denied", 403)
-    if (request.path != '/login' and 'password' in config['server'] and request.cookies.get('authorized') != 'True'):
+
+    authorized = request.cookies.get('authorized')
+    decrypted = None
+    if (authorized is not None and authorized != ''):
+        try:
+            decoded = base64.urlsafe_b64decode(authorized.encode())
+            decrypted = rsa.decrypt(decoded, privateKey).decode()
+        except Exception as e:
+            print("authorization token decription failed")
+
+    if (request.path != '/login' and 'password' in config['server'] and config['server']['password'] is not None and decrypted != config['server']['password'] ):
         return redirect('/login')
+
     clean_cache()
 
 @app.route('/arc/<arc>')
@@ -180,6 +207,24 @@ def beacons():
     beacons = backend.get_beacons()
     return render_template('beacons.html', beacons = beacons, nav = { 'home':True })
 
+@app.route('/current')
+def current():
+    items = []
+    up = None
+    back = None
+    forth = None
+    home = None
+
+    #for y in backend.get_comics_by_date(1986, 1):
+    for y in backend.get_comics_by_current():
+        short_series = '{} ({})'.format(y['series'][0:25], y['series'])
+        items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'short_series':short_series, 'datelink':'/dates/{}'.format(y['date'].strftime('%Y/%m')) })
+
+    nav = {'back':back, 'forth':forth, 'up':up, 'home':home }
+    response = make_response(render_template('comics.html', items = items, nav = nav ))
+    response.set_cookie('traversal', 'current', max_age=60*60*24*365)
+    return response
+
 @app.route('/dates')
 @app.route('/dates/<int:year>')
 @app.route('/dates/<int:year>/<int:month>')
@@ -188,7 +233,8 @@ def dates(year = None, month = None):
     up = None
     back = None
     forth = None
-    home = get_home_link(year, month)
+    #home = get_home_link(year, month)
+    home = None
 
     if (year is None and month is None):
         for year in backend.get_years():
@@ -231,13 +277,13 @@ def dates(year = None, month = None):
             short_series = '{} ({})'.format(y['series'][0:25], y['series'])
             items.append({ 'yacreader': y, 'date':y['date'].strftime('%m/%d/%Y'), 'short_series':short_series, 'datelink':'/dates/{}'.format(y['date'].strftime('%Y/%m')) })
 
-        #if (backend.get_beacon('{}/{}'.format(year, month)) is None):
+        ##if (backend.get_beacon('{}/{}'.format(year, month)) is None):
+        ##    beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
+        #if (len(backend.get_beacons()) > 1):
+        #    beacon = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'}
+        #else:
         #    beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
-        if (len(backend.get_beacons()) > 1):
-            beacon = {'url':'/take/{}/{}'.format(year, month), 'text':'Take Beacon'}
-        else:
-            beacon = {'url':'/drop/{}/{}'.format(year, month), 'text':'Drop Beacon'}
-        nav = {'back':back, 'forth':forth, 'up':up, 'beacon':beacon, 'home':home }
+        nav = {'back':back, 'forth':forth, 'up':up, 'home':home }
         response = make_response(render_template('comics.html', items = items, nav = nav ))
         response.set_cookie('traversal', 'date', max_age=60*60*24*365)
         response.set_cookie('date', '/dates/{}/{}|{}/{}'.format(year, month, month, year), max_age=60*60*24*365)
@@ -298,9 +344,16 @@ def filter():
                 label = m.group(1)
                 if (request.args.get(arg) == 'on' and label not in filter['labels']):
                     filter['labels'].append(label)
+
         #print(filter)
         pickled = str(base64.urlsafe_b64encode(pickle.dumps(filter)), 'utf-8')
-        response = make_response(redirect('/seriess'))
+        traversal = request.cookies.get('traversal') if request.cookies.get('traversal') else 'date'
+        print(traversal)
+        home = get_home_link()
+        dump(home)
+        print("home2:", home['url'])
+        response = make_response(redirect(home['url']))
+        
         response.set_cookie('filter', pickled)
         return response
 
@@ -312,9 +365,10 @@ def filter():
     for label in backend.get_labels():
         labels.append(label)
 
-
     home = get_home_link()
-    nav = nav = {'home':home }
+    dump(home)
+    print("home1:", home['url'])
+    nav = {'home':home }
     response = make_response(render_template('filter.html', filter = filter, publishers = publishers, labels = labels, nav = nav))
     return response
 
@@ -372,8 +426,9 @@ def login():
     if request.method == 'POST':
         if (request.form['password'] == config['server']['password']):
             response = redirect('/home')
-            response.set_cookie('authorized', 'True')
-
+            encrypted = rsa.encrypt(config['server']['password'].encode(), publicKey)
+            encoded = base64.urlsafe_b64encode(encrypted).decode()
+            response.set_cookie('authorized', encoded)
     return response
 
 @app.route('/update/<int:id>')
@@ -403,6 +458,13 @@ def link(aft_id, fore_id = None):
             backend.link(fore_id, aft_id)
 
     response = make_response(redirect('/read/{}'.format(aft_id)))
+    return response
+
+@app.route('/markunread/<int:id>')
+def markunread(id):
+    backend.mark_unread(id)
+    home = get_home_link()
+    response = make_response(redirect(home['url']))
     return response
 
 @app.route('/read/<int:id>')
@@ -633,7 +695,7 @@ def series(series = None):
 def seriess():
     items = []
     up = None
-    home = get_home_link()
+    home = None
 
     filter = get_filter()
 
