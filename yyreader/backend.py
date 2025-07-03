@@ -659,7 +659,7 @@ def get_labels():
     db.close()
     return sorted(labels, key=lambda x: x)
 
-def get_next_comic(id, db = None):
+def get_next_comic(id, db = None, traversal = 'date'):
     if (db is None):
         local_db = connect()
     else:
@@ -674,35 +674,42 @@ def get_next_comic(id, db = None):
     else:
         head = get_head_comic(id, db = local_db)
 
-        (year, month) = head['date'].strftime('%Y|%-m').split('|')
-        year = int(year)
-        month = int(month)
-        issues = get_comics_by_date(year, month, db = local_db)
-        i = 0
-        for issue in issues:
-            if (issue['id'] == head['id']):
-                current = i
-                break
-            i = i + 1
-
-        while (comic_data is None and year is not None and month is not None and len(issues) > 0):
+        if (traversal == 'date'):
+            (year, month) = head['date'].strftime('%Y|%-m').split('|')
+            year = int(year)
+            month = int(month)
+            issues = get_comics_by_date(year, month, db = local_db)
             i = 0
             for issue in issues:
-                if (i > current):
-                    n = issues[i]
-                    # When moving naturally from item to the next, skip anything that's part of a link chain.
-                    if (n['fore_id'] is None):
-                        comic_data = n
-                        break
-                    # TODO: Make an option so that anything that's already 'read' will also be skipped
+                if (issue['id'] == head['id']):
                     current = i
-                i = i + 1
-            if (comic_data is None):
-                (year, month) = get_next_date(year, month, db = local_db)
-                if (year is None or month is None):
                     break
-                issues = get_comics_by_date(year, month, db = local_db)
-                current = -1
+                i = i + 1
+
+            while (comic_data is None and year is not None and month is not None and len(issues) > 0):
+                i = 0
+                for issue in issues:
+                    if (i > current):
+                        n = issues[i]
+                        # When moving naturally from item to the next, skip anything that's part of a link chain.
+                        if (n['fore_id'] is None):
+                            comic_data = n
+                            break
+                        # TODO: Make an option so that anything that's already 'read' will also be skipped
+                        current = i
+                    i = i + 1
+                if (comic_data is None):
+                    (year, month) = get_next_date(year, month, db = local_db)
+                    if (year is None or month is None):
+                        break
+                    issues = get_comics_by_date(year, month, db = local_db)
+                    current = -1
+        elif (traversal == 'current'):
+            current_comics = get_comics_by_current(db = local_db)
+            for c in current_comics:
+                if (c['date'] >= head['date'] and c['id'] != head['id']):
+                    comic_data = c
+                    break
 
     if (db is None):
         local_db.close()
@@ -736,7 +743,7 @@ def get_next_date(year, month, db = None):
         local_db.close()
     return (next_year, next_month)
 
-def get_previous_comic(id, db = None):
+def get_previous_comic(id, db = None, traversal = 'date'):
     if (db is None):
         local_db = connect()
     else:
@@ -749,39 +756,46 @@ def get_previous_comic(id, db = None):
     if (y['fore_id'] is not None):
         comic_data = get_comic_by_id(y['fore_id'], db = local_db)
     else:
-        #print(y['date'])
-        (year, month) = y['date'].strftime('%Y|%-m').split('|')
-        year = int(year)
-        month = int(month)
-        #print(year, month)
-        issues = get_comics_by_date(year, month, db = local_db)
+        if (traversal == 'date'):
+            (year, month) = y['date'].strftime('%Y|%-m').split('|')
+            year = int(year)
+            month = int(month)
+            #print(year, month)
+            issues = get_comics_by_date(year, month, db = local_db)
 
-        i = len(issues) - 1
-        for issue in list(reversed(issues)):
-            if (issue['id'] == y['id']):
-                current = i
-                break
-            i = i - 1
-
-        #print(len(issues))
-        while (comic_data is None and year is not None and month is not None and len(issues) > 0):
             i = len(issues) - 1
             for issue in list(reversed(issues)):
-                if (i < current):
-                    n = issues[i]
-                    # When moving naturally from item to the previous, skip anything that's part of a link chain.
-                    if (n['fore_id'] is None):
-                        comic_data = n
-                        break
-                    # TODO: Make an option so that anything that's already 'read' will also be skipped
+                if (issue['id'] == y['id']):
                     current = i
-                i = i - 1
-            if (comic_data is None):
-                (year, month) = get_previous_date(year, month, db = local_db)
-                if (year is None or month is None):
                     break
-                issues = get_comics_by_date(year, month, db = local_db)
-                current = len(issues)
+                i = i - 1
+
+            #print(len(issues))
+            while (comic_data is None and year is not None and month is not None and len(issues) > 0):
+                i = len(issues) - 1
+                for issue in list(reversed(issues)):
+                    if (i < current):
+                        n = issues[i]
+                        # When moving naturally from item to the previous, skip anything that's part of a link chain.
+                        if (n['fore_id'] is None):
+                            comic_data = n
+                            break
+                        # TODO: Make an option so that anything that's already 'read' will also be skipped
+                        current = i
+                    i = i - 1
+                if (comic_data is None):
+                    (year, month) = get_previous_date(year, month, db = local_db)
+                    if (year is None or month is None):
+                        break
+                    issues = get_comics_by_date(year, month, db = local_db)
+                    current = len(issues)
+        elif (traversal == 'current'):
+            current_comics = get_comics_by_current(db = local_db)
+            current_comics = sorted(current_comics, key = lambda x:(x['date']), reverse = True)
+            for c in current_comics:
+                if (c['date'] <= y['date'] and c['id'] != y['id']):
+                    comic_data = c
+                    break
 
     if (db is None):
         local_db.close()

@@ -536,7 +536,10 @@ def read(id, page = None, zoom = 1, section = 1):
         if (re.search(r'^/dates/\d+/\d+#\d+\|', traversal_date) is None):
             traversal_date = traversal_date.split('|')[0] + '#{}'.format(id) + '|' + traversal_date.split('|')[1]
 
+    
     home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+    if (traversal == 'current'):
+        home = {'url':'/current', 'text':'Currently Reading'}
 
     if (traversal == 'series'):
         # If the user was looking specifically at the issues in a particular series, then the page turns on the first and last pages will go the prev/next issues.
@@ -565,6 +568,19 @@ def read(id, page = None, zoom = 1, section = 1):
         #forth = back
         p = backend.get_previous_comic(y['id'])
         n = backend.get_next_comic(y['id'])
+        #TODO: Figure out how to display long ass titles in what are supposed to be small buttons.  Just the first few
+        #   characters?  Maybe tiny cover thumbnails?
+        if (p and p['aft_id'] == y['id']):
+            linked = True
+        if (p):
+            back = {'url': '/read/{}'.format(p['id']), 'text':'{} #{}'.format(p['series'], p['issue'])}
+        if (n):
+            forth = {'url': '/read/{}'.format(n['id']), 'text':'{} #{}'.format(n['series'], n['issue'])}
+    elif (traversal == 'current'):
+        #back = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
+        #forth = back
+        p = backend.get_previous_comic(y['id'], traversal = 'current')
+        n = backend.get_next_comic(y['id'], traversal = 'current')
         #TODO: Figure out how to display long ass titles in what are supposed to be small buttons.  Just the first few
         #   characters?  Maybe tiny cover thumbnails?
         if (p and p['aft_id'] == y['id']):
