@@ -43,12 +43,38 @@ def main():
 
     app.run(port = config['server']['port'], host = '0.0.0.0', debug = debug)
 
+#@app.errorhandler(Exception)
+#def bad_request(e):
+#    print(e)
+#    return ("bad request", 400)
+#app.register_error_handler(400, bad_request)
+
+@app.before_request
+def before_request():
+    if ('allow_ip' in config['server'] and request.remote_addr != config['server']['allow_ip']):
+        return ("Permission denied", 403)
+
+    authorized = request.cookies.get('authorized')
+    decrypted = None
+    if (authorized is not None and authorized != ''):
+        try:
+            decoded = base64.urlsafe_b64decode(authorized.encode())
+            decrypted = rsa.decrypt(decoded, privateKey).decode()
+        except Exception as e:
+            print("authorization token decription failed")
+
+    if (request.path != '/login' and 'password' in config['server'] and config['server']['password'] is not None and decrypted != config['server']['password'] ):
+        return redirect('/login')
+
+    clean_cache()
+
 def clean_cache():
     ids = [key for key in comic_cache]
     for id in ids:
         if (('date' in comic_cache[id] and datetime.now() > comic_cache[id]['date'] + timedelta(hours=2)) or ('date' not in comic_cache[id])):
            del comic_cache[id]
 #app.teardown_request(clean_cache)
+
 
 def complementaryColor(my_hex):
     """Returns complementary RGB color
@@ -88,7 +114,6 @@ def get_home_link(year = None, month = None):
     if (traversal == 'series'):
         if (request.cookies.get('series')):
             traversal_series = request.cookies.get('series')
-            print(f"traversal_series:{traversal_series}")
             return {'url':traversal_series.split('|')[0], 'text':traversal_series.split('|')[1]}
         else:
             return {'url':'/seriess', 'text':'Series'}
@@ -97,7 +122,6 @@ def get_home_link(year = None, month = None):
     else: # traversal == 'date'
         if (request.cookies.get('date')):
             traversal_date = request.cookies.get('date')
-            print(f"traversal_date:{traversal_date}")
             return {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         else:
             return {'url':'dates', 'text':'Dates'}
@@ -108,26 +132,6 @@ def get_home_link(year = None, month = None):
     home = '{}/{}'.format(year, month)
     backend.add_beacon(home)
     return {'url':'/dates/' + home, 'text':'{}/{}'.format(month, year) }
-
-@app.before_request
-def before_request():
-    #request.cookies.get('filter')
-    if ('allow_ip' in config['server'] and request.remote_addr != config['server']['allow_ip']):
-        return ("Permission denied", 403)
-
-    authorized = request.cookies.get('authorized')
-    decrypted = None
-    if (authorized is not None and authorized != ''):
-        try:
-            decoded = base64.urlsafe_b64decode(authorized.encode())
-            decrypted = rsa.decrypt(decoded, privateKey).decode()
-        except Exception as e:
-            print("authorization token decription failed")
-
-    if (request.path != '/login' and 'password' in config['server'] and config['server']['password'] is not None and decrypted != config['server']['password'] ):
-        return redirect('/login')
-
-    clean_cache()
 
 @app.route('/arc/<arc>')
 def arc(arc = None):
@@ -348,10 +352,8 @@ def filter():
         #print(filter)
         pickled = str(base64.urlsafe_b64encode(pickle.dumps(filter)), 'utf-8')
         traversal = request.cookies.get('traversal') if request.cookies.get('traversal') else 'date'
-        print(traversal)
         home = get_home_link()
         dump(home)
-        print("home2:", home['url'])
         response = make_response(redirect(home['url']))
         
         response.set_cookie('filter', pickled)
@@ -367,7 +369,6 @@ def filter():
 
     home = get_home_link()
     dump(home)
-    print("home1:", home['url'])
     nav = {'home':home }
     response = make_response(render_template('filter.html', filter = filter, publishers = publishers, labels = labels, nav = nav))
     return response

@@ -660,7 +660,7 @@ class comic():
             tmp.write(result.stdout)
             img = Image.open(tmp, formats=['JPEG'])
         elif (self.is_cbz()):
-            print(f"number:{number}")
+            #print(f"number:{number}")
             page_file = self.page_file(number)
             page_file = re.sub('\[', '\\\[', page_file)
             page_file = re.sub('\]', '\\\]', page_file)
@@ -761,7 +761,7 @@ class comic():
         stat = ImageStat.Stat(img, mask)
         #print("extrema:", stat.extrema)
         #print("count:", stat.count)
-        print("median:", stat.median)
+        #print("median:", stat.median)
         #print("mean:", stat.mean)
         #print("rms:", stat.rms)
         colors = stat.median
