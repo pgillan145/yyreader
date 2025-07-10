@@ -788,9 +788,11 @@ class comic():
 
     def _page_files(self):
         page_files = []
-        files = self._files()
+        files = list(filter(lambda x:re.search(r'\.(jpg|jpeg)$',x),self._files()))
+        count = 0
         for f in files:
-            if (re.search(r'\.(jpg|jpeg)$', f, re.I) is None or parser.is_credit_page(f)):
+            count = count + 1
+            if (parser.is_credit_page(f, last = True if (count == len(files)) else False)):
                 continue
             page_files.append(f)
 

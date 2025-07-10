@@ -257,7 +257,9 @@ def convert_name_to_date(comic):
     extension = m.group(7)
     return f'{year}/{month}/{year}-{month}-{day} {series} ({start_year}) {issue}.{extension}'
 
-def is_credit_page(filename):
+def is_credit_page(filename, last = False):
+    if (re.search('Minutemen-Syl3ntBob', filename) is not None and last is True):
+        return True
     for credit_page in credit_pages:
         if filename == credit_page or re.search(credit_page, filename):
             return True
