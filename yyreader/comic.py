@@ -788,7 +788,7 @@ class comic():
 
     def _page_files(self):
         page_files = []
-        files = list(filter(lambda x:re.search(r'\.(jpg|jpeg)$',x),self._files()))
+        files = list(filter(lambda x:re.search(r'\.(jpg|jpeg|png|bmp|tiff)$',x,re.IGNORECASE),self._files()))
         count = 0
         for f in files:
             count = count + 1
