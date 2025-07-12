@@ -353,7 +353,7 @@ def filter():
         pickled = str(base64.urlsafe_b64encode(pickle.dumps(filter)), 'utf-8')
         traversal = request.cookies.get('traversal') if request.cookies.get('traversal') else 'date'
         home = get_home_link()
-        dump(home)
+        #dump(home)
         response = make_response(redirect(home['url']))
         
         response.set_cookie('filter', pickled)
@@ -368,7 +368,7 @@ def filter():
         labels.append(label)
 
     home = get_home_link()
-    dump(home)
+    #dump(home)
     nav = {'home':home }
     response = make_response(render_template('filter.html', filter = filter, publishers = publishers, labels = labels, nav = nav))
     return response
@@ -681,11 +681,16 @@ def settings(setting = None, value = None, id = None):
     return response
 
 def parse_settings_cookie(cookie_settings, setting = None):
-    settings = {}
+    settings = {'crop':True, 'logging':True}
     if (cookie_settings):
-        settings = pickle.loads(base64.urlsafe_b64decode(cookie_settings))
+        #dump(cookie_settings)
+        s = pickle.loads(base64.urlsafe_b64decode(cookie_settings))
+        dump(s)
+        if (s is not None):
+            settings = s
 
     if (setting is None):
+        #dump(settings)
         return settings
     if (setting in settings):
         return settings[setting]
