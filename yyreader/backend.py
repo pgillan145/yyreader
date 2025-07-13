@@ -408,8 +408,8 @@ def get_comics_by_current(db = None):
 
     # THIS NEEDS TO GO THROUGHT EVERYTHING THAT'S BEEN READ, IDENTIFY THE SERIES, THEN COLLECT THE NEXT
     # ISSUE THAT COMES AFTER THE LATEST READ ISSUE.
-    max_read = {}
-    history = get_history(db = db)
+    last_read = {}
+    history = list(reversed(get_history(db = local_db)))
     for c in history:
         #print(c['series'], c['volume'], c['issue'])
         s = c['series']
@@ -419,19 +419,19 @@ def get_comics_by_current(db = None):
         if (q is not None and len(q) > 0):
             continue
         sv = f'{s} ({v})'
-        if (c['series'] not in max_read or (c['series'] in max_read and max_read[c['series']]['date'] < c['date'])):
-            max_read[sv] = c
+        #if (c['series'] not in last_read or (c['series'] in max_read and max_read[c['series']]['date'] < c['date'])):
+        last_read[sv] = c
 
     comics = []
-    for sv in max_read:
-        c = max_read[sv]
+    for sv in last_read:
+        c = last_read[sv]
         s = c['series']
         v = c['volume']
         i = c['issue']
         if (c['read'] is False):
             comics.append(c)
         else:
-            series_comics = get_comics_by_series(sv, db = db)
+            series_comics = get_comics_by_series(sv, db = local_db)
             #print(sv, i, c['date'], c['read'])
             for c2 in sorted(series_comics, key = lambda x:(x['date'])):
                 #print(c2['issue'], c2['date'], c2['read'])

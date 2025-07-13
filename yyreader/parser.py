@@ -276,7 +276,7 @@ def parse(comic_file, year = None, verbose = False, debug = False):
         data['size'] = os.path.getsize(comic_file)
 
     if (re.search(r'\.cb[rz]$', comic_file, re.I) is None):
-        raise Exception("invalid file type")
+        raise Exception(f"invalid file type for '{comic_file}'")
 
     #if (debug is True): print(comic_file)
 
