@@ -442,7 +442,7 @@ def get_comics_by_current(db = None):
     if (db is None):
         local_db.close()
 
-    return sorted(comics, key = lambda x:(x['date']))
+    return sorted(comics, key = lambda x:(x['date'], x['series'], x['issue']))
 
 def get_comics_by_date(year, month, db = None):
     #print(month)

@@ -541,7 +541,6 @@ def read(id, page = None, zoom = 1, section = 1):
     home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
     if (traversal == 'current'):
         home = {'url':'/current', 'text':'Currently Reading'}
-
     if (traversal == 'series'):
         # If the user was looking specifically at the issues in a particular series, then the page turns on the first and last pages will go the prev/next issues.
         issues = backend.get_comics_by_series(y['series'])
@@ -561,9 +560,6 @@ def read(id, page = None, zoom = 1, section = 1):
             back = {'url': '/series/{}#{}'.format(urllib.parse.quote(f"{y['series']} ({y['volume']})"), id), 'text': '{}'.format(y['series']) }
         if (forth is None):
             forth = {'url': '/series/{}#{}'.format(urllib.parse.quote(f"{y['series']} ({y['volume']})"), id), 'text': '{}'.format(y['series']) }
-    elif (traversal == 'strict'):
-        #TODO: Add a traversal method that goes by date but ignores linking.
-        pass
     elif (traversal == 'date'):
         #back = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
         #forth = back
@@ -596,19 +592,20 @@ def read(id, page = None, zoom = 1, section = 1):
     if (page == 1 and section == 1 and back):
         previous_page_url =  back['url']
     elif (section > 1):
-       previous_page_url = '/read/{}/{}/{}/{}'.format(id, (page), zoom, section-1)
+        previous_page_url = '/read/{}/{}/{}/{}'.format(id, (page), zoom, section-1)
+    elif (zoom > 1 and section == 1):
+        previous_page_url = '/read/{}/{}/{}/{}'.format(id, (page-1), zoom, zoom)
     else:
         previous_page_url = '/read/{}/{}/{}'.format(id, (page-1), zoom)
 
 
-    if (page < c.page_count()):
+    if (zoom > 1 and section < zoom):
+        next_page_url = '/read/{}/{}/{}/{}'.format(id, (page), zoom, section + 1)
+    elif (page < c.page_count()):
         if (zoom == section or zoom == 1):
             next_page_url = '/read/{}/{}/{}'.format(id, (page+1), zoom)
-        else:
-            next_page_url = '/read/{}/{}/{}/{}'.format(id, (page), zoom, section + 1)
     elif (page == c.page_count() and forth is not None):
         next_page_url =  forth['url']
-
 
     if (parse_settings_cookie(request.cookies.get('settings'), 'logging') is True):
         # TODO: This doesn't get set until you go into settings and turn logging off and on again.
