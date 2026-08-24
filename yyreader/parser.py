@@ -53,6 +53,7 @@ formats = [
 
 date_formats = [ r'\((?P<month>\d\d)-(?P<day>\d\d)-(?P<year>\d\d\d\d)\)?',
                  r'\(?(?P<year>\d\d\d\d)-(?P<month>\d\d)-(?P<day>\d\d)\)?',
+                 r'\(?(?P<year>\d\d\d\d)\.(?P<month>\d\d)\.(?P<day>\d\d)\)?',
                  r'(?P<year>\d\d\d\d)(?P<month>\d\d)(?P<day>\d\d)',
                  r'(?P<year>\d\d\d\d)(?P<month>\d\d)',
                ]

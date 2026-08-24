@@ -1,4 +1,5 @@
 
+import datetime
 from dumper import dump
 from io import BytesIO
 from fuzzywuzzy import fuzz
@@ -23,6 +24,7 @@ ext_map = { 'cbr': 'RAR archive data', 'cbz': 'Zip archive data' }
 xml_map = { 'Characters':'a_characters', 'Publisher':'publisher', 'Number':'issue', 'Summary':'description', 'Series':'series', 'Volume':'volume', 'Day':'day', 'Month':'month', 'Year':'year', 'StoryArc':'a_story_arcs', 'Writer':'a_writers', 'Penciller':'a_pencillers', 'Inker':'a_inkers', 'Letterer':'a_letterers', 'Colorist':'a_colorists', 'Title':'issue_name', 'Web':'url' }
 
 config = minorimpact.config.getConfig(script_name = 'yyreader')
+page_time = None
 
 def dive(dir, ext = 'jpg'):
     for f in os.listdir(dir):
@@ -652,6 +654,8 @@ class comic():
         return (left, top, w-right, h-bottom)
 
     def _page_img(self, number, crop = True):
+        global page_time
+        #page_time = datetime.datetime.now()
         img = None
         if (self.is_cbr()):
             command = [config['default']['rar'], 'p', self.file, self.page_file(number)]
@@ -671,9 +675,11 @@ class comic():
             img = Image.open(tmp, formats=['JPEG'])
         else:
             img = Image.open(self.page_file(number))
+        #print("read:",(datetime.datetime.now() - page_time).total_seconds())
 
         if (img is not None and crop is True):
             img = img.crop(self.border(img))
+            #print("cropped:",(datetime.datetime.now() - page_time).total_seconds())
             pass
 
         #if md5(img.tobytes()).hexdigest() == '0e6eed12c279a1188930ace4dcd14457'
@@ -681,6 +687,8 @@ class comic():
         # because we look at which pages are "valid" based on filename. We call a list of pages
         # a lot, and I wouldn't want to have to fully extract, read and perform a hash against
         # every page file that often; it would be slow as fuck.
+
+        #print("loaded:",(datetime.datetime.now() - page_time).total_seconds())
 
         return img
 
@@ -699,7 +707,6 @@ class comic():
         #return data
 
         img = self._page_img(number, crop = crop)
-
 
         img = img.convert("RGBA")
         w, h = img.size
@@ -744,9 +751,12 @@ class comic():
             img = img.reduce(2)
             w, h = img.size
 
+        #print("reduced:",(datetime.datetime.now() - page_time).total_seconds())
+
         img = img.convert('RGB')
         out = BytesIO()
         img.save(out, format='JPEG')
+        #print("converted:",(datetime.datetime.now() - page_time).total_seconds())
         return out.getvalue()
 
     def page_color(self, page, crop = True):
@@ -765,6 +775,7 @@ class comic():
         #print("mean:", stat.mean)
         #print("rms:", stat.rms)
         colors = stat.median
+        #print("read_colors:",(datetime.datetime.now() - page_time).total_seconds())
         try:
             return to_hex(colors[0], colors[1], colors[2])
         except Exception as e:

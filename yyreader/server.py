@@ -643,7 +643,10 @@ def page(id, page, zoom = 1, section = 1):
     crop = True if (request.args.get('crop','True') == 'True') else False
     #zoom = int(request.args.get('zoom', 1))
     #section = int(request.args.get('section', 1))
-    return Response(c.page(page, crop = crop, zoom = zoom, section = section), mimetype = 'image/jpeg')
+    #start = datetime.now()
+    page_data = c.page(page, crop = crop, zoom = zoom, section = section)
+    #print("page:", (datetime.now() - start).total_seconds())
+    return Response(page_data, mimetype = 'image/jpeg')
 
 @app.route('/settings')
 @app.route('/settings/<setting>/<value>')
@@ -682,7 +685,6 @@ def parse_settings_cookie(cookie_settings, setting = None):
     if (cookie_settings):
         #dump(cookie_settings)
         s = pickle.loads(base64.urlsafe_b64decode(cookie_settings))
-        dump(s)
         if (s is not None):
             settings = s
 

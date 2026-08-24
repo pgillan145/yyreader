@@ -419,7 +419,6 @@ def get_comics_by_current(db = None):
         if (q is not None and len(q) > 0):
             continue
         sv = f'{s} ({v})'
-        #if (c['series'] not in last_read or (c['series'] in max_read and max_read[c['series']]['date'] < c['date'])):
         last_read[sv] = c
 
     comics = []
@@ -432,9 +431,9 @@ def get_comics_by_current(db = None):
             comics.append(c)
         else:
             series_comics = get_comics_by_series(sv, db = local_db)
-            #print(sv, i, c['date'], c['read'])
+            #print("last_read:", sv, i, c['date'], c['read'])
             for c2 in sorted(series_comics, key = lambda x:(x['date'])):
-                #print(c2['issue'], c2['date'], c2['read'])
+                #print("          ", c2['series'], c2['volume'], c2['issue'], c2['date'], c2['read'])
                 if (c2['date'] > c['date'] and c2['read'] is False):
                     comics.append(c2)
                     break
