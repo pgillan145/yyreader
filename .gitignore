@@ -9,3 +9,4 @@ test/*
 *.pyc
 __pycache__
 .*.swp
+.venv
