@@ -662,7 +662,8 @@ class comic():
             result = subprocess.run(command, capture_output = True)
             tmp = BytesIO()
             tmp.write(result.stdout)
-            img = Image.open(tmp, formats=['JPEG'])
+            #img = Image.open(tmp, formats=['JPEG','WEBP','PNG'])
+            img = Image.open(tmp)
         elif (self.is_cbz()):
             #print(f"number:{number}")
             page_file = self.page_file(number)
@@ -670,9 +671,15 @@ class comic():
             page_file = re.sub('\]', '\\\]', page_file)
             command = [config['default']['unzip'], '-p', self.file, page_file]
             result = subprocess.run(command, capture_output = True)
+            print(f"page_file:'{page_file}'")
             tmp = BytesIO()
             tmp.write(result.stdout)
-            img = Image.open(tmp, formats=['JPEG'])
+            #tmpfile = "/home/fafafauxhigh/test.webp"
+            #f = open(tmpfile, 'bw')
+            #f.write(tmp.getvalue())
+            #f.close()
+            #img = Image.open(tmp, formats=['JPEG','WEBP','PNG'])
+            img = Image.open(tmp)
         else:
             img = Image.open(self.page_file(number))
         #print("read:",(datetime.datetime.now() - page_time).total_seconds())
@@ -799,7 +806,7 @@ class comic():
 
     def _page_files(self):
         page_files = []
-        files = list(filter(lambda x:re.search(r'\.(jpg|jpeg|png|bmp|tiff)$',x,re.IGNORECASE),self._files()))
+        files = list(filter(lambda x:re.search(r'\.(jpg|jpeg|png|bmp|tiff|web|webp)$',x,re.IGNORECASE),self._files()))
         count = 0
         for f in files:
             count = count + 1

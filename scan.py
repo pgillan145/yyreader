@@ -51,10 +51,13 @@ def main():
     comic_files = minorimpact.readdir(comic_dir)
     i = 0
     for comic_file in sorted(comic_files):
+        i = i + 1
         #if (re.search('Deadpool & Wolverine WWIII', comic_file) is None): continue
+        if (args.verbose):
+            print(f"scanning {i} of {len(comic_files)}")
         c = comic.comic(comic_file)
         try:
-            yyreader.backend.scan(c)
+            yyreader.backend.scan(c, verbose = args.verbose, db = db)
         except sqlite3.IntegrityError as e:
             print(e)
             if (str(e) == 'UNIQUE constraint failed: comic_info.hash'):

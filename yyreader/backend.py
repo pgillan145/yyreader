@@ -96,19 +96,29 @@ def init_db():
 
     db.close()
 
-def add_beacon(name):
-    db = connect()
-    cursor = db.cursor()
+def add_beacon(name, db = None):
+    if (db is None):
+        #print("opening database")
+        local_db = connect()
+    else:
+        local_db = db
+
+    cursor = local_db.cursor()
     try:
         cursor.execute('insert into beacon (name, mod_date) values (?,  CURRENT_TIMESTAMP)', (name, ))
-        db.commit()
+        local_db.commit()
     except Exception as e:
-        print(e)
-    db.close()
+        print("add beacon", e)
+
+    if (db is None):
+        #print("closing database")
+        local_db.close()
 
 def add_comic(comic, db = None):
+    #print("add_comic()", comic)
     # TODO: Make an 'update_comic' function that will update the database with changes.
     if (db is None):
+        #print("opening database")
         local_db = connect()
     else:
         local_db = db
@@ -118,8 +128,7 @@ def add_comic(comic, db = None):
     #sql = {}
     #cursor.execute(build_sql(sql), sql['params'])
 
-    folder_id = get_folder_id(comic)
-
+    folder_id = get_folder_id(comic, db = local_db)
 
     #TODO: Settle on what 'done' means when it comes to what data should be in the yacreader database.  Technically all we need is issue number, date and volume to
     #   just read the books, but I also want arcs, publishers and some of the creatives in there for filtering and searching.
@@ -149,7 +158,15 @@ def add_comic(comic, db = None):
           }
     sql_string = build_sql(sql)
     #print (sql_string)
-    cursor.execute(sql_string, sql['params'])
+    try:
+        cursor.execute(sql_string, sql['params'])
+    except Exception as e:
+        #print(sql_string, e)
+        if (db is None):
+            #print("closing database")
+            local_db.close()
+        raise(e)
+
     comic_id = cursor.lastrowid
 
     sql = { 'insert': 'comic',
@@ -158,8 +175,14 @@ def add_comic(comic, db = None):
           }
     sql_string = build_sql(sql)
     #print (sql_string)
-    cursor.execute(sql_string, sql['params'])
-
+    try:
+        cursor.execute(sql_string, sql['params'])
+    except Exception as e:
+        if (db is None):
+            #print("closing database")
+            local_db.close();
+        raise(e)
+        
     for arc in arcs:
         sql = { 'insert': 'comic_info_arc',
                 'fields': ['storyArc', 'comicInfoId'],
@@ -171,7 +194,7 @@ def add_comic(comic, db = None):
             cursor.execute(sql_string, sql['params'])
         except Exception as e:
             if (str(e) != 'UNIQUE constraint failed: comic_info_arc.storyArc, comic_info_arc.comicInfoId'):
-                print(e)
+                print(sql_string, e)
                 pass
 
     local_db.commit()
@@ -268,20 +291,33 @@ def convert_yacreader_date(yacreader_date):
     date = datetime.strptime(yacreader_date, '%d/%m/%Y')
     return date
 
-def delete_beacon(name):
-    db = connect()
-    cursor = db.cursor()
+def delete_beacon(name, db = None):
+    if (db is None):
+        #print("opening database")
+        local_db = connect()
+    else:
+        local_db = db
+
+    cursor = local_db.cursor()
     try:
         cursor.execute('delete from beacon where name = ?', (name, ))
-        db.commit()
+        local_db.commit()
     except Exception as e:
-        print(e)
-    db.close()
+        print("delete beacon", e)
 
-def get_beacon(name):
+    if (db is None):
+        #print("closing database")
+        local_db.close()
+    
+
+def get_beacon(name, db = None):
     beacon = None
-    db = connect()
-    cursor = db.cursor()
+    if (db is None):
+        local_db = connect()
+    else:
+        local_db = db
+
+    cursor = local_db.cursor()
     cursor.execute('select id, name, mod_date from beacon where name = ?', (name, ))
     rows = cursor.fetchall()
     if (len(rows) > 0):
@@ -289,7 +325,9 @@ def get_beacon(name):
         name = rows[0][1]
         mod_date = rows[0][2]
         beacon = { 'id':id, 'name':name, 'mod_date':mod_date }
-    db.close()
+
+    if (db is None):
+        local_db.close()
     return beacon
 
 def get_beacons():
@@ -307,21 +345,24 @@ def get_beacons():
     return beacons
 
 def get_comic_by_series(series, issue, date, db = None):
-    sql = { 'select': 'comic_info.volume, comic_info.number as issue, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher, comic_info.series', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id and comic_info.series = ? and comic_info.number = ? and comic_info.date = ?', 'params':[series, issue, date]}
+    yacreader_date = convert_date_to_yacreader(date)
+
+    sql = { 'select': 'comic_info.volume, comic_info.number as issue, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher, comic_info.series', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id and comic_info.series = ? and comic_info.number = ? and comic_info.date = ?', 'params':[series, issue, yacreader_date]}
 
     return get_comic(sql, db = db)
 
 def get_comic_by_id(id, db = None):
     sql = { 'select': 'comic_info.volume, comic_info.number as issue, comic_info.date, comic_info.id, comic.path, comic_info.read, comic_info.currentPage, comic_info.hash, comic.id as comic_id, comic_info.publisher, comic_info.series', 'from':'comic_info, comic', 'where':'comic.comicInfoId=comic_info.id and comic_info.id = ?', 'params':[id]}
 
-    comic_data = get_comic(sql, db = db)
-    return comic_data
+    return get_comic(sql, db = db)
 
 def get_comic(sql, db = None):
+    #print("get_comic()", sql)
     if (sql is None):
         raise Exception("SQL not defined")
 
     if (db is None):
+        #print("opening database")
         local_db = connect()
     else:
         local_db = db
@@ -329,7 +370,6 @@ def get_comic(sql, db = None):
     cursor = local_db.cursor()
 
     sql_text = f"{build_sql(sql), sql['params']}"
-
     #print(sql_text)
     cursor.execute(build_sql(sql), sql['params'])
 
@@ -391,6 +431,7 @@ def get_comic(sql, db = None):
         comic_data = { 'id':id, 'series':series, 'volume':volume, 'issue':issue, 'date':date, 'path': path, 'read':read, 'current_page':current_page, 'hash':hash, 'publisher':publisher, 'fore_id':fore_id, 'aft_id': aft_id, 'labels':labels, 'read_previous': read_previous, 'start_date':start_date, 'end_date':end_date, 'mod_date':mod_date }
 
     if (db is None):
+        #print("closing database")
         local_db.close()
 
     #if (comic_data is None):
@@ -1019,20 +1060,41 @@ def quit_series(series, db = None):
     if (db is None):
         local_db.close()
 
-def scan(comic):
-    db = connect()
-    cursor = db.cursor()
+def scan(comic, db = None, verbose = False):
+    if (verbose):
+        #print(f"scanning {comic.file}'")
+        pass
+    if (db is None):
+        #print("opening database for scan")
+        local_db = connect()
+    else:
+        local_db = db
 
-    folder_id = get_folder_id(comic, db = db)
+    cursor = local_db.cursor()
+
+    folder_id = get_folder_id(comic, db = local_db)
 
     #print(f"folder_id:{folder_id}")
 
-    comic_data = get_comic_by_series(comic.series(), comic.issue(), comic.date())
+    #print("getting comic data by series")
+    comic_data = get_comic_by_series(comic.series(), comic.issue(), comic.date(), db = local_db)
     if (comic_data is None):
-        comic_data = add_comic(comic, db = db)
+        if (verbose):
+            print(f"adding '{comic.file}'")
+        try:
+            comic_data = add_comic(comic, db = local_db)
+        except Exception as e:
+            if (db is None):
+                print("closing database")
+                local_db.close()
+            raise(e)
 
     if (comic_data is None):
+        if (db is None):
+            print("closing database, no comic_data")
+            local_db.close()
         raise Exception("couldn't add comic to database")
+
     #print(comic_data['id'])
 
     #try:
@@ -1043,7 +1105,9 @@ def scan(comic):
     #    count = cursor.execute('select count(*) from label, comic_label where label.id=comic_label.label_id and label.name = ?', (label,)).fetchone()[0]
     #    cursor.execute('insert into comic_label (label_id,comic_id, ordering) select label.id, ?, ? from label where label.name = ?', (comic_id, count+1, label))
 
-    db.close()
+    if (db is None):
+        print("closing database, done scan")
+        local_db.close()
 
 def set_labels(id, labels):
     local_db = connect()
