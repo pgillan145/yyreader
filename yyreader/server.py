@@ -13,25 +13,13 @@ import sqlite3
 import urllib.parse
 from . import comic, backend
 
-app = Flask(__name__, template_folder='templates')
-app.config.from_mapping(
-        #EXPLAIN_TEMPLATE_LOADING=True,
-        #SECRET_KEY='dev',
-        #DATABASE=config['default']['db'],
-    )
 comic_cache = {}
-comic_dir = '/'
-config = None
 publicKey, privateKey = rsa.newkeys(512)
 
+app = Flask(__name__, template_folder='templates')
+
 def main():
-    global comic_dir
-    global config
-
     config = minorimpact.config.getConfig(script_name = 'yyreader')
-
-    comic_dir = config['default']['comic_dir']
-    comic_dir = re.sub(r'/$', '', comic_dir)
 
     debug = False
     if ('debug' in config['server']):
@@ -40,6 +28,12 @@ def main():
             debug = True
 
     backend.init_db()
+
+    app.config.update(
+        #EXPLAIN_TEMPLATE_LOADING=True,
+        #SECRET_KEY='dev',
+        #DATABASE=config['default']['db'],
+    )
 
     app.run(port = config['server']['port'], host = '0.0.0.0', debug = debug)
 
@@ -51,6 +45,8 @@ def main():
 
 @app.before_request
 def before_request():
+    config = get_config()
+
     if ('allow_ip' in config['server'] and request.remote_addr != config['server']['allow_ip']):
         return ("Permission denied", 403)
 
@@ -88,6 +84,20 @@ def complementaryColor(my_hex):
     rgb = (my_hex[0:2], my_hex[2:4], my_hex[4:6])
     comp = ['%02X' % (255 - int(a, 16)) for a in rgb]
     return ''.join(comp)
+
+def get_comic_dir():
+    if ('comic_dir' not in g):
+        comic_dir = g.config['default']['comic_dir']
+        comic_dir = re.sub(r'/$', '', comic_dir)
+        g.comic_dir = comic_dir
+
+    return g.comic_dir
+
+def get_config():
+    if ('config' not in g):
+        g.config =  minorimpact.config.getConfig(script_name = 'yyreader')
+
+    return g.config
 
 def get_filter(filter = None):
     cookie_filter = request.cookies.get('filter')
@@ -155,6 +165,7 @@ def arclink(aft_id = None, fore_id = None):
     home = get_home_link()
     db = backend.connect()
     cursor = db.cursor()
+    comic_dir = get_comic_dir()
 
     if (aft_id is not None):
         if (fore_id is not None):
@@ -355,7 +366,7 @@ def filter():
         home = get_home_link()
         #dump(home)
         response = make_response(redirect(home['url']))
-        
+
         response.set_cookie('filter', pickled)
         return response
 
@@ -423,6 +434,7 @@ def label(id):
 
 @app.route('/login', methods = ['GET', 'POST'])
 def login():
+    config = get_config()
     response = Response(render_template('login.html'))
     if request.method == 'POST':
         if (request.form['password'] == config['server']['password']):
@@ -481,6 +493,8 @@ def quit(series):
 @app.route('/read/<int:id>/<int:page>/<int:zoom>/<int:section>')
 def read(id, page = None, zoom = 1, section = 1):
     linked = False
+    comic_dir = get_comic_dir()
+
     # TODO: Experiment with removing the cache.  Up to this point there's been very little need to optimize, and since I started
     #   reading the image data directly from the file without unpacking it first it could be argued that caching as whole is
     #   largely unecessary (I only started caching the 'comic.py' object in the first place so the temp directory didn't get obliterated
@@ -537,7 +551,6 @@ def read(id, page = None, zoom = 1, section = 1):
         if (re.search(r'^/dates/\d+/\d+#\d+\|', traversal_date) is None):
             traversal_date = traversal_date.split('|')[0] + '#{}'.format(id) + '|' + traversal_date.split('|')[1]
 
-    
     home = {'url':traversal_date.split('|')[0], 'text':traversal_date.split('|')[1]}
     if (traversal == 'current'):
         home = {'url':'/current', 'text':'Currently Reading'}
@@ -622,6 +635,9 @@ def read(id, page = None, zoom = 1, section = 1):
 @app.route('/page/<int:id>/<int:page>/<int:zoom>/<int:section>')
 def page(id, page, zoom = 1, section = 1):
     y = None
+    comic_dir = get_comic_dir()
+    config = get_config()
+
     #if (id in comic_cache):
     #    y = comic_cache[id]['yacreader']
     #    c = comic_cache[id]['comic']

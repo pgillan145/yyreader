@@ -1,6 +1,7 @@
 dumper
 flask
 fuzzywuzzy
+gunicorn
 minorimpact
 Pillow
 python-dateutil

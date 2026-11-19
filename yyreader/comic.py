@@ -671,7 +671,6 @@ class comic():
             page_file = re.sub('\]', '\\\]', page_file)
             command = [config['default']['unzip'], '-p', self.file, page_file]
             result = subprocess.run(command, capture_output = True)
-            print(f"page_file:'{page_file}'")
             tmp = BytesIO()
             tmp.write(result.stdout)
             #tmpfile = "/home/fafafauxhigh/test.webp"
