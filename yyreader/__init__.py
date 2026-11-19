@@ -69,7 +69,8 @@ def main():
             args.dir = c_file
             args.file = None
 
-    read_cache(config['default']['cache_file'], args = args)
+    if (args.clear_cache is None):
+        read_cache(config['default']['cache_file'], args = args)
     # 'verify' is essentially just running 'box' on everything that's in the target directory.  The main difference is that it will
     #    maintain a log of everything it's already verified so as not to have to run through again unless it's changed -- but under the hood
     #   they are both running the 'box' method, which renames, moves and updates the comicinfo.xml file based on informatin it pulls from
