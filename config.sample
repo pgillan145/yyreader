@@ -16,6 +16,10 @@ zip = /usr/bin/zip
 # Where the comics ultimately want to live
 comic_dir = /Volumes/Media/Comics
 
+
+# sqlite database file
+db = yyreader.ydb
+
 # Where to move files that already exist in comic_dir
 existing_dir = /tmp/existing
 
