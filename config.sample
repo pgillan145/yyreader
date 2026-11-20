@@ -36,14 +36,18 @@ api_key = XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 # listening port
 port = 8616
 
-# enable debugging mode on the flask server
+# enable debugging mode on the flask server, default: False
 debug = False
 
 # Set this value to require password access
 #password = 
 
-# If this value is set, requests from any other ip will return a 400 error
+# If this value is set, requests from any other ip not included in the comma separated list will return a 400 error
 #allow_ip =
+
+
+# Log server output to this file
+#log_file = 
 
 [reader]
 overlap_percent = 5

@@ -47,7 +47,7 @@ def main():
 def before_request():
     config = get_config()
 
-    if ('allow_ip' in config['server'] and request.remote_addr != config['server']['allow_ip']):
+    if ('allowed_ips' in g and request.remote_addr not in g.allowed_ips):
         return ("Permission denied", 403)
 
     authorized = request.cookies.get('authorized')
@@ -96,6 +96,9 @@ def get_comic_dir():
 def get_config():
     if ('config' not in g):
         g.config =  minorimpact.config.getConfig(script_name = 'yyreader')
+        g.allowed_ips = []
+        if ('allow_ip' in g.config['server']):
+             g.allowed_ips = g.config['server']['allow_ip'].split(',')
 
     return g.config
 
